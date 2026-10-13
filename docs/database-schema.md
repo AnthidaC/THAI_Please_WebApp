@@ -4,7 +4,27 @@
 
 ---
 
-## 1. ปรัชญาการตั้งชื่อ (Naming Conventions)
+## 1. การเชื่อมต่อ Supabase PostgreSQL
+
+ระบบถูกตั้งค่าให้รองรับ **Supabase** อย่างเป็นทางการด้วยสถาปัตยกรรม 2 พอร์ต (ตามมาตรฐาน Prisma + Supabase):
+
+- **`DATABASE_URL` (Transaction Pooler - Port 6543):**
+  สำหรับ Express Backend รันคิวรีทั่วไป รองรับ Concurrent requests สูง ป้องกัน Connection เต็ม
+- **`DIRECT_URL` (Direct Connection - Port 5432):**
+  สำหรับรันคำสั่ง `prisma migrate` ซึ่งต้องใช้ Direct Session ในการล็อกตารางสร้าง Schema
+
+```prisma
+// server/prisma/schema.prisma
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+```
+
+---
+
+## 2. ปรัชญาการตั้งชื่อ (Naming Conventions)
 - **Table Name (Model Mapping):** ใช้ `snake_case` รูปพหูพจน์ (Plural) เช่น `@@map("users")`, `@@map("orders")`
 - **Column Name (Field):** ใช้ `camelCase` ในโค้ด Prisma (Prisma จะ Map เป็น camelCase หรือ snake_case ตามกำหนด)
 - **Primary Key:** ใช้ `id String @id @default(uuid())` หรือ CUID เป็นค่าเริ่มต้น

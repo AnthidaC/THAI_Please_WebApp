@@ -8,6 +8,8 @@ A modern full-stack web application built with **React**, **Express**, **TypeScr
 
 ### 1. Frontend (`/client`)
 - **Core:** React 18 + TypeScript + Vite
+- **Design System:** Follows [Coinbase Design System](docs/coinbase.design.md) (Blue `#0052ff`, Pill 100px, Card 24px)
+- **Typography:** Google Font **Sarabun** (สำหรับภาษาไทย) & **JetBrains Mono** (สำหรับตัวเลขการเงิน)
 - **Styling:** Tailwind CSS
 - **Server State & Data Fetching:** TanStack (React) Query v5
 - **Client State Management:** Zustand

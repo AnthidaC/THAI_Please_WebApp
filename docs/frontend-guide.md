@@ -4,6 +4,17 @@
 
 ---
 
+## 0. กฎการออกแบบ UI (Coinbase Design System Compliance)
+
+ทีม Frontend ทุกคนต้องยึดถือมาตรฐานจาก [coinbase.design.md](./coinbase.design.md) เป็นหลัก:
+* **สีหลัก (Brand Voltage):** ใช้ `bg-brand-blue` (`#0052ff`) เป็นสี Action หลัก
+* **ปุ่มกด (Pill Shape):** ปุ่ม Primary CTA และ Badges ต้องใส่คลาส `rounded-pill` หรือ `rounded-full` เสมอ
+* **การ์ด (Card Layering):** การ์ดใช้ `rounded-card` (`24px`), พื้นหลังขาวหรือเทาอ่อน `bg-surface-soft`, เส้นขอบ `border border-hairline` (หลีกเลี่ยงเงาฟุ้งหนา)
+* **ฟอนต์ภาษาไทย:** เรนเดอร์ด้วย Google Font **`Sarabun`** เป็นค่าเริ่มต้นอัตโนมัติ โดยเว้นระยะบรรทัดขั้นต่ำ `leading-relaxed` / `leading-normal` (ห้ามใช้ `leading-tight` กับภาษาไทย)
+* **ตัวเลขการเงิน (Numeric Monospace):** ยอดเงินบาท, ตัวเลขสลิป และยอด Co-pay ให้ใส่คลาส `font-mono font-numeric` เสมอ
+
+---
+
 ## 1. Directory Structure Conventions
 
 | โฟลเดอร์ | วัตถุประสงค์ | กฎการตั้งชื่อ |
