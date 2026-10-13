@@ -1,36 +1,44 @@
 import { Request, Response, NextFunction } from 'express';
+import crypto from 'crypto';
 import { prisma } from '../utils/prisma';
-import { hashPassword, comparePassword } from '../utils/bcrypt';
 import { signToken } from '../utils/jwt';
 import { cache } from '../utils/redis';
 
+// Helper to hash citizen ID
+const hashCitizenId = (id: string): string => {
+  return crypto.createHash('sha256').update(id).digest('hex');
+};
+
+/**
+ * 2.1 ลงทะเบียนรับสิทธิ์โครงการ / ตรวจสอบสิทธิ์ (Citizen ThaiD Registration)
+ */
 export const register = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const { email, password, name } = req.body;
+    const { citizenId, fullName, provinceCode } = req.body;
+    const citizenIdHash = hashCitizenId(citizenId);
 
-    const existingUser = await prisma.user.findUnique({ where: { email } });
+    const existingUser = await prisma.user.findUnique({
+      where: { citizen_id_hash: citizenIdHash },
+    });
+
     if (existingUser) {
-      res.status(400).json({ status: 'error', message: 'Email already registered' });
+      res.status(400).json({
+        status: 'error',
+        message: 'เลขประจำตัวประชาชนนี้ลงทะเบียนรับสิทธิ์แล้ว',
+      });
       return;
     }
 
-    const hashedPassword = await hashPassword(password);
     const user = await prisma.user.create({
       data: {
-        email,
-        password: hashedPassword,
-        name,
-      },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        role: true,
-        createdAt: true,
+        citizen_id_hash: citizenIdHash,
+        full_name: fullName,
+        province_code: provinceCode,
+        is_registered_thai_plus: true,
       },
     });
 
-    const token = signToken({ userId: user.id, role: user.role });
+    const token = signToken({ userId: user.user_id, role: 'CITIZEN' });
 
     res.status(201).json({
       status: 'success',
@@ -41,33 +49,35 @@ export const register = async (req: Request, res: Response, next: NextFunction):
   }
 };
 
+/**
+ * 1.1 หน้าล็อกอินสำหรับประชาชน (ThaiD / NDID Login Simulation)
+ */
 export const login = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const { email, password } = req.body;
+    const { citizenId } = req.body;
+    const citizenIdHash = hashCitizenId(citizenId);
 
-    const user = await prisma.user.findUnique({ where: { email } });
+    const user = await prisma.user.findUnique({
+      where: { citizen_id_hash: citizenIdHash },
+      include: {
+        wallets: true,
+      },
+    });
+
     if (!user) {
-      res.status(401).json({ status: 'error', message: 'Invalid credentials' });
+      res.status(404).json({
+        status: 'error',
+        message: 'ไม่พบข้อมูลผู้ใช้งาน กรุณาลงทะเบียนตรวจสอบสิทธิ์ก่อน',
+      });
       return;
     }
 
-    const isMatch = await comparePassword(password, user.password);
-    if (!isMatch) {
-      res.status(401).json({ status: 'error', message: 'Invalid credentials' });
-      return;
-    }
-
-    const token = signToken({ userId: user.id, role: user.role });
+    const token = signToken({ userId: user.user_id, role: 'CITIZEN' });
 
     res.json({
       status: 'success',
       data: {
-        user: {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          role: user.role,
-        },
+        user,
         token,
       },
     });
@@ -76,6 +86,9 @@ export const login = async (req: Request, res: Response, next: NextFunction): Pr
   }
 };
 
+/**
+ * 2.5 ดึงข้อมูลโปรไฟล์ผู้ใช้ปัจจุบันพร้อมกระเป๋าเงิน (Citizen Me & Wallet)
+ */
 export const getMe = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const userId = req.user?.userId;
@@ -84,7 +97,7 @@ export const getMe = async (req: Request, res: Response, next: NextFunction): Pr
       return;
     }
 
-    // Try cache first (Upstash REST or Redis TCP)
+    // Try Redis cache first (Upstash REST or TCP Redis)
     const cacheKey = `user:${userId}`;
     const cachedUser = await cache.get(cacheKey);
     if (cachedUser) {
@@ -97,8 +110,13 @@ export const getMe = async (req: Request, res: Response, next: NextFunction): Pr
     }
 
     const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { id: true, email: true, name: true, role: true, createdAt: true },
+      where: { user_id: userId },
+      include: {
+        wallets: true,
+        user_badges: {
+          include: { badges: true },
+        },
+      },
     });
 
     if (!user) {
@@ -106,7 +124,7 @@ export const getMe = async (req: Request, res: Response, next: NextFunction): Pr
       return;
     }
 
-    // Cache user for 5 minutes (300s)
+    // Cache user profile for 5 minutes (300s)
     await cache.set(cacheKey, user, 300);
 
     res.json({

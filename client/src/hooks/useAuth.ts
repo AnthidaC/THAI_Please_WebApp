@@ -29,7 +29,7 @@ export const useRegister = () => {
 };
 
 export const useCurrentUser = () => {
-  const { isAuthenticated, setAuth } = useAuthStore();
+  const { isAuthenticated } = useAuthStore();
 
   return useQuery({
     queryKey: ['currentUser'],

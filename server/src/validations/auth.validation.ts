@@ -1,15 +1,14 @@
 import { z } from 'zod';
 
-export const registerSchema = z.object({
-  email: z.string().email('Invalid email address'),
-  password: z.string().min(6, 'Password must be at least 6 characters long'),
-  name: z.string().optional(),
+export const citizenAuthSchema = z.object({
+  citizenId: z.string().length(13, 'เลขบัตรประชาชนต้องมีความยาว 13 หลัก'),
+  fullName: z.string().min(2, 'ชื่อ-นามสกุลต้องมีความยาวอย่างน้อย 2 ตัวอักษร'),
+  provinceCode: z.string().min(1, 'กรุณาระบุรหัสจังหวัด'),
 });
 
-export const loginSchema = z.object({
-  email: z.string().email('Invalid email address'),
-  password: z.string().min(1, 'Password is required'),
+export const citizenLoginSchema = z.object({
+  citizenId: z.string().length(13, 'เลขบัตรประชาชนต้องมีความยาว 13 หลัก'),
 });
 
-export type RegisterInput = z.infer<typeof registerSchema>;
-export type LoginInput = z.infer<typeof loginSchema>;
+export type CitizenAuthInput = z.infer<typeof citizenAuthSchema>;
+export type CitizenLoginInput = z.infer<typeof citizenLoginSchema>;

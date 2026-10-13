@@ -8,19 +8,379 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
-enum Role {
-  USER
-  ADMIN
+model User {
+  user_id                                     String                      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  citizen_id_hash                             String                      @unique(map: "uq_users_citizen_id_hash") @db.VarChar(255)
+  full_name                                   String                      @db.VarChar(100)
+  province_code                               String                      @db.VarChar(10)
+  is_registered_thai_plus                     Boolean                     @default(false)
+  created_at                                  DateTime                    @default(now()) @db.Timestamptz(6)
+  recommendation_logs                         recommendation_logs[]
+  referrals_referrals_referred_user_idTousers referrals[]                 @relation("referrals_referred_user_idTousers")
+  referrals_referrals_referrer_user_idTousers referrals[]                 @relation("referrals_referrer_user_idTousers")
+  reviews                                     reviews[]
+  transactions                                transactions[]
+  user_badges                                 user_badges[]
+  user_category_preferences                   user_category_preferences[]
+  user_quests                                 user_quests[]
+  user_rewards                                user_rewards[]
+  wallets                                     wallets?
+
+  @@index([province_code], map: "idx_users_province_code")
+  @@map("users")
 }
 
-model User {
-  id        String    @id @default(uuid())
-  email     String    @unique
-  password  String
-  name      String?
-  role      Role      @default(USER)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model badges {
+  badge_id       String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  badge_name     String        @db.VarChar(100)
+  badge_level    String        @db.VarChar(20)
+  description    String?
+  condition_type String        @db.VarChar(50)
+  required_count Int
+  status         String        @default("active") @db.VarChar(20)
+  created_at     DateTime      @default(now()) @db.Timestamptz(6)
+  user_badges    user_badges[]
 
-  @@map("users")
+  @@unique([badge_level, condition_type], map: "uq_badges_level_condition")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model campaigns {
+  campaign_id                   String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  campaign_name                 String    @db.VarChar(150)
+  government_copay_rate_percent Decimal   @default(60) @db.Decimal(5, 2)
+  citizen_payment_rate_percent  Decimal   @default(40) @db.Decimal(5, 2)
+  daily_quota_limit             Decimal   @default(150) @db.Decimal(10, 2)
+  total_quota_limit             Decimal   @default(3000) @db.Decimal(12, 2)
+  start_date                    DateTime  @db.Timestamptz(6)
+  end_date                      DateTime  @db.Timestamptz(6)
+  status                        String    @default("ACTIVE") @db.VarChar(20)
+  created_at                    DateTime  @default(now()) @db.Timestamptz(6)
+  quests                        quests[]
+  wallets                       wallets[]
+
+  @@index([start_date, end_date], map: "idx_campaigns_date_range")
+  @@index([status], map: "idx_campaigns_status")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model daily_social_impact_metrics {
+  social_impact_metric_id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  metric_date                    DateTime @db.Date
+  province                       String?  @db.VarChar(100)
+  new_customers_count            Int      @default(0)
+  successful_referrals_count     Int      @default(0)
+  benefited_merchants_count      Int      @default(0)
+  recommendation_spending_amount Decimal  @default(0.00) @db.Decimal(15, 2)
+  referral_spending_amount       Decimal  @default(0.00) @db.Decimal(15, 2)
+  total_spending_amount          Decimal  @default(0.00) @db.Decimal(15, 2)
+  created_at                     DateTime @default(now()) @db.Timestamptz(6)
+  updated_at                     DateTime @default(now()) @db.Timestamptz(6)
+
+  @@unique([metric_date, province], map: "uq_daily_social_impact_metrics_date_province")
+  @@index([metric_date], map: "idx_daily_social_impact_metrics_date")
+  @@index([province], map: "idx_daily_social_impact_metrics_province")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model fraud_checks {
+  fraud_check_id       String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  transaction_id       String       @unique(map: "uq_fraud_checks_transaction") @db.Uuid
+  user_latitude        Decimal      @db.Decimal(10, 8)
+  user_longitude       Decimal      @db.Decimal(11, 8)
+  merchant_latitude    Decimal      @db.Decimal(10, 8)
+  merchant_longitude   Decimal      @db.Decimal(11, 8)
+  distance_meters      Decimal      @db.Decimal(10, 2)
+  is_distance_valid    Boolean      @default(true)
+  risk_score           Decimal      @default(0) @db.Decimal(5, 2)
+  fraud_reason         String?      @db.VarChar(255)
+  decision             String       @default("AUTO_APPROVED") @db.VarChar(20)
+  reviewed_by_admin_id String?      @db.Uuid
+  created_at           DateTime     @default(now()) @db.Timestamptz(6)
+  transactions         transactions @relation(fields: [transaction_id], references: [transaction_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_fraud_checks_transaction")
+
+  @@index([decision], map: "idx_fraud_checks_decision")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model merchants {
+  merchant_id          String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tax_id               String                @unique(map: "uq_merchants_tax_id") @db.VarChar(20)
+  shop_name            String                @db.VarChar(100)
+  latitude             Decimal               @db.Decimal(10, 8)
+  longitude            Decimal               @db.Decimal(11, 8)
+  average_rating_stars Decimal               @default(0.0) @db.Decimal(2, 1)
+  digital_credit_score Int                   @default(0)
+  is_approved          Boolean               @default(false)
+  approved_by_admin_id String?               @db.Uuid
+  created_at           DateTime              @default(now()) @db.Timestamptz(6)
+  recommendation_logs  recommendation_logs[]
+  referrals            referrals[]
+  reviews              reviews[]
+  transactions         transactions[]
+
+  @@index([latitude, longitude], map: "idx_merchants_location")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model quests {
+  quest_id     String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  campaign_id  String?        @db.Uuid
+  reward_id    String?        @db.Uuid
+  quest_name   String         @db.VarChar(150)
+  description  String?
+  quest_type   String         @db.VarChar(50)
+  target_value Decimal        @db.Decimal(12, 2)
+  starts_at    DateTime       @db.Timestamptz(6)
+  ends_at      DateTime       @db.Timestamptz(6)
+  status       String         @default("draft") @db.VarChar(20)
+  created_at   DateTime       @default(now()) @db.Timestamptz(6)
+  updated_at   DateTime       @default(now()) @db.Timestamptz(6)
+  campaigns    campaigns?     @relation(fields: [campaign_id], references: [campaign_id], onUpdate: NoAction, map: "fk_quests_campaign")
+  rewards      rewards?       @relation(fields: [reward_id], references: [reward_id], onUpdate: NoAction, map: "fk_quests_reward")
+  user_quests  user_quests[]
+  user_rewards user_rewards[]
+
+  @@index([campaign_id], map: "idx_quests_campaign")
+  @@index([starts_at, ends_at], map: "idx_quests_date_range")
+  @@index([reward_id], map: "idx_quests_reward")
+  @@index([status], map: "idx_quests_status")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model recommendation_logs {
+  recommendation_id       String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id                 String    @db.Uuid
+  merchant_id             String    @db.Uuid
+  user_latitude           Decimal   @db.Decimal(10, 8)
+  user_longitude          Decimal   @db.Decimal(11, 8)
+  recommendation_score    Decimal   @db.Decimal(6, 3)
+  is_clicked              Boolean   @default(false)
+  is_converted_to_payment Boolean   @default(false)
+  created_at              DateTime  @default(now()) @db.Timestamptz(6)
+  merchants               merchants @relation(fields: [merchant_id], references: [merchant_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_recommendation_logs_merchant")
+  users                   User      @relation(fields: [user_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_recommendation_logs_user")
+
+  @@index([is_clicked, is_converted_to_payment], map: "idx_recommendation_logs_conversion")
+  @@index([merchant_id], map: "idx_recommendation_logs_merchant")
+  @@index([user_id, created_at], map: "idx_recommendation_logs_user_created_at")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model referrals {
+  referral_id                             String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  referrer_user_id                        String         @db.Uuid
+  referred_user_id                        String?        @db.Uuid
+  merchant_id                             String?        @db.Uuid
+  transaction_id                          String?        @db.Uuid
+  referral_code                           String         @unique(map: "uq_referrals_referral_code") @db.VarChar(50)
+  discount_amount                         Decimal        @default(30.00) @db.Decimal(10, 2)
+  status                                  String         @default("pending") @db.VarChar(20)
+  expires_at                              DateTime?      @db.Timestamptz(6)
+  accepted_at                             DateTime?      @db.Timestamptz(6)
+  converted_at                            DateTime?      @db.Timestamptz(6)
+  created_at                              DateTime       @default(now()) @db.Timestamptz(6)
+  updated_at                              DateTime       @default(now()) @db.Timestamptz(6)
+  merchants                               merchants?     @relation(fields: [merchant_id], references: [merchant_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_referrals_merchant")
+  users_referrals_referred_user_idTousers User?          @relation("referrals_referred_user_idTousers", fields: [referred_user_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_referrals_referred")
+  users_referrals_referrer_user_idTousers User           @relation("referrals_referrer_user_idTousers", fields: [referrer_user_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_referrals_referrer")
+  transactions                            transactions?  @relation(fields: [transaction_id], references: [transaction_id], onUpdate: NoAction, map: "fk_referrals_transaction")
+  user_rewards                            user_rewards[]
+
+  @@index([expires_at], map: "idx_referrals_expires_at")
+  @@index([merchant_id], map: "idx_referrals_merchant")
+  @@index([referred_user_id], map: "idx_referrals_referred")
+  @@index([referrer_user_id], map: "idx_referrals_referrer")
+  @@index([status], map: "idx_referrals_status")
+  @@index([transaction_id], map: "idx_referrals_transaction")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model reviews {
+  review_id            String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  transaction_id       String       @unique(map: "uq_reviews_transaction") @db.Uuid
+  user_id              String       @db.Uuid
+  merchant_id          String       @db.Uuid
+  rating_stars         Int
+  review_text          String?
+  is_verified_purchase Boolean      @default(true)
+  created_at           DateTime     @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime     @default(now()) @db.Timestamptz(6)
+  merchants            merchants    @relation(fields: [merchant_id], references: [merchant_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_reviews_merchant")
+  transactions         transactions @relation(fields: [transaction_id], references: [transaction_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_reviews_transaction")
+  users                User         @relation(fields: [user_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_reviews_user")
+
+  @@index([merchant_id, created_at], map: "idx_reviews_merchant_created_at")
+  @@index([merchant_id, rating_stars], map: "idx_reviews_merchant_rating")
+  @@index([user_id], map: "idx_reviews_user")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model rewards {
+  reward_id      String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  reward_name    String         @db.VarChar(150)
+  description    String?
+  reward_type    String         @db.VarChar(20)
+  discount_type  String?        @db.VarChar(20)
+  discount_value Decimal?       @db.Decimal(10, 2)
+  valid_days     Int            @default(30)
+  status         String         @default("active") @db.VarChar(20)
+  created_at     DateTime       @default(now()) @db.Timestamptz(6)
+  updated_at     DateTime       @default(now()) @db.Timestamptz(6)
+  quests         quests[]
+  user_rewards   user_rewards[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model transactions {
+  transaction_id          String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  qr_reference            String?               @db.VarChar(64)
+  user_id                 String                @db.Uuid
+  merchant_id             String                @db.Uuid
+  total_amount            Decimal               @db.Decimal(10, 2)
+  government_copay_amount Decimal               @default(0) @db.Decimal(10, 2)
+  citizen_paid_amount     Decimal               @db.Decimal(10, 2)
+  status                  String                @default("PENDING") @db.VarChar(20)
+  created_at              DateTime              @default(now()) @db.Timestamptz(6)
+  completed_at            DateTime?             @db.Timestamptz(6)
+  fraud_checks            fraud_checks?
+  referrals               referrals[]
+  reviews                 reviews?
+  merchants               merchants             @relation(fields: [merchant_id], references: [merchant_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_transactions_merchant")
+  users                   User                  @relation(fields: [user_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_transactions_user")
+  user_rewards            user_rewards[]
+  wallet_transactions     wallet_transactions[]
+
+  @@index([merchant_id, created_at], map: "idx_transactions_merchant_created_at")
+  @@index([qr_reference], map: "idx_transactions_qr_reference")
+  @@index([status], map: "idx_transactions_status")
+  @@index([user_id, created_at], map: "idx_transactions_user_created_at")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model user_badges {
+  user_badge_id String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id       String   @db.Uuid
+  badge_id      String   @db.Uuid
+  earned_at     DateTime @default(now()) @db.Timestamptz(6)
+  badges        badges   @relation(fields: [badge_id], references: [badge_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_user_badges_badge")
+  users         User     @relation(fields: [user_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_user_badges_user")
+
+  @@unique([user_id, badge_id], map: "uq_user_badges_user_badge")
+  @@index([badge_id], map: "idx_user_badges_badge")
+  @@index([user_id], map: "idx_user_badges_user")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model user_category_preferences {
+  preference_id     String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id           String   @db.Uuid
+  category_id       String   @db.VarChar(50)
+  preference_weight Decimal  @default(1.00) @db.Decimal(3, 2)
+  created_at        DateTime @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime @default(now()) @db.Timestamptz(6)
+  users             User     @relation(fields: [user_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_user_category_preferences_user")
+
+  @@unique([user_id, category_id], map: "uq_user_category_preferences_user_category")
+  @@index([user_id], map: "idx_user_category_preferences_user")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model user_quests {
+  user_quest_id  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id        String    @db.Uuid
+  quest_id       String    @db.Uuid
+  progress_value Decimal   @default(0) @db.Decimal(12, 2)
+  status         String    @default("in_progress") @db.VarChar(20)
+  started_at     DateTime  @default(now()) @db.Timestamptz(6)
+  completed_at   DateTime? @db.Timestamptz(6)
+  created_at     DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at     DateTime  @default(now()) @db.Timestamptz(6)
+  quests         quests    @relation(fields: [quest_id], references: [quest_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_user_quests_quest")
+  users          User      @relation(fields: [user_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_user_quests_user")
+
+  @@unique([user_id, quest_id], map: "uq_user_quests_user_quest")
+  @@index([quest_id], map: "idx_user_quests_quest")
+  @@index([status], map: "idx_user_quests_status")
+  @@index([user_id], map: "idx_user_quests_user")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model user_rewards {
+  user_reward_id String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id        String        @db.Uuid
+  reward_id      String        @db.Uuid
+  quest_id       String?       @db.Uuid
+  referral_id    String?       @db.Uuid
+  transaction_id String?       @db.Uuid
+  reward_code    String        @unique(map: "uq_user_rewards_reward_code") @db.VarChar(50)
+  status         String        @default("available") @db.VarChar(20)
+  earned_at      DateTime      @default(now()) @db.Timestamptz(6)
+  expires_at     DateTime?     @db.Timestamptz(6)
+  used_at        DateTime?     @db.Timestamptz(6)
+  quests         quests?       @relation(fields: [quest_id], references: [quest_id], onUpdate: NoAction, map: "fk_user_rewards_quest")
+  referrals      referrals?    @relation(fields: [referral_id], references: [referral_id], onUpdate: NoAction, map: "fk_user_rewards_referral")
+  rewards        rewards       @relation(fields: [reward_id], references: [reward_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_user_rewards_reward")
+  transactions   transactions? @relation(fields: [transaction_id], references: [transaction_id], onUpdate: NoAction, map: "fk_user_rewards_transaction")
+  users          User          @relation(fields: [user_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_user_rewards_user")
+
+  @@index([quest_id], map: "idx_user_rewards_quest")
+  @@index([referral_id], map: "idx_user_rewards_referral")
+  @@index([reward_id], map: "idx_user_rewards_reward")
+  @@index([status], map: "idx_user_rewards_status")
+  @@index([transaction_id], map: "idx_user_rewards_transaction")
+  @@index([user_id], map: "idx_user_rewards_user")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model wallet_transactions {
+  wallet_transaction_id String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  wallet_id             String        @db.Uuid
+  transaction_id        String?       @db.Uuid
+  transaction_type      String        @db.VarChar(30)
+  amount                Decimal       @db.Decimal(12, 2)
+  payment_channel       String?       @db.VarChar(30)
+  reference_number      String?       @db.VarChar(100)
+  balance_after         Decimal       @db.Decimal(12, 2)
+  created_at            DateTime      @default(now()) @db.Timestamptz(6)
+  transactions          transactions? @relation(fields: [transaction_id], references: [transaction_id], onUpdate: NoAction, map: "fk_wallet_transactions_transaction")
+  wallets               wallets       @relation(fields: [wallet_id], references: [wallet_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_wallet_transactions_wallet")
+
+  @@index([reference_number], map: "idx_wallet_transactions_reference_number")
+  @@index([transaction_id], map: "idx_wallet_transactions_transaction")
+  @@index([wallet_id, created_at], map: "idx_wallet_transactions_wallet_created_at")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model wallets {
+  wallet_id             String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id               String                @unique(map: "uq_wallets_user") @db.Uuid
+  campaign_id           String?               @db.Uuid
+  balance               Decimal               @default(0) @db.Decimal(12, 2)
+  daily_quota_limit     Decimal               @default(150) @db.Decimal(10, 2)
+  daily_quota_used      Decimal               @default(0) @db.Decimal(10, 2)
+  last_quota_reset_date DateTime              @default(dbgenerated("CURRENT_DATE")) @db.Date
+  total_quota_remaining Decimal               @default(3000) @db.Decimal(12, 2)
+  eligibility_status    String                @db.VarChar(30)
+  status                String                @default("ACTIVE") @db.VarChar(20)
+  created_at            DateTime              @default(now()) @db.Timestamptz(6)
+  updated_at            DateTime              @default(now()) @db.Timestamptz(6)
+  wallet_transactions   wallet_transactions[]
+  campaigns             campaigns?            @relation(fields: [campaign_id], references: [campaign_id], onUpdate: NoAction, map: "fk_wallets_campaign")
+  users                 User                  @relation(fields: [user_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_wallets_user")
+
+  @@index([campaign_id], map: "idx_wallets_campaign")
+  @@index([status], map: "idx_wallets_status")
 }
