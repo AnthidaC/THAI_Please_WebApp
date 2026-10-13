@@ -31,6 +31,7 @@ A modern full-stack web application built with **React**, **Express**, **TypeScr
 
 ```text
 THAI_Please_WebApp/
+├── docs/                           # 📚 เอกสารมาตรฐานและคู่มือการพัฒนาทีม (Markdown)
 ├── docker-compose.yml              # Local PostgreSQL & Redis services
 ├── package.json                    # Root workspace script runner
 ├── README.md
