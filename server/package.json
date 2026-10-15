@@ -9,7 +9,8 @@
     "start": "node dist/server.js",
     "db:migrate": "npx prisma migrate dev",
     "db:generate": "npx prisma generate",
-    "db:studio": "npx prisma studio"
+    "db:studio": "npx prisma studio",
+    "test:engine": "tsx src/tests/payment-engine.test.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.4.1",
