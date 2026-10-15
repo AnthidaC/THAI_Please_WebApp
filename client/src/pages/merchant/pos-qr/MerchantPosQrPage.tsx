@@ -122,13 +122,298 @@ export const MerchantPosQrPage: React.FC = () => {
     }
   };
 
-  const handleDownloadQr = () => {
-    if (!canvasRef.current) return;
-    const url = canvasRef.current.toDataURL('image/png');
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `QR-${qrResult?.qrReference || 'payment'}.png`;
-    a.click();
+  const [isDownloading, setIsDownloading] = useState<boolean>(false);
+
+  /**
+   * ฟังก์ชันวาดกรอบมน (Rounded Rectangle) บน Canvas
+   */
+  const drawRoundedRect = (
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    r: number | { tl?: number; tr?: number; br?: number; bl?: number }
+  ) => {
+    const tl = typeof r === 'number' ? r : r.tl ?? 0;
+    const tr = typeof r === 'number' ? r : r.tr ?? 0;
+    const br = typeof r === 'number' ? r : r.br ?? 0;
+    const bl = typeof r === 'number' ? r : r.bl ?? 0;
+
+    ctx.beginPath();
+    ctx.moveTo(x + tl, y);
+    ctx.lineTo(x + w - tr, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + tr);
+    ctx.lineTo(x + w, y + h - br);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - br, y + h);
+    ctx.lineTo(x + bl, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - bl);
+    ctx.lineTo(x, y + tl);
+    ctx.quadraticCurveTo(x, y, x + tl, y);
+    ctx.closePath();
+  };
+
+  /**
+   * สร้างรูปภาพ QR Code พร้อมกรอบและรายละเอียดครบถ้วน เสมือนป้าย QR พร้อมเพย์ของธนาคาร
+   */
+  const generatePromptPayFramedImage = async (
+    qr: DynamicQrResponse,
+    shop: string,
+    total: number
+  ): Promise<string> => {
+    const canvas = document.createElement('canvas');
+    const w = 720;
+    const h = 1060;
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('Canvas context not available');
+
+    const citizenPay = qr.estimatedCitizenPay;
+    const govPay = qr.estimatedGovCopay;
+
+    // 1. วาดการ์ดสีขาวพื้นหลังพร้อมขอบมน (Card Outer Frame)
+    ctx.fillStyle = '#ffffff';
+    drawRoundedRect(ctx, 4, 4, w - 8, h - 8, 36);
+    ctx.fill();
+    ctx.strokeStyle = '#cbd5e1';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    // 2. วาดแบนเนอร์ส่วนหัวสีน้ำเงินเข้ม (Thai QR / PromptPay Royal Blue Header)
+    const headerGrad = ctx.createLinearGradient(0, 0, w, 155);
+    headerGrad.addColorStop(0, '#0f2b5c');
+    headerGrad.addColorStop(1, '#1a56db');
+
+    ctx.save();
+    ctx.fillStyle = headerGrad;
+    drawRoundedRect(ctx, 4, 4, w - 8, 155, { tl: 36, tr: 36, bl: 0, br: 0 });
+    ctx.fill();
+    ctx.restore();
+
+    // ป้ายแถบขาว "THAI QR PAYMENT"
+    ctx.fillStyle = '#ffffff';
+    drawRoundedRect(ctx, (w - 260) / 2, 24, 260, 36, 18);
+    ctx.fill();
+
+    ctx.fillStyle = '#0f2b5c';
+    ctx.font = 'bold 16px "Prompt", "Sarabun", -apple-system, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('THAI QR PAYMENT', w / 2, 42);
+
+    // หัวข้อแบนเนอร์โครงการ
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 20px "Prompt", "Sarabun", -apple-system, sans-serif';
+    ctx.fillText('ไทยช่วยไทยพลีส • โครงการ Co-pay 60/40', w / 2, 92);
+
+    ctx.fillStyle = '#bfdbfe';
+    ctx.font = '14px "Prompt", "Sarabun", -apple-system, sans-serif';
+    ctx.fillText('สแกน QR เพื่อชำระเงินร่วมกับสิทธิรัฐช่วยจ่าย', w / 2, 122);
+
+    // 3. ข้อมูลร้านค้า (Merchant Info)
+    ctx.fillStyle = '#64748b';
+    ctx.font = '14px "Prompt", "Sarabun", -apple-system, sans-serif';
+    ctx.fillText('ร้านค้าสมาชิกโครงการ', w / 2, 185);
+
+    ctx.fillStyle = '#0f172a';
+    ctx.font = 'bold 24px "Prompt", "Sarabun", -apple-system, sans-serif';
+    const displayShopName = shop.length > 32 ? shop.substring(0, 31) + '...' : shop;
+    ctx.fillText(displayShopName, w / 2, 218);
+
+    // 4. ยอดเงินรวมที่ต้องชำระ (Amount Section)
+    ctx.fillStyle = '#64748b';
+    ctx.font = '15px "Prompt", "Sarabun", -apple-system, sans-serif';
+    ctx.fillText('จำนวนเงินที่ต้องชำระ', w / 2, 260);
+
+    ctx.fillStyle = '#1a56db';
+    ctx.font = 'bold 44px "Prompt", "Sarabun", -apple-system, sans-serif';
+    ctx.fillText(`฿ ${total.toLocaleString('th-TH', { minimumFractionDigits: 2 })}`, w / 2, 305);
+
+    // แถบสรุปสัดส่วน Co-pay 60/40
+    const barW = 600;
+    const barX = (w - barW) / 2;
+    const barY = 328;
+    const barH = 44;
+
+    ctx.fillStyle = '#eff6ff';
+    drawRoundedRect(ctx, barX, barY, barW, barH, 14);
+    ctx.fill();
+    ctx.strokeStyle = '#bfdbfe';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    ctx.fillStyle = '#1e293b';
+    ctx.font = 'bold 15px "Prompt", "Sarabun", -apple-system, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(
+      `ลูกค้าจ่าย 40%: ฿${citizenPay.toFixed(2)}    |    รัฐช่วยจ่าย 60%: ฿${govPay.toFixed(2)}`,
+      w / 2,
+      barY + barH / 2
+    );
+
+    // 5. กล่องกรอบ QR Code ตรงกลาง (QR Container Box)
+    const qrBoxW = 380;
+    const qrBoxH = 380;
+    const qrBoxX = (w - qrBoxW) / 2;
+    const qrBoxY = 392;
+
+    ctx.fillStyle = '#ffffff';
+    drawRoundedRect(ctx, qrBoxX, qrBoxY, qrBoxW, qrBoxH, 24);
+    ctx.fill();
+    ctx.strokeStyle = '#e2e8f0';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // สร้างภาพ QR Code คุณภาพสูง
+    const qrDataUrl = await QRCode.toDataURL(qr.qrReference, {
+      width: 340,
+      margin: 1,
+      color: {
+        dark: '#0a0b0d',
+        light: '#ffffff',
+      },
+      errorCorrectionLevel: 'M',
+    });
+
+    const qrImg = new Image();
+    qrImg.src = qrDataUrl;
+    await new Promise<void>((resolve, reject) => {
+      qrImg.onload = () => resolve();
+      qrImg.onerror = reject;
+    });
+
+    const qrImgX = qrBoxX + (qrBoxW - 340) / 2;
+    const qrImgY = qrBoxY + (qrBoxH - 340) / 2;
+    ctx.drawImage(qrImg, qrImgX, qrImgY, 340, 340);
+
+    // โลโก้ PromptPay / Thai QR ตรงกลางของ QR Code (Center Badge)
+    const centerBadgeSize = 52;
+    const centerBadgeX = w / 2 - centerBadgeSize / 2;
+    const centerBadgeY = qrImgY + 340 / 2 - centerBadgeSize / 2;
+
+    ctx.fillStyle = '#ffffff';
+    drawRoundedRect(ctx, centerBadgeX, centerBadgeY, centerBadgeSize, centerBadgeSize, 12);
+    ctx.fill();
+    ctx.strokeStyle = '#1a56db';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.fillStyle = '#1a56db';
+    ctx.font = 'bold 15px "Prompt", "Sarabun", -apple-system, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('THAI', w / 2, centerBadgeY + 18);
+    ctx.font = 'bold 12px "Prompt", "Sarabun", -apple-system, sans-serif';
+    ctx.fillText('QR', w / 2, centerBadgeY + 34);
+
+    // 6. เส้นประคั่นส่วนรายละเอียด (Dashed Separator Line)
+    ctx.strokeStyle = '#cbd5e1';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([8, 6]);
+    ctx.beginPath();
+    ctx.moveTo(60, 796);
+    ctx.lineTo(w - 60, 796);
+    ctx.stroke();
+    ctx.setLineDash([]); // รีเซ็ตเส้นประ
+
+    // 7. หมายเลข Reference และเวลาสร้าง / เวลาหมดอายุ 3 นาที
+    ctx.fillStyle = '#334155';
+    ctx.font = 'bold 15px "Courier New", monospace, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(`Ref: ${qr.qrReference}`, w / 2, 826);
+
+    const createdAtDate = new Date(qr.createdAt);
+    const createdTimeStr = createdAtDate.toLocaleTimeString('th-TH', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
+    const createdDateStr = createdAtDate.toLocaleDateString('th-TH', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+
+    const expiresAtDate = new Date(qr.expiresAt);
+    const expiryTimeStr = expiresAtDate.toLocaleTimeString('th-TH', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+
+    ctx.fillStyle = '#64748b';
+    ctx.font = '13px "Prompt", "Sarabun", -apple-system, sans-serif';
+    ctx.fillText(`สร้างเมื่อ: ${createdDateStr} เวลา ${createdTimeStr} น.`, w / 2, 854);
+
+    // ป้ายเตือนอายุ QR 3 นาที
+    const pillW = 460;
+    const pillH = 34;
+    const pillX = (w - pillW) / 2;
+    const pillY = 874;
+
+    ctx.fillStyle = '#fef2f2';
+    drawRoundedRect(ctx, pillX, pillY, pillW, pillH, 17);
+    ctx.fill();
+    ctx.strokeStyle = '#fecaca';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    ctx.fillStyle = '#dc2626';
+    ctx.font = 'bold 13px "Prompt", "Sarabun", -apple-system, sans-serif';
+    ctx.fillText(`⏳ QR Code มีอายุ 3 นาที (หมดอายุเวลา ${expiryTimeStr} น.)`, w / 2, pillY + pillH / 2);
+
+    // 8. ส่วนท้ายการ์ด (Footer Banner)
+    const footerW = 600;
+    const footerX = (w - footerW) / 2;
+    const footerY = 932;
+    const footerH = 68;
+
+    ctx.fillStyle = '#f8fafc';
+    drawRoundedRect(ctx, footerX, footerY, footerW, footerH, 18);
+    ctx.fill();
+    ctx.strokeStyle = '#e2e8f0';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    ctx.fillStyle = '#334155';
+    ctx.font = 'bold 13px "Prompt", "Sarabun", -apple-system, sans-serif';
+    ctx.fillText('กรุณาสแกนจ่ายผ่านแอปไทยช่วยไทยพลีส เพื่อรับสิทธิรัฐช่วยจ่าย 60%', w / 2, footerY + 26);
+
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '12px "Prompt", "Sarabun", -apple-system, sans-serif';
+    ctx.fillText('ระบบความปลอดภัยระดับสถาบันการเงิน • ตรวจสอบพิกัด Geofence อัตโนมัติ', w / 2, footerY + 48);
+
+    return canvas.toDataURL('image/png');
+  };
+
+  const handleDownloadQr = async () => {
+    if (!qrResult) return;
+    setIsDownloading(true);
+    try {
+      const activeShopName = qrResult.shopName || currentShopName;
+      const cardDataUrl = await generatePromptPayFramedImage(
+        qrResult,
+        activeShopName,
+        qrResult.totalAmount
+      );
+      const a = document.createElement('a');
+      a.href = cardDataUrl;
+      const cleanShop = activeShopName.replace(/[^\u0E00-\u0E7Fa-zA-Z0-9]/g, '_');
+      a.download = `PromptPay-QR-${cleanShop}-${qrResult.totalAmount}THB.png`;
+      a.click();
+    } catch (err) {
+      console.error('Error generating PromptPay QR card:', err);
+      // Fallback กรณีมีข้อผิดพลาด ให้เซฟจาก canvas เดิม
+      if (canvasRef.current) {
+        const url = canvasRef.current.toDataURL('image/png');
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `QR-${qrResult.qrReference || 'payment'}.png`;
+        a.click();
+      }
+    } finally {
+      setIsDownloading(false);
+    }
   };
 
   const handleCopyRef = () => {
@@ -413,11 +698,23 @@ export const MerchantPosQrPage: React.FC = () => {
               {/* ปุ่มสร้างบิลใหม่ และบันทึกรูป */}
               <div className="mt-5 grid grid-cols-2 gap-3">
                 <button
+                  id="btn-download-qr"
+                  disabled={isDownloading}
                   onClick={handleDownloadQr}
-                  className="flex items-center justify-center space-x-1.5 rounded-pill border border-hairline bg-white py-3 text-xs font-semibold text-ink shadow-sm hover:bg-gray-50 transition active:scale-95"
+                  className="flex items-center justify-center space-x-1.5 rounded-pill border border-blue-200 bg-blue-50/70 py-3 text-xs font-semibold text-brand-blue shadow-sm hover:bg-blue-100 transition active:scale-95 disabled:opacity-50"
+                  title="บันทึกรูปป้าย QR พร้อมเพย์เต็มรูปแบบ"
                 >
-                  <Download className="h-4 w-4 text-brand-blue" />
-                  <span>บันทึกรูป QR</span>
+                  {isDownloading ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 animate-spin text-brand-blue" />
+                      <span>กำลังสร้างรูปป้าย...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Download className="h-4 w-4 text-brand-blue" />
+                      <span>บันทึกรูป QR พร้อมเพย์</span>
+                    </>
+                  )}
                 </button>
 
                 <button
