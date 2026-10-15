@@ -2,19 +2,9 @@ import axios from '../lib/axios';
 
 export interface MonthlyCycleInfo {
   currentMonthName: string;
-  currentPeriodIndex: number;
-  totalPeriods: number;
-  periodRangeLabel: string;
-  nextQuotaDate: string;
-  cumulativeToMonthLabel: string;
-  monthlyAllocationAmount: number;
-  periods: Array<{
-    periodNumber: number;
-    monthName: string;
-    amount: number;
-    status: 'ACTIVE' | 'UPCOMING' | 'COMPLETED';
-    badgeLabel: string;
-  }>;
+  nextQuotaDate?: string;
+  cumulativeToMonthLabel?: string;
+  monthlyAllocationAmount?: number;
 }
 
 export interface WalletData {

@@ -98,7 +98,7 @@ export const CitizenWalletPage: React.FC = () => {
 
         {/* Responsive Grid: Single column on Mobile, 2-Column on Desktop */}
         <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
-          {/* Left Column: Balances, Quota & 3-Month Milestones (md:col-span-7) */}
+          {/* Left Column: Balances & Quota (md:col-span-7) */}
           <div className="md:col-span-7 space-y-4">
             {/* 1. การ์ดยอดเงินส่วนตัว (Personal Wallet Balance) */}
             <section className="relative overflow-hidden rounded-card border border-hairline bg-white p-5 shadow-sm transition hover:shadow-md">
@@ -132,7 +132,7 @@ export const CitizenWalletPage: React.FC = () => {
               </div>
             </section>
 
-            {/* 2. การ์ดสิทธิรัฐสมทบ 60% (Co-pay 60% Quota Card & Monthly Milestone Tracker) */}
+            {/* 2. การ์ดสิทธิรัฐสมทบ 60% (Co-pay 60% Quota Card - แสดงเฉพาะงวดปัจจุบัน) */}
             <section className="rounded-card border border-blue-100 bg-gradient-to-br from-blue-50/80 to-white p-5 shadow-sm">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
@@ -140,16 +140,16 @@ export const CitizenWalletPage: React.FC = () => {
                   <h2 className="text-sm font-semibold text-ink">สิทธิรัฐช่วยจ่าย 60%</h2>
                 </div>
                 <div className="flex items-center space-x-1.5">
-                  <span className="inline-flex items-center rounded-pill bg-blue-100/70 px-2 py-0.5 text-[10px] font-semibold text-brand-blue border border-blue-200">
+                  <span className="inline-flex items-center rounded-pill bg-blue-100/70 px-2.5 py-0.5 text-xs font-semibold text-brand-blue border border-blue-200">
                     <Calendar className="mr-1 h-3 w-3" />
-                    รอบ {wallet?.monthlyCycle?.currentMonthName ?? 'ตุลาคม 2569'}
+                    งวดปัจจุบัน: {wallet?.monthlyCycle?.currentMonthName ?? 'ตุลาคม 2569'}
                   </span>
                 </div>
               </div>
 
               <div className="mt-4 grid grid-cols-2 gap-3">
-                <div className="rounded-2xl border border-hairline/60 bg-white p-3">
-                  <span className="text-[11px] text-ink-muted">โควตาวันนี้คงเหลือ</span>
+                <div className="rounded-2xl border border-hairline/60 bg-white p-3.5 shadow-2xs">
+                  <span className="text-[11px] font-medium text-ink-muted">โควตาวันนี้คงเหลือ</span>
                   <div className="mt-1 font-mono text-xl font-bold text-brand-blue">
                     ฿ {isWalletLoading ? '---' : (wallet?.dailyQuotaRemaining ?? 150).toFixed(2)}
                   </div>
@@ -158,90 +158,36 @@ export const CitizenWalletPage: React.FC = () => {
                   </span>
                 </div>
 
-                <div className="rounded-2xl border border-hairline/60 bg-white p-3">
+                <div className="rounded-2xl border border-hairline/60 bg-white p-3.5 shadow-2xs">
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] text-ink-muted">สิทธิสะสมรวมคงเหลือ</span>
-                    <span className="rounded-pill bg-emerald-50 px-1.5 py-0.2 text-[9px] font-bold text-emerald-700 border border-emerald-200">
-                      งวดที่ {wallet?.monthlyCycle?.currentPeriodIndex ?? 1}/{wallet?.monthlyCycle?.totalPeriods ?? 3}
+                    <span className="text-[11px] font-medium text-ink-muted">สิทธิสะสมรวมคงเหลือ</span>
+                    <span className="rounded-pill bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-200">
+                      รอบปัจจุบัน
                     </span>
                   </div>
                   <div className="mt-1 font-mono text-xl font-bold text-emerald-600">
                     ฿ {isWalletLoading ? '---' : (wallet?.totalQuotaRemaining ?? 3000).toLocaleString('th-TH', { minimumFractionDigits: 2 })}
                   </div>
-                  <div className="mt-1 space-y-0.5 border-t border-hairline/60 pt-1">
+                  <div className="mt-1.5 space-y-0.5 border-t border-hairline/60 pt-1.5">
                     <div className="text-[10px] text-ink flex items-center justify-between">
                       <span className="text-ink-muted">สะสมถึงงวด:</span>
                       <span className="font-semibold text-brand-blue">{wallet?.monthlyCycle?.currentMonthName ?? 'ตุลาคม 2569'}</span>
                     </div>
-                    <div className="text-[9px] text-ink-muted flex items-center justify-between">
-                      <span>เพิ่มรอบถัดไป:</span>
-                      <span className="font-mono text-ink font-medium">{wallet?.monthlyCycle?.nextQuotaDate ?? '1 พ.ย. 2569'}</span>
-                    </div>
+                    {wallet?.monthlyCycle?.nextQuotaDate && (
+                      <div className="text-[9px] text-ink-muted flex items-center justify-between">
+                        <span>เพิ่มรอบถัดไป:</span>
+                        <span className="font-mono text-ink font-medium">{wallet.monthlyCycle.nextQuotaDate}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
 
-              {/* รอบการจัดสรรสิทธิ์รายเดือน (Monthly Quota Milestone Tracker) */}
-              <div className="mt-3.5 pt-3 border-t border-hairline/70">
-                <div className="flex items-center justify-between text-xs text-ink-muted mb-1.5">
-                  <span className="flex items-center space-x-1.5 font-medium text-ink">
-                    <Calendar className="h-3.5 w-3.5 text-brand-blue" />
-                    <span>รอบการจัดสรรสิทธิ์รายเดือน (3 เดือน)</span>
-                  </span>
-                  <span className="text-[10px] text-brand-blue font-medium">
-                    {wallet?.monthlyCycle?.periodRangeLabel ?? 'ต.ค. - ธ.ค. 2569'}
-                  </span>
-                </div>
-
-                {/* 3 Steps monthly progress pills */}
-                <div className="grid grid-cols-3 gap-1.5 mt-2">
-                  {(wallet?.monthlyCycle?.periods ?? [
-                    { periodNumber: 1, monthName: 'ต.ค. 2569', amount: 1000, status: 'ACTIVE', badgeLabel: 'กำลังใช้สิทธิ์งวดนี้' },
-                    { periodNumber: 2, monthName: 'พ.ย. 2569', amount: 1000, status: 'UPCOMING', badgeLabel: 'เปิด 1 พ.ย.' },
-                    { periodNumber: 3, monthName: 'ธ.ค. 2569', amount: 1000, status: 'UPCOMING', badgeLabel: 'เปิด 1 ธ.ค.' },
-                  ]).map((p) => {
-                    const isActive = p.status === 'ACTIVE';
-                    const isCompleted = p.status === 'COMPLETED';
-                    return (
-                      <div
-                        key={p.periodNumber}
-                        className={`rounded-2xl border p-2 text-center transition ${
-                          isActive
-                            ? 'border-blue-400 bg-blue-50/80 shadow-sm ring-1 ring-blue-300'
-                            : isCompleted
-                            ? 'border-emerald-200 bg-emerald-50/50'
-                            : 'border-hairline bg-surface-soft/80 opacity-75'
-                        }`}
-                      >
-                        <div className="text-[9px] font-bold text-ink-muted">งวดที่ {p.periodNumber}</div>
-                        <div className="text-[10px] font-bold text-ink mt-0.5">{p.monthName}</div>
-                        <div className="font-mono text-xs font-bold text-ink mt-0.5">
-                          ฿{p.amount.toLocaleString()}
-                        </div>
-                        <div className="mt-1">
-                          <span
-                            className={`inline-block rounded-pill px-1.5 py-0.2 text-[8px] font-semibold ${
-                              isActive
-                                ? 'bg-brand-blue text-white'
-                                : isCompleted
-                                ? 'bg-emerald-100 text-emerald-800'
-                                : 'bg-gray-100 text-ink-muted'
-                            }`}
-                          >
-                            {p.badgeLabel}
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
               {/* แถบการใช้สิทธิรายวัน */}
-              <div className="mt-3.5">
+              <div className="mt-4 pt-3.5 border-t border-hairline/70">
                 <div className="flex justify-between text-xs text-ink-muted mb-1.5">
-                  <span>การใช้สิทธิวันนี้ (รีเซ็ตทุกวัน 06:00 น.)</span>
-                  <span className="font-mono">{dailyUsedPercent}%</span>
+                  <span className="font-medium text-ink">การใช้สิทธิวันนี้ (รีเซ็ตทุกวัน 06:00 น.)</span>
+                  <span className="font-mono font-semibold text-brand-blue">{dailyUsedPercent}%</span>
                 </div>
                 <div className="h-2 w-full rounded-full bg-gray-200 overflow-hidden">
                   <div
