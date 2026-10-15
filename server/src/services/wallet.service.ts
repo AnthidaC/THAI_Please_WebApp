@@ -1,5 +1,22 @@
 import prisma from '../utils/prisma';
 
+export interface MonthlyCycleInfo {
+  currentMonthName: string;
+  currentPeriodIndex: number;
+  totalPeriods: number;
+  periodRangeLabel: string;
+  nextQuotaDate: string;
+  cumulativeToMonthLabel: string;
+  monthlyAllocationAmount: number;
+  periods: Array<{
+    periodNumber: number;
+    monthName: string;
+    amount: number;
+    status: 'ACTIVE' | 'UPCOMING' | 'COMPLETED';
+    badgeLabel: string;
+  }>;
+}
+
 export interface WalletDetails {
   walletId: string;
   userId: string;
@@ -11,7 +28,70 @@ export interface WalletDetails {
   eligibilityStatus: string;
   status: string;
   lastQuotaResetDate: string;
+  monthlyCycle: MonthlyCycleInfo;
 }
+
+export const getMonthlyCycleDetails = (now = new Date()): MonthlyCycleInfo => {
+  const thaiMonths = [
+    'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
+    'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม',
+  ];
+  const thaiShortMonths = [
+    'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
+    'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.',
+  ];
+
+  const currentMonthIdx = now.getMonth();
+  const currentYearBuddhist = now.getFullYear() + 543;
+  const currentMonthName = `${thaiMonths[currentMonthIdx]} ${currentYearBuddhist}`;
+
+  // สมมุติโครงการเป็นรอบ 3 เดือน (เช่น ไตรมาส ต.ค. - ธ.ค. 2569)
+  const startQuarterMonth = Math.floor(currentMonthIdx / 3) * 3;
+  const currentPeriodIndex = (currentMonthIdx - startQuarterMonth) + 1;
+  const totalPeriods = 3;
+
+  const nextMonthIdx = (currentMonthIdx + 1) % 12;
+  const nextMonthYear = currentMonthIdx === 11 ? currentYearBuddhist + 1 : currentYearBuddhist;
+  const nextQuotaDate = `1 ${thaiShortMonths[nextMonthIdx]} ${nextMonthYear}`;
+
+  const startShort = thaiShortMonths[startQuarterMonth];
+  const endShort = thaiShortMonths[startQuarterMonth + 2];
+  const periodRangeLabel = `${startShort} - ${endShort} ${currentYearBuddhist}`;
+
+  const periods = [0, 1, 2].map((offset) => {
+    const mIdx = startQuarterMonth + offset;
+    const pNumber = offset + 1;
+    let status: 'ACTIVE' | 'UPCOMING' | 'COMPLETED' = 'UPCOMING';
+    let badgeLabel = `เปิด 1 ${thaiShortMonths[mIdx]}`;
+
+    if (pNumber < currentPeriodIndex) {
+      status = 'COMPLETED';
+      badgeLabel = 'ได้รับสิทธิ์แล้ว';
+    } else if (pNumber === currentPeriodIndex) {
+      status = 'ACTIVE';
+      badgeLabel = 'กำลังใช้สิทธิ์งวดนี้';
+    }
+
+    return {
+      periodNumber: pNumber,
+      monthName: `${thaiShortMonths[mIdx]} ${currentYearBuddhist}`,
+      amount: 1000.0,
+      status,
+      badgeLabel,
+    };
+  });
+
+  return {
+    currentMonthName,
+    currentPeriodIndex,
+    totalPeriods,
+    periodRangeLabel,
+    nextQuotaDate,
+    cumulativeToMonthLabel: `สะสมถึงเดือน${thaiMonths[currentMonthIdx]} ${currentYearBuddhist}`,
+    monthlyAllocationAmount: 1000.0,
+    periods,
+  };
+};
 
 export class WalletService {
   /**
@@ -67,6 +147,7 @@ export class WalletService {
       eligibilityStatus: wallet.eligibility_status,
       status: wallet.status,
       lastQuotaResetDate: wallet.last_quota_reset_date.toISOString(),
+      monthlyCycle: getMonthlyCycleDetails(),
     };
   }
 

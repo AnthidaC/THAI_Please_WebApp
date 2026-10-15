@@ -1,5 +1,22 @@
 import axios from '../lib/axios';
 
+export interface MonthlyCycleInfo {
+  currentMonthName: string;
+  currentPeriodIndex: number;
+  totalPeriods: number;
+  periodRangeLabel: string;
+  nextQuotaDate: string;
+  cumulativeToMonthLabel: string;
+  monthlyAllocationAmount: number;
+  periods: Array<{
+    periodNumber: number;
+    monthName: string;
+    amount: number;
+    status: 'ACTIVE' | 'UPCOMING' | 'COMPLETED';
+    badgeLabel: string;
+  }>;
+}
+
 export interface WalletData {
   walletId: string;
   userId: string;
@@ -11,6 +28,7 @@ export interface WalletData {
   eligibilityStatus: string;
   status: string;
   lastQuotaResetDate: string;
+  monthlyCycle?: MonthlyCycleInfo;
 }
 
 export interface DynamicQrResponse {
