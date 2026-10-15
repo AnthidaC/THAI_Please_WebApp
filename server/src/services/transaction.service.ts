@@ -115,12 +115,14 @@ export class TransactionService {
       return {
         transactionId: tx.transaction_id,
         qrReference: tx.qr_reference,
-        customerName: tx.users.full_name,
+        customerName: tx.users ? tx.users.full_name : 'ผู้ใช้งานในระบบ',
         totalAmount: total,
         governmentCopayAmount: gov,
         citizenPaidAmount: cit,
         status: tx.status,
         createdAt: tx.created_at.toISOString(),
+        fraudReason: tx.fraud_checks?.fraud_reason || null,
+        distanceMeters: tx.fraud_checks ? Number(tx.fraud_checks.distance_meters) : null,
       };
     });
 

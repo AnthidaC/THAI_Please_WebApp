@@ -43,6 +43,7 @@ export interface DynamicQrData {
   expiresAt: string;
   estimatedGovCopay: number;
   estimatedCitizenPay: number;
+  status?: 'ACTIVE' | 'USED' | 'SUSPENDED' | 'EXPIRED' | 'REJECTED';
 }
 
 // In-memory cache สำหรับเก็บ Dynamic QR ชั่วคราว (มีอายุ 15 นาที) ควบคู่กับฐานข้อมูล
@@ -296,6 +297,7 @@ export class PaymentService {
       expiresAt: expiresAt.toISOString(),
       estimatedGovCopay: tentativeGov,
       estimatedCitizenPay: tentativeCit,
+      status: 'ACTIVE',
     };
 
     qrStore.set(qrReference, qrData);
@@ -332,10 +334,20 @@ export class PaymentService {
           expiresAt: new Date(tx.created_at.getTime() + 15 * 60 * 1000).toISOString(),
           estimatedGovCopay: Number(tx.government_copay_amount),
           estimatedCitizenPay: Number(tx.citizen_paid_amount),
+          status: tx.status as any,
         };
       } else {
         throw new Error('ไม่พบข้อมูล QR Code นี้ หรือ QR Code อาจหมดอายุหรือถูกยกเลิกแล้ว');
       }
+    }
+
+    // ตรวจสอบสถานะของ QR Code (ไม่ลบข้อมูลออกจากระบบ แค่ตรวจสอบสถานะ)
+    if (qrData.status === 'REJECTED' || qrData.status === 'SUSPENDED') {
+      throw new Error('ไม่พบข้อมูล QR Code นี้ หรือ QR Code อาจหมดอายุหรือถูกยกเลิกแล้ว');
+    }
+
+    if (qrData.status === 'USED') {
+      throw new Error('QR Code นี้ถูกใช้งานชำระเงินเรียบร้อยแล้ว ไม่สามารถชำระซ้ำได้');
     }
 
     // ตรวจสอบพิกัดระยะทางตั้งแต่ขั้นตอนสแกน QR
@@ -349,8 +361,9 @@ export class PaymentService {
 
       // ถ้าระยะห่างเกิน 1,000 เมตร (อยู่นอกพื้นที่หน้าร้าน)
       if (distanceMeters > 1000) {
-        // 1. ระงับและลบ QR Code ทันที ไม่ให้สามารถใช้ต่อได้
-        qrStore.delete(qrReference);
+        // 1. ระงับ QR Code โดยปรับสถานะเป็น REJECTED (ไม่ลบข้อมูลออกจากระบบหรือ DB เพื่อเก็บประวัติไว้ตรวจสอบ)
+        qrData.status = 'REJECTED';
+        qrStore.set(qrReference, qrData);
 
         // 2. จด log เก็บไว้เงียบๆ ในฐานข้อมูล เพื่อให้ Admin ตรวจสอบภายหลัง
         try {
@@ -509,10 +522,11 @@ export class PaymentService {
     });
 
     if (fraudAssessment.decision === 'REJECTED' || fraudAssessment.distanceMeters > 1000) {
-      // ระงับและลบ QR Code ทันที
-      qrStore.delete(params.qrReference);
+      // ระงับ QR Code โดยปรับสถานะเป็น REJECTED (ไม่ลบข้อมูลออกจากระบบ เพื่อให้ติดตามและตรวจสอบได้)
+      qrData.status = 'REJECTED';
+      qrStore.set(params.qrReference, qrData);
 
-      // จด log เก็บไว้เงียบๆ สำหรับ Admin ตรวจสอบภายหลัง
+      // บันทึกธุรกรรมสถานะ REJECTED ลงฐานข้อมูล DB (ไม่ลบออกจาก DB) เพื่อให้ติดตามและตรวจสอบได้
       try {
         const rejectedTx = await prisma.transactions.create({
           data: {
@@ -640,7 +654,9 @@ export class PaymentService {
       return newTx;
     });
 
-    qrStore.delete(params.qrReference);
+    // ปรับสถานะ QR Code เป็น USED เมื่อทำรายการสำเร็จ ไม่ลบออกจากระบบ เพื่อเก็บประวัติไว้ตรวจสอบ
+    qrData.status = 'USED';
+    qrStore.set(params.qrReference, qrData);
 
     return {
       transactionId: transactionRecord.transaction_id,

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   TrendingUp,
@@ -7,13 +7,33 @@ import {
   RefreshCw,
   Star,
   MapPin,
+  Search,
+  AlertTriangle,
+  CheckCircle2,
+  XCircle,
 } from 'lucide-react';
 import { getMerchantHistory } from '../../../services/paymentApi';
 
 export const MerchantSalesHistoryPage: React.FC = () => {
+  const [filterStatus, setFilterStatus] = useState<'ALL' | 'SUCCESS' | 'FLAGGED' | 'REJECTED'>('ALL');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['merchant-sales'],
     queryFn: () => getMerchantHistory(),
+  });
+
+  const filteredTransactions = (data?.transactions || []).filter((tx) => {
+    if (filterStatus !== 'ALL' && tx.status !== filterStatus) return false;
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      return (
+        tx.qrReference.toLowerCase().includes(q) ||
+        tx.customerName.toLowerCase().includes(q) ||
+        (tx.fraudReason && tx.fraudReason.toLowerCase().includes(q))
+      );
+    }
+    return true;
   });
 
   return (
@@ -27,7 +47,7 @@ export const MerchantSalesHistoryPage: React.FC = () => {
               <h1 className="text-xl font-bold text-ink">สถิติยอดขายและประวัติการรับเงินร้านค้า</h1>
             </div>
             <p className="text-xs text-ink-muted mt-1">
-              สรุปรายได้จากโครงการไทยช่วยไทยพลีส สัดส่วน Co-pay 60/40
+              สรุปรายได้และประวัติธุรกรรมทั้งหมด (รวมรายการที่สำเร็จ, รอตรวจสอบ, และถูกระงับเพื่อการตรวจสอบย้อนหลัง)
             </p>
           </div>
           <button
@@ -69,7 +89,7 @@ export const MerchantSalesHistoryPage: React.FC = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           {/* Card 1: ยอดขายรวม */}
           <div className="rounded-card border border-hairline bg-white p-5 shadow-sm">
-            <span className="text-xs text-ink-muted font-medium">ยอดขายรวมทั้งหมด</span>
+            <span className="text-xs text-ink-muted font-medium">ยอดขายสำเร็จรวมทั้งหมด</span>
             <div className="mt-2 font-mono text-2xl font-bold text-ink">
               ฿ {isLoading ? '---' : (data?.summary.totalRevenue ?? 0).toLocaleString('th-TH', { minimumFractionDigits: 2 })}
             </div>
@@ -115,15 +135,58 @@ export const MerchantSalesHistoryPage: React.FC = () => {
           </div>
         </div>
 
-        {/* ตารางรายการบิลที่ลูกค้าสแกนจ่าย */}
-        <div className="rounded-card border border-hairline bg-white p-6 shadow-sm">
-          <h3 className="text-sm font-semibold text-ink mb-4">รายการบิลขายล่าสุด</h3>
+        {/* ตารางรายการประวัติธุรกรรมทั้งหมดของร้านค้า */}
+        <div className="rounded-card border border-hairline bg-white p-5 md:p-6 shadow-sm space-y-4">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-bold text-ink">ประวัติการทำธุรกรรมร้านค้า (Audit Trail)</h3>
+              <p className="text-xs text-ink-muted">
+                เก็บบันทึกประวัติทุกสถานะในระบบ (ไม่ลบออกจากฐานข้อมูล เพื่อความโปร่งใสและตรวจสอบย้อนหลัง)
+              </p>
+            </div>
+
+            {/* ช่องค้นหา */}
+            <div className="relative w-full md:w-64">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-ink-muted" />
+              <input
+                type="text"
+                placeholder="ค้นหารหัส QR หรือลูกค้า..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full rounded-pill border border-hairline pl-8 pr-3 py-1.5 text-xs text-ink focus:border-brand-blue focus:outline-none"
+              />
+            </div>
+          </div>
+
+          {/* ตัวกรองสถานะธุรกรรม */}
+          <div className="flex flex-wrap gap-1.5 text-xs">
+            {(
+              [
+                { key: 'ALL', label: 'ทั้งหมด' },
+                { key: 'SUCCESS', label: 'สำเร็จ (SUCCESS)' },
+                { key: 'FLAGGED', label: 'รอตรวจสอบพิกัด (FLAGGED)' },
+                { key: 'REJECTED', label: 'ถูกระงับ/นอกพิกัด (REJECTED)' },
+              ] as const
+            ).map((tab) => (
+              <button
+                key={tab.key}
+                onClick={() => setFilterStatus(tab.key)}
+                className={`rounded-pill px-3.5 py-1 font-medium transition ${
+                  filterStatus === tab.key
+                    ? 'bg-brand-blue text-white shadow-sm'
+                    : 'bg-surface-soft border border-hairline text-ink-muted hover:text-ink'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
 
           {isLoading ? (
             <div className="py-8 text-center text-xs text-ink-muted">กำลังโหลดรายการบิล...</div>
-          ) : !data || data.transactions.length === 0 ? (
+          ) : filteredTransactions.length === 0 ? (
             <div className="py-10 text-center text-xs text-ink-muted">
-              ยังไม่มีประวัติการรับชำระเงิน
+              ไม่พบรายการธุรกรรมตามเงื่อนไขที่เลือก
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -136,46 +199,78 @@ export const MerchantSalesHistoryPage: React.FC = () => {
                     <th className="pb-3 font-medium text-right">ยอดรวม (100%)</th>
                     <th className="pb-3 font-medium text-right">รัฐสมทบ (60%)</th>
                     <th className="pb-3 font-medium text-right">ลูกค้าจ่าย (40%)</th>
-                    <th className="pb-3 font-medium text-center">สถานะ</th>
+                    <th className="pb-3 font-medium text-center">สถานะธุรกรรม</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-hairline">
-                  {data.transactions.map((tx) => (
-                    <tr key={tx.transactionId} className="hover:bg-surface-soft/60 transition">
-                      <td className="py-3 font-mono text-[11px] text-ink-muted">
-                        {new Date(tx.createdAt).toLocaleString('th-TH', {
-                          day: 'numeric',
-                          month: 'short',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                      </td>
-                      <td className="py-3 font-mono text-[11px] text-ink font-semibold">
-                        {tx.qrReference}
-                      </td>
-                      <td className="py-3 font-medium text-ink">{tx.customerName}</td>
-                      <td className="py-3 text-right font-mono font-bold text-ink">
-                        ฿{tx.totalAmount.toFixed(2)}
-                      </td>
-                      <td className="py-3 text-right font-mono font-semibold text-brand-blue">
-                        ฿{tx.governmentCopayAmount.toFixed(2)}
-                      </td>
-                      <td className="py-3 text-right font-mono font-semibold text-status-success">
-                        ฿{tx.citizenPaidAmount.toFixed(2)}
-                      </td>
-                      <td className="py-3 text-center">
-                        <span
-                          className={`rounded-pill px-2.5 py-0.5 text-[10px] font-medium border ${
-                            tx.status === 'SUCCESS'
-                              ? 'bg-emerald-50 text-status-success border-emerald-200'
-                              : 'bg-amber-50 text-status-warning border-amber-200'
-                          }`}
-                        >
-                          {tx.status === 'SUCCESS' ? 'สำเร็จ' : 'รอตรวจสอบ'}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
+                  {filteredTransactions.map((tx) => {
+                    const isSuccess = tx.status === 'SUCCESS';
+                    const isFlagged = tx.status === 'FLAGGED';
+                    const isRejected = tx.status === 'REJECTED';
+
+                    return (
+                      <tr key={tx.transactionId} className="hover:bg-surface-soft/60 transition">
+                        <td className="py-3 font-mono text-[11px] text-ink-muted">
+                          {new Date(tx.createdAt).toLocaleString('th-TH', {
+                            day: 'numeric',
+                            month: 'short',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </td>
+                        <td className="py-3 font-mono text-[11px] text-ink font-semibold">
+                          <span>{tx.qrReference}</span>
+                          {tx.fraudReason && (
+                            <span className="block text-[10px] text-status-error font-sans font-normal mt-0.5">
+                              {tx.fraudReason}
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-3 font-medium text-ink">{tx.customerName}</td>
+                        <td className="py-3 text-right font-mono font-bold text-ink">
+                          ฿{tx.totalAmount.toFixed(2)}
+                        </td>
+                        <td className="py-3 text-right font-mono font-semibold text-brand-blue">
+                          ฿{tx.governmentCopayAmount.toFixed(2)}
+                        </td>
+                        <td className="py-3 text-right font-mono font-semibold text-status-success">
+                          ฿{tx.citizenPaidAmount.toFixed(2)}
+                        </td>
+                        <td className="py-3 text-center">
+                          <span
+                            className={`inline-flex items-center space-x-1 rounded-pill px-2.5 py-0.5 text-[10px] font-semibold border ${
+                              isSuccess
+                                ? 'bg-emerald-50 text-status-success border-emerald-200'
+                                : isFlagged
+                                ? 'bg-amber-50 text-status-warning border-amber-200'
+                                : isRejected
+                                ? 'bg-red-50 text-status-error border-red-200'
+                                : 'bg-gray-100 text-ink-muted border-gray-200'
+                            }`}
+                          >
+                            {isSuccess ? (
+                              <>
+                                <CheckCircle2 className="h-3 w-3" />
+                                <span>สำเร็จ</span>
+                              </>
+                            ) : isFlagged ? (
+                              <>
+                                <AlertTriangle className="h-3 w-3" />
+                                <span>รอตรวจสอบ</span>
+                              </>
+                            ) : isRejected ? (
+                              <>
+                                <XCircle className="h-3 w-3" />
+                                <span>ถูกระงับ/นอกพิกัด</span>
+                              </>
+                            ) : (
+                              <span>{tx.status}</span>
+                            )}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
