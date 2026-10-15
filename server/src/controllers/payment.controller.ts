@@ -24,11 +24,30 @@ export const getQrDetails = async (req: Request, res: Response): Promise<void> =
   try {
     const reference = Array.isArray(req.params.reference) ? req.params.reference[0] : req.params.reference;
     const userId = req.user?.userId;
+    const discountCode = req.query.discountCode as string | undefined;
 
-    const details = await paymentService.getQrDetails(reference, userId);
+    const details = await paymentService.getQrDetails(reference, userId, discountCode);
     sendSuccess(res, details, 'ดึงข้อมูล QR Code สำเร็จ');
   } catch (error: any) {
     sendError(res, error.message || 'ไม่พบข้อมูล QR Code', 404);
+  }
+};
+
+export const validateDiscount = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { code, merchantId, totalAmount } = req.body;
+    const userId = req.user?.userId;
+
+    const result = await paymentService.validateDiscountCode({
+      code,
+      userId,
+      merchantId,
+      totalAmount: Number(totalAmount),
+    });
+
+    sendSuccess(res, result, 'ตรวจสอบรหัสส่วนลดสำเร็จ');
+  } catch (error: any) {
+    sendError(res, error.message || 'รหัสคูปองหรือโค้ดคำชวนของเพื่อนไม่ถูกต้อง', 400);
   }
 };
 
@@ -40,7 +59,7 @@ export const checkoutCopay = async (req: Request, res: Response): Promise<void> 
       return;
     }
 
-    const { qrReference, userLatitude, userLongitude, merchantId } = req.body;
+    const { qrReference, userLatitude, userLongitude, merchantId, discountCode } = req.body;
 
     const result = await paymentService.checkout({
       userId,
@@ -48,6 +67,7 @@ export const checkoutCopay = async (req: Request, res: Response): Promise<void> 
       userLatitude: Number(userLatitude),
       userLongitude: Number(userLongitude),
       merchantId,
+      discountCode,
     });
 
     sendSuccess(res, result, 'ชำระเงินร่วม (Co-pay 60/40) สำเร็จ');

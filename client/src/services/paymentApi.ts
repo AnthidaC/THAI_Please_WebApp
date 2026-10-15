@@ -26,18 +26,37 @@ export interface DynamicQrResponse {
   estimatedCitizenPay: number;
 }
 
+export interface DiscountValidationResult {
+  code: string;
+  isValid: boolean;
+  discountAmount: number;
+  discountType: 'FIXED' | 'PERCENT';
+  discountSource: 'FRIEND_REFERRAL' | 'COUPON' | 'DEMO_PROMO';
+  sourceDescription: string;
+  referrerName?: string;
+  referralId?: string;
+  userRewardId?: string;
+}
+
 export interface CopayPreviewData {
   qrData: DynamicQrResponse;
   walletInfo?: WalletData;
   copaySplit?: {
+    originalTotalAmount?: number;
+    discountAmount?: number;
+    discountCode?: string;
+    discountDescription?: string;
+    netTotalAmount?: number;
     totalAmount: number;
     governmentCopayAmount: number;
     citizenPaidAmount: number;
     governmentPercentage: number;
     citizenPercentage: number;
+    totalSavingsAmount?: number;
     dailyQuotaRemainingBefore: number;
     dailyQuotaRemainingAfter: number;
   };
+  discountInfo?: DiscountValidationResult | null;
 }
 
 export interface CheckoutResult {
@@ -45,9 +64,15 @@ export interface CheckoutResult {
   qrReference: string;
   shopName: string;
   status: 'SUCCESS' | 'FLAGGED' | 'REJECTED';
+  originalTotalAmount?: number;
+  discountAmount?: number;
+  discountCode?: string;
+  discountDescription?: string;
+  netTotalAmount?: number;
   totalAmount: number;
   governmentCopayAmount: number;
   citizenPaidAmount: number;
+  totalSavingsAmount?: number;
   completedAt: string;
   distanceMeters: number;
   riskScore: number;
@@ -127,9 +152,15 @@ export interface SlipData {
   customerName: string;
   shopName: string;
   merchantTaxId: string;
+  originalTotalAmount?: number;
+  discountAmount?: number;
+  discountCode?: string | null;
+  discountDescription?: string | null;
+  netTotalAmount?: number;
   totalAmount: number;
   governmentCopayAmount: number;
   citizenPaidAmount: number;
+  totalSavingsAmount?: number;
   copayRatio: string;
   status: string;
   timestamp: string;
@@ -165,8 +196,19 @@ export const generateDynamicQr = async (payload: {
   return res.data.data;
 };
 
-export const getQrDetails = async (reference: string): Promise<CopayPreviewData> => {
-  const res = await axios.get(`/payment/qr/${reference}`);
+export const getQrDetails = async (reference: string, discountCode?: string): Promise<CopayPreviewData> => {
+  const res = await axios.get(`/payment/qr/${reference}`, {
+    params: discountCode ? { discountCode } : {},
+  });
+  return res.data.data;
+};
+
+export const validateDiscountCode = async (params: {
+  code: string;
+  totalAmount: number;
+  merchantId?: string;
+}): Promise<DiscountValidationResult> => {
+  const res = await axios.post('/payment/discount/validate', params);
   return res.data.data;
 };
 
@@ -176,6 +218,7 @@ export const checkoutCopay = async (payload: {
   userLongitude: number;
   merchantId?: string;
   pin?: string;
+  discountCode?: string;
 }): Promise<CheckoutResult> => {
   const res = await axios.post('/payment/qr/checkout', payload);
   return res.data.data;

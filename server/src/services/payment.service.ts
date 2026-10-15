@@ -2,12 +2,30 @@ import prisma from '../utils/prisma';
 import { walletService } from './wallet.service';
 import { fraudService } from './fraud.service';
 
+export interface DiscountValidationResult {
+  code: string;
+  isValid: boolean;
+  discountAmount: number;
+  discountType: 'FIXED' | 'PERCENT';
+  discountSource: 'FRIEND_REFERRAL' | 'COUPON' | 'DEMO_PROMO';
+  sourceDescription: string;
+  referrerName?: string;
+  referralId?: string;
+  userRewardId?: string;
+}
+
 export interface CopayCalculationResult {
-  totalAmount: number;
+  originalTotalAmount: number;
+  discountAmount: number;
+  discountCode?: string;
+  discountDescription?: string;
+  netTotalAmount: number;
+  totalAmount: number; // compatible with netTotalAmount
   governmentCopayAmount: number;
   citizenPaidAmount: number;
   governmentPercentage: number;
   citizenPercentage: number;
+  totalSavingsAmount: number;
   dailyQuotaRemainingBefore: number;
   dailyQuotaRemainingAfter: number;
   totalQuotaRemainingBefore: number;
@@ -32,31 +50,47 @@ const qrStore = new Map<string, DynamicQrData>();
 
 export class PaymentService {
   /**
-   * คำนวณยอด Co-pay 60/40 ตามสูตรและเพดานสิทธิ์
+   * คำนวณยอด Co-pay 60/40 ตามสูตรและเพดานสิทธิ์ ร่วมกับคูปอง/โค้ดคำชวนของเพื่อน
    */
   public calculateCopay(
     totalAmount: number,
     dailyQuotaRemaining: number,
-    totalQuotaRemaining: number
+    totalQuotaRemaining: number,
+    discountAmount = 0,
+    discountCode?: string,
+    discountDescription?: string
   ): CopayCalculationResult {
-    const tentativeGovCopay = Math.round(totalAmount * 0.6 * 100) / 100;
+    // 1. คำนวณยอดสุทธิหลังหักส่วนลดคูปอง/โค้ดชวนเพื่อน (Net Amount)
+    const netTotalAmount = Math.max(0, Math.round((totalAmount - discountAmount) * 100) / 100);
+
+    // 2. คำนวณส่วนที่รัฐช่วย 60% จากยอดสุทธิ (ไม่เกินโควตารายวัน 150 บาท และโควตารวม 3,000 บาท)
+    const tentativeGovCopay = Math.round(netTotalAmount * 0.6 * 100) / 100;
     const maxGovAllowable = Math.max(
       0,
       Math.min(tentativeGovCopay, dailyQuotaRemaining, totalQuotaRemaining)
     );
     const governmentCopayAmount = Math.round(maxGovAllowable * 100) / 100;
-    const citizenPaidAmount = Math.round((totalAmount - governmentCopayAmount) * 100) / 100;
+
+    // 3. ประชาชนจ่าย 40% ของยอดสุทธิ หรือส่วนที่เกินจากสิทธิรัฐ
+    const citizenPaidAmount = Math.round((netTotalAmount - governmentCopayAmount) * 100) / 100;
 
     const governmentPercentage =
-      totalAmount > 0 ? Math.round((governmentCopayAmount / totalAmount) * 100) : 0;
+      netTotalAmount > 0 ? Math.round((governmentCopayAmount / netTotalAmount) * 100) : 0;
     const citizenPercentage = 100 - governmentPercentage;
+    const totalSavingsAmount = Math.round((discountAmount + governmentCopayAmount) * 100) / 100;
 
     return {
-      totalAmount,
+      originalTotalAmount: totalAmount,
+      discountAmount,
+      discountCode,
+      discountDescription,
+      netTotalAmount,
+      totalAmount: netTotalAmount,
       governmentCopayAmount,
       citizenPaidAmount,
       governmentPercentage,
       citizenPercentage,
+      totalSavingsAmount,
       dailyQuotaRemainingBefore: dailyQuotaRemaining,
       dailyQuotaRemainingAfter:
         Math.round((dailyQuotaRemaining - governmentCopayAmount) * 100) / 100,
@@ -64,6 +98,151 @@ export class PaymentService {
       totalQuotaRemainingAfter:
         Math.round((totalQuotaRemaining - governmentCopayAmount) * 100) / 100,
     };
+  }
+
+  /**
+   * ตรวจสอบรหัสคูปองส่วนลด หรือโค้ดคำชวนของเพื่อน (Friend Referral Code)
+   */
+  public async validateDiscountCode(params: {
+    code: string;
+    userId?: string;
+    merchantId?: string;
+    totalAmount: number;
+  }): Promise<DiscountValidationResult> {
+    const cleanCode = params.code.trim().toUpperCase();
+    if (!cleanCode) {
+      throw new Error('กรุณาระบุรหัสคูปองหรือโค้ดคำชวนของเพื่อน');
+    }
+
+    // 1. ตรวจสอบในตาราง referrals (โค้ดคำชวนของเพื่อน / Friend Referral)
+    try {
+      const referral = await prisma.referrals.findUnique({
+        where: { referral_code: cleanCode },
+        include: {
+          users_referrals_referrer_user_idTousers: {
+            select: { full_name: true },
+          },
+        },
+      });
+
+      if (referral) {
+        if (referral.status === 'redeemed') {
+          throw new Error('โค้ดคำชวนของเพื่อนนี้ถูกใช้งานไปแล้ว');
+        }
+        if (referral.expires_at && new Date(referral.expires_at).getTime() < Date.now()) {
+          throw new Error('โค้ดคำชวนของเพื่อนนี้หมดอายุแล้ว');
+        }
+        if (params.userId && referral.referrer_user_id === params.userId) {
+          throw new Error('ไม่สามารถใช้โค้ดชวนเพื่อนของตนเองได้');
+        }
+        if (referral.merchant_id && params.merchantId && referral.merchant_id !== params.merchantId) {
+          throw new Error('โค้ดนี้สามารถใช้ได้เฉพาะกับร้านค้าที่กำหนดเท่านั้น');
+        }
+
+        const discountAmount = Math.min(params.totalAmount, Number(referral.discount_amount || 30));
+        const referrerName = referral.users_referrals_referrer_user_idTousers.full_name;
+
+        return {
+          code: cleanCode,
+          isValid: true,
+          discountAmount,
+          discountType: 'FIXED',
+          discountSource: 'FRIEND_REFERRAL',
+          sourceDescription: `ส่วนลด ฿${discountAmount.toFixed(0)} จากโค้ดคำชวนของเพื่อน (${referrerName})`,
+          referrerName,
+          referralId: referral.referral_id,
+        };
+      }
+    } catch (e: any) {
+      if (e.message && !e.message.includes('PrismaClient')) {
+        throw e;
+      }
+    }
+
+    // 2. ตรวจสอบในตาราง user_rewards (คูปองรางวัล / Discount Coupons)
+    try {
+      const userReward = await prisma.user_rewards.findUnique({
+        where: { reward_code: cleanCode },
+        include: { rewards: true },
+      });
+
+      if (userReward) {
+        if (userReward.status !== 'available') {
+          throw new Error('คูปองนี้ถูกใช้งานไปแล้วหรือหมดสิทธิ์');
+        }
+        if (userReward.expires_at && new Date(userReward.expires_at).getTime() < Date.now()) {
+          throw new Error('คูปองนี้หมดอายุแล้ว');
+        }
+
+        let discountVal = 0;
+        if (userReward.rewards.discount_type === 'percent') {
+          const pct = Number(userReward.rewards.discount_value || 10);
+          discountVal = Math.round(params.totalAmount * (pct / 100) * 100) / 100;
+        } else {
+          discountVal = Number(userReward.rewards.discount_value || 30);
+        }
+        const finalDiscount = Math.min(params.totalAmount, discountVal);
+
+        return {
+          code: cleanCode,
+          isValid: true,
+          discountAmount: finalDiscount,
+          discountType: userReward.rewards.discount_type === 'percent' ? 'PERCENT' : 'FIXED',
+          discountSource: 'COUPON',
+          sourceDescription: `คูปองส่วนลด: ${userReward.rewards.reward_name} (ลด ฿${finalDiscount.toFixed(0)})`,
+          userRewardId: userReward.user_reward_id,
+        };
+      }
+    } catch (e: any) {
+      if (e.message && !e.message.includes('PrismaClient')) {
+        throw e;
+      }
+    }
+
+    // 3. โค้ดโปรโมชันและคำชวนเพื่อนจำลองมาตรฐาน (Duo Coupon & Demo Codes)
+    const demoCodes: Record<
+      string,
+      { amount: number; desc: string; source: 'FRIEND_REFERRAL' | 'COUPON'; referrer?: string }
+    > = {
+      FRIEND30: {
+        amount: 30,
+        desc: 'ส่วนลด ฿30 จากโค้ดคำชวนของเพื่อน (สมชาย ใจดี)',
+        source: 'FRIEND_REFERRAL',
+        referrer: 'สมชาย ใจดี',
+      },
+      DUO50: {
+        amount: 50,
+        desc: 'คูปองชวนเพื่อน Duo Special (ลด ฿50)',
+        source: 'FRIEND_REFERRAL',
+        referrer: 'วิภาดา พารวย',
+      },
+      WELCOME20: {
+        amount: 20,
+        desc: 'คูปองต้อนรับสมาชิกใหม่ (ลด ฿20)',
+        source: 'COUPON',
+      },
+      THAIPLUS30: {
+        amount: 30,
+        desc: 'คูปองกระตุ้นเศรษฐกิจไทยช่วยไทยพลีส (ลด ฿30)',
+        source: 'COUPON',
+      },
+    };
+
+    if (demoCodes[cleanCode]) {
+      const demo = demoCodes[cleanCode];
+      const discount = Math.min(params.totalAmount, demo.amount);
+      return {
+        code: cleanCode,
+        isValid: true,
+        discountAmount: discount,
+        discountType: 'FIXED',
+        discountSource: demo.source,
+        sourceDescription: demo.desc,
+        referrerName: demo.referrer,
+      };
+    }
+
+    throw new Error(`ไม่พบรหัสคูปองหรือโค้ดคำชวนของเพื่อน '${cleanCode}' ในระบบ`);
   }
 
   /**
@@ -79,7 +258,6 @@ export class PaymentService {
     let merchantId = params.merchantId;
     let shopName = params.shopName || 'ร้านค้าประชารัฐร่วมใจ';
 
-    // ถ้าไม่มี merchantId หรือส่งมาว่าง ให้ค้นหาหรือสร้างร้านค้าตัวอย่าง
     if (!merchantId) {
       const existingMerchant = await prisma.merchants.findFirst();
       if (existingMerchant) {
@@ -102,7 +280,7 @@ export class PaymentService {
 
     const qrReference = `TP-QR-${Date.now()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
     const now = new Date();
-    const expiresAt = new Date(now.getTime() + 15 * 60 * 1000); // มีอายุ 15 นาที
+    const expiresAt = new Date(now.getTime() + 15 * 60 * 1000);
 
     const tentativeGov = Math.min(Math.round(params.amount * 0.6 * 100) / 100, 150.0);
     const tentativeCit = Math.round((params.amount - tentativeGov) * 100) / 100;
@@ -126,13 +304,12 @@ export class PaymentService {
   }
 
   /**
-   * ดึงข้อมูล QR Code เพื่อพรีวิวยอดชำระเงินร่วม Co-pay 60/40
+   * ดึงข้อมูล QR Code เพื่อพรีวิวยอดชำระเงินร่วม Co-pay 60/40 (รองรับส่วนลดคูปอง/โค้ดเพื่อน)
    */
-  public async getQrDetails(qrReference: string, userId?: string) {
+  public async getQrDetails(qrReference: string, userId?: string, discountCode?: string) {
     let qrData = qrStore.get(qrReference);
 
     if (!qrData) {
-      // ค้นหาจากฐานข้อมูลธุรกรรมหากมี
       const tx = await prisma.transactions.findFirst({
         where: { qr_reference: qrReference },
         include: { merchants: true },
@@ -156,7 +333,23 @@ export class PaymentService {
       }
     }
 
-    // หากมี userId คำนวณยอดจริงตามโควตาคงเหลือของผู้ใช้นั้น
+    let discountInfo: DiscountValidationResult | null = null;
+    let discountAmount = 0;
+
+    if (discountCode) {
+      try {
+        discountInfo = await this.validateDiscountCode({
+          code: discountCode,
+          userId,
+          merchantId: qrData.merchantId,
+          totalAmount: qrData.totalAmount,
+        });
+        discountAmount = discountInfo.discountAmount;
+      } catch (err: any) {
+        console.warn('Discount validation error in preview:', err.message);
+      }
+    }
+
     let copaySplit: CopayCalculationResult | null = null;
     let walletInfo = null;
 
@@ -165,7 +358,10 @@ export class PaymentService {
       copaySplit = this.calculateCopay(
         qrData.totalAmount,
         walletInfo.dailyQuotaRemaining,
-        walletInfo.totalQuotaRemaining
+        walletInfo.totalQuotaRemaining,
+        discountAmount,
+        discountInfo?.code,
+        discountInfo?.sourceDescription
       );
     }
 
@@ -173,12 +369,13 @@ export class PaymentService {
       qrData,
       walletInfo,
       copaySplit,
+      discountInfo,
     };
   }
 
   /**
    * ประชาชนยืนยันชำระเงินร่วม (Co-pay Checkout)
-   * พร้อมประเมินพิกัด GPS และส่งวิเคราะห์ Semi-AI Fraud Engine
+   * คำนวณ Co-pay 60/40 + ส่วนลดคูปอง/โค้ดเพื่อน + ตรวจพิกัด GPS & Semi-AI
    */
   public async checkout(params: {
     userId: string;
@@ -186,6 +383,7 @@ export class PaymentService {
     userLatitude: number;
     userLongitude: number;
     merchantId?: string;
+    discountCode?: string;
   }) {
     const { qrData } = await this.getQrDetails(params.qrReference);
 
@@ -198,12 +396,29 @@ export class PaymentService {
     const merchantLon = merchant ? Number(merchant.longitude) : qrData.merchantLongitude;
     const shopName = merchant ? merchant.shop_name : qrData.shopName;
 
-    // 1. ดึงข้อมูลกระเป๋าเงินและคำนวณ Co-pay 60/40
+    // 1. ตรวจสอบโค้ดส่วนลด/โค้ดชวนเพื่อน (ถ้ามี)
+    let discountInfo: DiscountValidationResult | null = null;
+    let discountAmount = 0;
+
+    if (params.discountCode) {
+      discountInfo = await this.validateDiscountCode({
+        code: params.discountCode,
+        userId: params.userId,
+        merchantId,
+        totalAmount: qrData.totalAmount,
+      });
+      discountAmount = discountInfo.discountAmount;
+    }
+
+    // 2. ดึงข้อมูลกระเป๋าเงินและคำนวณ Co-pay 60/40 จากยอดสุทธิ
     const wallet = await walletService.getWalletByUserId(params.userId);
     const copay = this.calculateCopay(
       qrData.totalAmount,
       wallet.dailyQuotaRemaining,
-      wallet.totalQuotaRemaining
+      wallet.totalQuotaRemaining,
+      discountAmount,
+      discountInfo?.code,
+      discountInfo?.sourceDescription
     );
 
     // ตรวจสอบยอดเงินคงเหลือในกระเป๋า
@@ -215,7 +430,7 @@ export class PaymentService {
       );
     }
 
-    // 2. เรียกใช้ระบบตรวจสอบทุจริตพิกัด GPS & Semi-AI Anomaly Engine
+    // 3. เรียกใช้ระบบตรวจสอบทุจริตพิกัด GPS & Semi-AI Anomaly Engine
     const fraudAssessment = await fraudService.evaluateTransaction({
       userId: params.userId,
       merchantId,
@@ -226,7 +441,6 @@ export class PaymentService {
       merchantLon,
     });
 
-    // หากระบบ AI ตัดสินว่าเสี่ยงทุจริตรุนแรง ให้ปฏิเสธรายการทันที
     if (fraudAssessment.decision === 'REJECTED') {
       throw new Error(
         `ระบบปฏิเสธการทำรายการชั่วคราว: ตรวจพบความเสี่ยงทุจริต (${fraudAssessment.reason})`
@@ -236,9 +450,9 @@ export class PaymentService {
     const txStatus =
       fraudAssessment.decision === 'FLAGGED_FOR_REVIEW' ? 'FLAGGED' : 'SUCCESS';
 
-    // 3. หักเงินในกระเป๋าและบันทึกฐานข้อมูลใน Atomic Transaction
+    // 4. บันทึกและตัดยอดเงินใน Atomic Transaction
     const transactionRecord = await prisma.$transaction(async (tx: any) => {
-      // 3.1 ตัดยอดเงินในกระเป๋าประชาชน
+      // 4.1 ตัดยอดเงินในกระเป๋าประชาชน
       const newWalletBalance =
         Math.round((wallet.balance - copay.citizenPaidAmount) * 100) / 100;
       const newDailyQuotaUsed =
@@ -255,13 +469,13 @@ export class PaymentService {
         },
       });
 
-      // 3.2 สร้างรายการธุรกรรมหลัก (Transactions)
+      // 4.2 สร้างรายการธุรกรรมหลัก
       const newTx = await tx.transactions.create({
         data: {
           qr_reference: params.qrReference,
           user_id: params.userId,
           merchant_id: merchantId,
-          total_amount: copay.totalAmount,
+          total_amount: copay.netTotalAmount, // บันทึกยอดสุทธิของธุรกรรม
           government_copay_amount: copay.governmentCopayAmount,
           citizen_paid_amount: copay.citizenPaidAmount,
           status: txStatus,
@@ -269,7 +483,28 @@ export class PaymentService {
         },
       });
 
-      // 3.3 บันทึกประวัติการเคลื่อนไหวของกระเป๋าเงิน (Wallet Transactions)
+      // 4.3 ตัดสิทธิ์โค้ดชวนเพื่อน หรือ คูปอง หากมีการใช้งาน
+      if (discountInfo?.referralId) {
+        await tx.referrals.update({
+          where: { referral_id: discountInfo.referralId },
+          data: {
+            status: 'redeemed',
+            transaction_id: newTx.transaction_id,
+            converted_at: new Date(),
+          },
+        });
+      } else if (discountInfo?.userRewardId) {
+        await tx.user_rewards.update({
+          where: { user_reward_id: discountInfo.userRewardId },
+          data: {
+            status: 'used',
+            transaction_id: newTx.transaction_id,
+            used_at: new Date(),
+          },
+        });
+      }
+
+      // 4.4 บันทึกประวัติการเคลื่อนไหวของกระเป๋าเงิน
       await tx.wallet_transactions.create({
         data: {
           wallet_id: wallet.walletId,
@@ -282,7 +517,7 @@ export class PaymentService {
         },
       });
 
-      // 3.4 บันทึกการตรวจสอบทุจริต (Fraud Checks)
+      // 4.5 บันทึกการตรวจสอบทุจริต
       await tx.fraud_checks.create({
         data: {
           transaction_id: newTx.transaction_id,
@@ -301,7 +536,6 @@ export class PaymentService {
       return newTx;
     });
 
-    // ล้าง QR หลังใช้งานเสร็จ
     qrStore.delete(params.qrReference);
 
     return {
@@ -309,9 +543,15 @@ export class PaymentService {
       qrReference: params.qrReference,
       shopName,
       status: txStatus,
-      totalAmount: copay.totalAmount,
+      originalTotalAmount: copay.originalTotalAmount,
+      discountAmount: copay.discountAmount,
+      discountCode: copay.discountCode,
+      discountDescription: copay.discountDescription,
+      netTotalAmount: copay.netTotalAmount,
+      totalAmount: copay.netTotalAmount,
       governmentCopayAmount: copay.governmentCopayAmount,
       citizenPaidAmount: copay.citizenPaidAmount,
+      totalSavingsAmount: copay.totalSavingsAmount,
       completedAt: transactionRecord.created_at.toISOString(),
       distanceMeters: fraudAssessment.distanceMeters,
       riskScore: fraudAssessment.riskScore,

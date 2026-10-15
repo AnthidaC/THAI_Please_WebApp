@@ -39,6 +39,13 @@ export const checkoutCopaySchema = z.object({
     .min(-180)
     .max(180),
   pin: z.string().optional(),
+  discountCode: z.string().optional(),
+});
+
+export const validateDiscountSchema = z.object({
+  code: z.string({ required_error: 'กรุณาระบุรหัสคูปองหรือโค้ดชวนเพื่อน' }).min(1),
+  merchantId: z.string().optional(),
+  totalAmount: z.number().positive('ยอดเงินต้องมากกว่า 0 บาท'),
 });
 
 export const resolveFraudAlertSchema = z.object({

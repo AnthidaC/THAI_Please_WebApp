@@ -160,12 +160,33 @@ export class TransactionService {
           },
         },
         fraud_checks: true,
+        referrals: true,
+        user_rewards: {
+          include: { rewards: true },
+        },
       },
     });
 
     if (!tx) {
       throw new Error('ไม่พบข้อมูลรายการทำธุรกรรม');
     }
+
+    let discountAmount = 0;
+    let discountCode: string | null = null;
+    let discountDescription: string | null = null;
+
+    if (tx.referrals && tx.referrals.length > 0) {
+      discountAmount = Number(tx.referrals[0].discount_amount || 0);
+      discountCode = tx.referrals[0].referral_code;
+      discountDescription = `ส่วนลดจากโค้ดคำชวนของเพื่อน (${discountCode})`;
+    } else if (tx.user_rewards && tx.user_rewards.length > 0) {
+      discountAmount = Number(tx.user_rewards[0].rewards?.discount_value || 0);
+      discountCode = tx.user_rewards[0].reward_code;
+      discountDescription = `คูปองส่วนลด: ${tx.user_rewards[0].rewards?.reward_name || discountCode}`;
+    }
+
+    const netAmount = Number(tx.total_amount);
+    const originalAmount = netAmount + discountAmount;
 
     return {
       slipId: `SLIP-${tx.transaction_id.substring(0, 8).toUpperCase()}`,
@@ -174,9 +195,15 @@ export class TransactionService {
       customerName: tx.users.full_name,
       shopName: tx.merchants.shop_name,
       merchantTaxId: tx.merchants.tax_id,
-      totalAmount: Number(tx.total_amount),
+      originalTotalAmount: originalAmount,
+      discountAmount,
+      discountCode,
+      discountDescription,
+      netTotalAmount: netAmount,
+      totalAmount: netAmount,
       governmentCopayAmount: Number(tx.government_copay_amount),
       citizenPaidAmount: Number(tx.citizen_paid_amount),
+      totalSavingsAmount: Math.round((discountAmount + Number(tx.government_copay_amount)) * 100) / 100,
       copayRatio: '60/40',
       status: tx.status,
       timestamp: (tx.completed_at || tx.created_at).toISOString(),

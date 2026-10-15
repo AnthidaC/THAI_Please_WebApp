@@ -10,6 +10,8 @@ import {
   AlertTriangle,
   Store,
   Calendar,
+  Gift,
+  Sparkles,
 } from 'lucide-react';
 import { getTransactionSlip } from '../../../services/paymentApi';
 import { APP_ROUTES } from '../../../constants/routes';
@@ -138,16 +140,40 @@ export const CitizenPaymentSlipPage: React.FC = () => {
           {/* ยอดเงินและสัดส่วน Co-pay */}
           <div className="py-4 border-b border-hairline space-y-2">
             <div className="flex items-center justify-between text-xs">
-              <span className="text-ink-muted">ยอดรวมทั้งสิ้น (100%)</span>
-              <span className="font-mono font-medium text-ink">
-                ฿{slip.totalAmount.toFixed(2)}
+              <span className="text-ink-muted">ยอดรวมสินค้า (100%)</span>
+              <span className={`font-mono ${slip.discountAmount && slip.discountAmount > 0 ? 'line-through text-ink-muted text-xs' : 'font-medium text-ink'}`}>
+                ฿{(slip.originalTotalAmount ?? slip.totalAmount).toFixed(2)}
               </span>
             </div>
 
+            {slip.discountAmount && slip.discountAmount > 0 ? (
+              <>
+                <div className="flex items-center justify-between text-xs text-emerald-700 font-medium">
+                  <span className="flex items-center space-x-1">
+                    <Gift className="h-3.5 w-3.5 text-emerald-600" />
+                    <span>ส่วนลดคูปอง / โค้ดชวนเพื่อน ({slip.discountCode || 'DISCOUNT'})</span>
+                  </span>
+                  <span className="font-mono font-bold">
+                    - ฿{slip.discountAmount.toFixed(2)}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between text-[11px] text-ink-muted pb-1 border-b border-hairline/60">
+                  <span>ยอดสุทธิก่อนคำนวณ Co-pay 60/40</span>
+                  <span className="font-mono font-semibold text-ink">
+                    ฿{(slip.netTotalAmount ?? slip.totalAmount).toFixed(2)}
+                  </span>
+                </div>
+              </>
+            ) : null}
+
             <div className="flex items-center justify-between text-xs text-brand-blue">
-              <span>รัฐบาลสมทบ (60%)</span>
+              <span className="flex items-center space-x-1">
+                <Sparkles className="h-3.5 w-3.5" />
+                <span>รัฐบาลสมทบ (60%)</span>
+              </span>
               <span className="font-mono font-semibold">
-                ฿{slip.governmentCopayAmount.toFixed(2)}
+                - ฿{slip.governmentCopayAmount.toFixed(2)}
               </span>
             </div>
 
@@ -156,6 +182,18 @@ export const CitizenPaymentSlipPage: React.FC = () => {
               <span className="font-mono text-2xl font-bold text-status-error">
                 ฿{slip.citizenPaidAmount.toFixed(2)}
               </span>
+            </div>
+
+            {/* ป้ายประหยัดเงินรวม */}
+            <div className="mt-2 rounded-xl bg-blue-50 border border-blue-200 p-2 text-center">
+              <span className="text-xs font-semibold text-brand-blue">
+                🎉 ประหยัดเงินรวม: ฿{(slip.totalSavingsAmount ?? (slip.governmentCopayAmount + (slip.discountAmount || 0))).toFixed(2)}
+              </span>
+              {slip.discountAmount && slip.discountAmount > 0 ? (
+                <span className="block text-[10px] text-brand-blue-hover mt-0.5">
+                  (รัฐบาลช่วย ฿{slip.governmentCopayAmount.toFixed(2)} + ส่วนลดคูปอง ฿{slip.discountAmount.toFixed(2)})
+                </span>
+              ) : null}
             </div>
           </div>
 

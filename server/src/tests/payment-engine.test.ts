@@ -36,26 +36,82 @@ console.log('🧪 เริ่มการทดสอบระบบคำน�
 
 // 4. ทดสอบระยะทาง Haversine Formula (พิกัดเดียวกัน vs ต่างพิกัด)
 {
-  // จุดเดียวกัน ระยะห่างต้องเป็น 0
   const distSame = calculateHaversineDistance(13.7563, 100.5018, 13.7563, 100.5018);
   assert.strictEqual(distSame, 0);
 
-  // เสาชิงช้า (13.7525, 100.5014) ไป อนุสาวรีย์ประชาธิปไตย (13.7567, 100.5018) ห่างประมาณ 460-480 เมตร
   const distNear = calculateHaversineDistance(13.7525, 100.5014, 13.7567, 100.5018);
   assert.ok(distNear >= 400 && distNear <= 600, `ระยะทางควรอยู่ที่ประมาณ 460-480 เมตร ได้ ${distNear}`);
   console.log(`  ✅ ผ่าน: คำนวณระยะพิกัด GPS Haversine สำเร็จ (${distNear} เมตร)`);
 
-  // กรุงเทพฯ (13.7563, 100.5018) ไป เชียงใหม่ (18.7883, 98.9853) ห่างประมาณ 580-600 กิโลเมตร
   const distFar = calculateHaversineDistance(13.7563, 100.5018, 18.7883, 98.9853);
   assert.ok(distFar > 550000, `ระยะทางกรุงเทพ-เชียงใหม่ควรมากกว่า 550 กม. ได้ ${distFar}`);
   console.log(`  ✅ ผ่าน: คำนวณระยะพิกัด GPS ระยะไกลข้ามจังหวัด (${Math.round(distFar / 1000)} กม.)`);
 }
 
-// 5. ทดสอบ Semi-AI Anomaly Evaluator
+// 5. ทดสอบคำนวณ Co-pay 60/40 ร่วมกับคูปองส่วนลด 30 บาท (ยอดรวม 200 บ. - คูปอง 30 บ. = ยอดสุทธิ 170 บ.)
+{
+  const result = paymentService.calculateCopay(200, 150, 3000, 30, 'COUPON30', 'คูปองส่วนลด ฿30');
+  assert.strictEqual(result.originalTotalAmount, 200);
+  assert.strictEqual(result.discountAmount, 30);
+  assert.strictEqual(result.netTotalAmount, 170); // 200 - 30 = 170
+  assert.strictEqual(result.governmentCopayAmount, 102); // 60% ของ 170 คือ 102
+  assert.strictEqual(result.citizenPaidAmount, 68); // 40% ของ 170 คือ 68
+  assert.strictEqual(result.totalSavingsAmount, 132); // รัฐช่วย 102 + คูปอง 30 = ประหยัด 132 บาท!
+  assert.strictEqual(result.dailyQuotaRemainingAfter, 48); // 150 - 102 = 48
+  console.log('  ✅ ผ่าน: คำนวณ Co-pay 60/40 ร่วมกับคูปองส่วนลด (ยอด 200 -> ลด 30 -> รัฐ 102 / ประชาชน 68)');
+}
+
+// 6. ทดสอบคำนวณ Co-pay 60/40 ร่วมกับโค้ดคำชวนของเพื่อน (Friend Referral Code เช่น FRIEND30)
+{
+  const result = paymentService.calculateCopay(100, 150, 3000, 30, 'FRIEND30', 'โค้ดคำชวนของเพื่อน (สมชาย)');
+  assert.strictEqual(result.originalTotalAmount, 100);
+  assert.strictEqual(result.discountAmount, 30);
+  assert.strictEqual(result.netTotalAmount, 70); // 100 - 30 = 70
+  assert.strictEqual(result.governmentCopayAmount, 42); // 60% ของ 70 คือ 42
+  assert.strictEqual(result.citizenPaidAmount, 28); // 40% ของ 70 คือ 28
+  assert.strictEqual(result.totalSavingsAmount, 72); // ประหยัด 72 บาท
+  console.log('  ✅ ผ่าน: คำนวณ Co-pay 60/40 ร่วมกับโค้ดคำชวนของเพื่อน (ยอด 100 -> ลด 30 -> รัฐ 42 / ประชาชน 28)');
+}
+
+// 7. ทดสอบตรวจสอบความถูกต้องของรหัสส่วนลด / โค้ดชวนเพื่อน (validateDiscountCode)
+async function testDiscountValidation() {
+  // ทดสอบโค้ดชวนเพื่อน FRIEND30
+  const referralCheck = await paymentService.validateDiscountCode({
+    code: 'FRIEND30',
+    totalAmount: 150,
+  });
+  assert.strictEqual(referralCheck.isValid, true);
+  assert.strictEqual(referralCheck.discountAmount, 30);
+  assert.strictEqual(referralCheck.discountSource, 'FRIEND_REFERRAL');
+  console.log(`  ✅ ผ่าน: ตรวจสอบโค้ดคำชวนของเพื่อนสำเร็จ: ${referralCheck.sourceDescription}`);
+
+  // ทดสอบคูปอง DUO50
+  const couponCheck = await paymentService.validateDiscountCode({
+    code: 'DUO50',
+    totalAmount: 200,
+  });
+  assert.strictEqual(couponCheck.isValid, true);
+  assert.strictEqual(couponCheck.discountAmount, 50);
+  console.log(`  ✅ ผ่าน: ตรวจสอบคูปองส่วนลดสำเร็จ: ${couponCheck.sourceDescription}`);
+
+  // ทดสอบโค้ดไม่ถูกต้อง (ต้องโยน Error)
+  await assert.rejects(
+    async () => {
+      await paymentService.validateDiscountCode({
+        code: 'INVALID_CODE_999',
+        totalAmount: 100,
+      });
+    },
+    /ไม่พบรหัสคูปองหรือโค้ดคำชวนของเพื่อน/,
+    'ควรแสดงข้อผิดพลาดเมื่อโค้ดไม่ถูกต้อง'
+  );
+  console.log('  ✅ ผ่าน: ปฏิเสธโค้ดส่วนลดที่ไม่ถูกต้องตามมาตรฐาน');
+}
+
+// 8. ทดสอบ Semi-AI Anomaly Evaluator
 async function testAiEngine() {
   const aiEngine = AiFraudEngine.getInstance();
 
-  // กรณีปกติ: อยู่หน้าร้าน 50 เมตร, จ่าย 120 บาท
   const normalAssessment = await aiEngine.evaluate({
     userId: 'u-1',
     merchantId: 'm-1',
@@ -73,7 +129,6 @@ async function testAiEngine() {
   assert.ok(normalAssessment.riskScore < 0.3, `คะแนนความเสี่ยงกรณีปกติควรต่ำ ได้ ${normalAssessment.riskScore}`);
   console.log(`  ✅ ผ่าน: Semi-AI ประเมินธุรกรรมปกติ -> AUTO_APPROVED (Risk: ${normalAssessment.riskScore})`);
 
-  // กรณีผิดปกติ: ห่างจากร้านค้า 6,000 เมตร (6 กม.)
   const suspiciousAssessment = await aiEngine.evaluate({
     userId: 'u-2',
     merchantId: 'm-1',
@@ -91,10 +146,15 @@ async function testAiEngine() {
   assert.ok(suspiciousAssessment.riskScore >= 0.5, `คะแนนความเสี่ยงกรณีผิดปกติควรสูง ได้ ${suspiciousAssessment.riskScore}`);
   console.log(`  ✅ ผ่าน: Semi-AI ประเมินธุรกรรมห่างไกล -> ${suspiciousAssessment.decision} (Risk: ${suspiciousAssessment.riskScore})`);
 
-  console.log('\n🎉 ผลการทดสอบ Unit Tests ทั้งหมด 5/5 ผ่านอย่างสมบูรณ์แบบ!');
+  console.log('\n🎉 ผลการทดสอบ Unit Tests ทั้งหมด 8/8 ผ่านอย่างสมบูรณ์แบบ!');
 }
 
-testAiEngine().catch((err) => {
+async function runAllTests() {
+  await testDiscountValidation();
+  await testAiEngine();
+}
+
+runAllTests().catch((err) => {
   console.error('❌ การทดสอบล้มเหลว:', err);
   process.exit(1);
 });
