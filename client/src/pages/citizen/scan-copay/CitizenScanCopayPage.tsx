@@ -17,6 +17,7 @@ import {
   Users,
   Check,
   X,
+  Clock,
 } from 'lucide-react';
 import {
   getWalletBalance,
@@ -82,6 +83,34 @@ export const CitizenScanCopayPage: React.FC = () => {
     }
   }, []);
 
+  // ตรวจสอบเวลานับถอยหลังของ QR ขณะอยู่ที่หน้าพรีวิว Co-pay (อายุ 3 นาที)
+  const [previewSecondsRemaining, setPreviewSecondsRemaining] = useState<number>(180);
+
+  useEffect(() => {
+    if (!scannedData?.qrData?.expiresAt) return;
+
+    const checkExpiry = () => {
+      const expiryTime = new Date(scannedData.qrData.expiresAt).getTime();
+      const diffSec = Math.max(0, Math.floor((expiryTime - Date.now()) / 1000));
+      setPreviewSecondsRemaining(diffSec);
+
+      if (diffSec <= 0) {
+        // หากหมดอายุ ให้เด้งกลับหน้าสแกนใหม่ทันที พร้อมแจ้งเตือนตามที่กำหนด
+        setScannedData(null);
+        setQrReference('');
+        setCheckoutError('QR หมดอายุ กรุณาทำรายการใหม่');
+      }
+    };
+
+    checkExpiry();
+    const interval = setInterval(checkExpiry, 1000);
+    return () => clearInterval(interval);
+  }, [scannedData]);
+
+  const previewMinutes = Math.floor(previewSecondsRemaining / 60);
+  const previewSecs = previewSecondsRemaining % 60;
+  const formattedPreviewTimer = `${String(previewMinutes).padStart(2, '0')}:${String(previewSecs).padStart(2, '0')}`;
+
   // Mutation ตรวจสอบรหัส QR เพื่อพรีวิวยอดเงิน Co-pay (ส่งพิกัด GPS ตรวจสอบทันทีตั้งแต่ตอนสแกน)
   const previewMutation = useMutation({
     mutationFn: ({ ref, code }: { ref: string; code?: string }) =>
@@ -94,14 +123,14 @@ export const CitizenScanCopayPage: React.FC = () => {
       setCheckoutError(null);
     },
     onError: (err: any) => {
-      // หากพิกัดไกลเกินหรือมีข้อผิดพลาด ให้เด้งอยู่หน้าสแกนใหม่ ไม่ต้องไปหน้าต่อไป
+      // หากหมดอายุหรือพิกัดไกลเกิน ให้เด้งอยู่หน้าสแกนใหม่ ไม่ต้องไปหน้าต่อไป
       setScannedData(null);
       setQrReference('');
-      setCheckoutError(
+      const errorMsg =
         err.response?.data?.message ||
-          err.message ||
-          'ไม่สามารถทำรายการได้ เนื่องจากตำแหน่งของคุณอยู่ห่างจากร้านค้าเกินระยะที่กำหนด กรุณาสแกนใหม่อีกครั้งที่หน้าร้าน'
-      );
+        err.message ||
+        'ไม่สามารถทำรายการได้ กรุณาสแกน QR Code ใหม่อีกครั้ง';
+      setCheckoutError(errorMsg);
     },
   });
 
@@ -158,13 +187,13 @@ export const CitizenScanCopayPage: React.FC = () => {
       navigate(`/citizen/slip/${data.transactionId}`);
     },
     onError: (err: any) => {
-      // หากไม่ผ่านหรือตำแหน่งอยู่นอกระยะ ให้เด้งกลับหน้าสแกนใหม่
+      // หากไม่ผ่านหรือตำแหน่งอยู่นอกระยะ หรือหมดอายุ ให้เด้งกลับหน้าสแกนใหม่
       setScannedData(null);
       setQrReference('');
       setCheckoutError(
         err.response?.data?.message ||
           err.message ||
-          'ไม่สามารถทำรายการได้ เนื่องจากตำแหน่งของคุณอยู่ห่างจากร้านค้าเกินระยะที่กำหนด'
+          'ไม่สามารถทำรายการได้ กรุณาสแกน QR Code ใหม่อีกครั้ง'
       );
     },
   });
@@ -222,6 +251,23 @@ export const CitizenScanCopayPage: React.FC = () => {
       </div>
 
       <main className="mx-auto max-w-md md:max-w-5xl px-4 md:px-6 space-y-4">
+        {/* กล่องแจ้งเตือนข้อผิดพลาด (ถ้ามี) - แสดงด้านบนสุด เด่นชัดทั้งบนมือถือและคอม */}
+        {checkoutError && (
+          <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-xs text-status-error flex items-start space-x-2.5 shadow-xs animate-in fade-in">
+            <AlertTriangle className="h-5 w-5 flex-shrink-0 mt-0.5 text-red-600" />
+            <div className="flex-1">
+              <p className="font-bold text-sm text-red-700">แจ้งเตือนระบบ</p>
+              <p className="mt-0.5 text-red-800 font-medium">{checkoutError}</p>
+            </div>
+            <button
+              onClick={() => setCheckoutError(null)}
+              className="text-red-400 hover:text-red-700 p-0.5"
+              title="ปิดข้อความแจ้งเตือน"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        )}
         {/* ส่วนจำลองสแกน QR และเลือกตัวอย่างทดสอบ (Responsive 2-Column บน Desktop) */}
         {!scannedData ? (
           <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start animate-in fade-in duration-200">
@@ -368,9 +414,15 @@ export const CitizenScanCopayPage: React.FC = () => {
                     </div>
                     <div>
                       <h3 className="font-bold text-sm text-ink">{scannedData.qrData.shopName}</h3>
-                      <p className="font-mono text-xs text-ink-muted">
-                        Ref: {scannedData.qrData.qrReference}
-                      </p>
+                      <div className="flex flex-wrap items-center gap-2 mt-1">
+                        <span className="font-mono text-xs text-ink-muted">
+                          Ref: {scannedData.qrData.qrReference}
+                        </span>
+                        <span className="inline-flex items-center space-x-1 rounded-pill bg-blue-50 px-2 py-0.5 text-[10px] font-mono font-bold text-brand-blue border border-blue-200">
+                          <Clock className="h-3 w-3" />
+                          <span>อายุ QR: {formattedPreviewTimer} น.</span>
+                        </span>
+                      </div>
                     </div>
                   </div>
                   <button
@@ -642,17 +694,6 @@ export const CitizenScanCopayPage: React.FC = () => {
                   )}
                 </button>
               </div>
-            </div>
-          </div>
-        )}
-
-        {/* แจ้งเตือนข้อผิดพลาด (ถ้ามี) */}
-        {checkoutError && (
-          <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-xs text-status-error flex items-start space-x-2">
-            <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="font-semibold">ไม่สามารถทำรายการได้</p>
-              <p className="mt-0.5">{checkoutError}</p>
             </div>
           </div>
         )}

@@ -183,13 +183,52 @@ async function testDistanceCheckAndQrSuspension() {
   );
 
   console.log('  ✅ ผ่าน: ตรวจจับพิกัดไกลเกิน 1 กม. ระงับ QR อัตโนมัติ แจ้งข้อความสุภาพไม่กล่าวหาทุจริต');
-  console.log('\n🎉 ผลการทดสอบ Unit Tests ทั้งหมด 9/9 ผ่านอย่างสมบูรณ์แบบ!');
+}
+
+// 10. ทดสอบอายุ QR Code 3 นาที (180,000 มิลลิวินาที) และการแจ้งเตือน "QR หมดอายุ กรุณาทำรายการใหม่"
+async function testQrExpirationIn3Minutes() {
+  const qr = await paymentService.generateDynamicQr({
+    amount: 100,
+    latitude: 13.7563,
+    longitude: 100.5018,
+    shopName: 'ร้านค้าทดสอบอายุ QR 3 นาที',
+  });
+
+  const createdTime = new Date(qr.createdAt).getTime();
+  const expiryTime = new Date(qr.expiresAt).getTime();
+  const diffMs = expiryTime - createdTime;
+
+  // ตรวจสอบว่าอายุของ QR Code ในระบบคือ 3 นาทีพอดี (180,000 มิลลิวินาที)
+  assert.strictEqual(diffMs, 3 * 60 * 1000, 'อายุ QR Code ต้องเท่ากับ 3 นาที (180,000 มิลลิวินาที)');
+
+  // ทดสอบขณะยังไม่หมดอายุ: ต้องสแกนอ่านรายละเอียดได้สำเร็จ
+  const validScan = await paymentService.getQrDetails(qr.qrReference);
+  assert.strictEqual(validScan.qrData.qrReference, qr.qrReference);
+
+  // จำลองเวลาให้ QR Code หมดอายุ (เกิน 3 นาที)
+  paymentService._simulateExpireQr(qr.qrReference);
+
+  // ทดสอบเมื่อสแกนหลังหมดอายุ: ต้องแจ้งเตือน "QR หมดอายุ กรุณาทำรายการใหม่"
+  await assert.rejects(
+    async () => {
+      await paymentService.getQrDetails(qr.qrReference);
+    },
+    (err: any) => {
+      assert.strictEqual(err.message, 'QR หมดอายุ กรุณาทำรายการใหม่');
+      return true;
+    },
+    'เมื่อสแกน QR ที่หมดอายุ ต้องแจ้งเตือนว่า "QR หมดอายุ กรุณาทำรายการใหม่"'
+  );
+
+  console.log('  ✅ ผ่าน: ระบบตั้งเวลาหมดอายุ QR 3 นาที และแจ้งเตือน "QR หมดอายุ กรุณาทำรายการใหม่" เมื่อสแกนหลังหมดอายุ');
 }
 
 async function runAllTests() {
   await testDiscountValidation();
   await testAiEngine();
   await testDistanceCheckAndQrSuspension();
+  await testQrExpirationIn3Minutes();
+  console.log('\n🎉 ผลการทดสอบ Unit Tests ทั้งหมด 10/10 ผ่านอย่างสมบูรณ์แบบ!');
 }
 
 runAllTests().catch((err) => {

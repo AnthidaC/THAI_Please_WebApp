@@ -46,7 +46,10 @@ export interface DynamicQrData {
   status?: 'ACTIVE' | 'USED' | 'SUSPENDED' | 'EXPIRED' | 'REJECTED';
 }
 
-// In-memory cache สำหรับเก็บ Dynamic QR ชั่วคราว (มีอายุ 15 นาที) ควบคู่กับฐานข้อมูล
+// อายุของ Dynamic QR Code ทุกรายการในระบบกำหนดไว้ที่ 3 นาที (180,000 มิลลิวินาที)
+export const QR_EXPIRATION_MS = 3 * 60 * 1000;
+
+// In-memory cache สำหรับเก็บ Dynamic QR ชั่วคราว (มีอายุ 3 นาที) ควบคู่กับฐานข้อมูล
 const qrStore = new Map<string, DynamicQrData>();
 
 export class PaymentService {
@@ -281,7 +284,7 @@ export class PaymentService {
 
     const qrReference = `TP-QR-${Date.now()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
     const now = new Date();
-    const expiresAt = new Date(now.getTime() + 15 * 60 * 1000);
+    const expiresAt = new Date(now.getTime() + QR_EXPIRATION_MS);
 
     const tentativeGov = Math.min(Math.round(params.amount * 0.6 * 100) / 100, 150.0);
     const tentativeCit = Math.round((params.amount - tentativeGov) * 100) / 100;
@@ -331,7 +334,7 @@ export class PaymentService {
           merchantLatitude: Number(tx.merchants.latitude),
           merchantLongitude: Number(tx.merchants.longitude),
           createdAt: tx.created_at.toISOString(),
-          expiresAt: new Date(tx.created_at.getTime() + 15 * 60 * 1000).toISOString(),
+          expiresAt: new Date(tx.created_at.getTime() + QR_EXPIRATION_MS).toISOString(),
           estimatedGovCopay: Number(tx.government_copay_amount),
           estimatedCitizenPay: Number(tx.citizen_paid_amount),
           status: tx.status as any,
@@ -341,7 +344,15 @@ export class PaymentService {
       }
     }
 
-    // ตรวจสอบสถานะของ QR Code (ไม่ลบข้อมูลออกจากระบบ แค่ตรวจสอบสถานะ)
+    // 1. ตรวจสอบเวลาหมดอายุของ QR Code (อายุ 3 นาที)
+    const isExpired = new Date() > new Date(qrData.expiresAt) || qrData.status === 'EXPIRED';
+    if (isExpired) {
+      qrData.status = 'EXPIRED';
+      qrStore.set(qrReference, qrData);
+      throw new Error('QR หมดอายุ กรุณาทำรายการใหม่');
+    }
+
+    // 2. ตรวจสอบสถานะของ QR Code (ไม่ลบข้อมูลออกจากระบบ แค่ตรวจสอบสถานะ)
     if (qrData.status === 'REJECTED' || qrData.status === 'SUSPENDED') {
       throw new Error('ไม่พบข้อมูล QR Code นี้ หรือ QR Code อาจหมดอายุหรือถูกยกเลิกแล้ว');
     }
@@ -680,6 +691,17 @@ export class PaymentService {
       reviewEligible: true,
       reviewWindowExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
     };
+  }
+
+  /**
+   * สำหรับใช้ในการทดสอบ Unit Test หรือจำลองสถานะ QR Code หมดอายุ (ตั้งเวลาถอยหลังเป็นอดีต)
+   */
+  public _simulateExpireQr(qrReference: string): void {
+    const qrData = qrStore.get(qrReference);
+    if (qrData) {
+      qrData.expiresAt = new Date(Date.now() - 5000).toISOString();
+      qrStore.set(qrReference, qrData);
+    }
   }
 }
 

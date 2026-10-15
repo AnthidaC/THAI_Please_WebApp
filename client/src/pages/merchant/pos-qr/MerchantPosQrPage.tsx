@@ -14,6 +14,8 @@ import {
   ArrowLeft,
   Copy,
   Check,
+  Clock,
+  AlertTriangle,
 } from 'lucide-react';
 import { generateDynamicQr, getMerchantHistory, DynamicQrResponse } from '../../../services/paymentApi';
 import { APP_ROUTES } from '../../../constants/routes';
@@ -28,7 +30,28 @@ export const MerchantPosQrPage: React.FC = () => {
   const [qrResult, setQrResult] = useState<DynamicQrResponse | null>(null);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [copied, setCopied] = useState<boolean>(false);
+  const [secondsRemaining, setSecondsRemaining] = useState<number>(180);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  // คำนวณเวลานับถอยหลังของ QR Code (อายุ 3 นาที)
+  useEffect(() => {
+    if (!qrResult) return;
+
+    const updateTimer = () => {
+      const expiryTime = new Date(qrResult.expiresAt).getTime();
+      const diffSec = Math.max(0, Math.floor((expiryTime - Date.now()) / 1000));
+      setSecondsRemaining(diffSec);
+    };
+
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
+    return () => clearInterval(interval);
+  }, [qrResult]);
+
+  const isExpired = secondsRemaining <= 0;
+  const timerMinutes = Math.floor(secondsRemaining / 60);
+  const timerSeconds = secondsRemaining % 60;
+  const formattedTimer = `${String(timerMinutes).padStart(2, '0')}:${String(timerSeconds).padStart(2, '0')}`;
 
   // ดึงข้อมูลร้านค้าจริงจากระบบอัตโนมัติ (ไม่ต้องกรอกเองทุกครั้ง)
   const { data: merchantData, isLoading: isMerchantLoading } = useQuery({
@@ -292,11 +315,33 @@ export const MerchantPosQrPage: React.FC = () => {
           /* VIEW 2: หน้าจอแสดงผล QR Code ให้ลูกค้าสแกนทันที (เด้งหน้าใหม่ เต็มตา ไม่ต้องเลื่อนจอ บนคอมกึ่งกลาง) */
           <div className="max-w-lg mx-auto animate-in fade-in zoom-in-95 duration-200">
             <div className="rounded-card border border-hairline bg-white p-6 md:p-8 shadow-lg text-center">
-              {/* Badge สถานะพร้อมสแกน */}
-              <span className="inline-flex items-center space-x-1.5 rounded-pill bg-emerald-50 px-3.5 py-1 text-xs font-semibold text-status-success border border-emerald-200 mb-2">
-                <CheckCircle2 className="h-4 w-4" />
-                <span>Dynamic QR พร้อมให้ลูกค้าสแกน</span>
-              </span>
+              {/* Badge สถานะพร้อมสแกน & Countdown Timer 3 นาที */}
+              <div className="flex flex-wrap items-center justify-center gap-2 mb-2">
+                {!isExpired ? (
+                  <span className="inline-flex items-center space-x-1.5 rounded-pill bg-emerald-50 px-3 py-1 text-xs font-semibold text-status-success border border-emerald-200">
+                    <CheckCircle2 className="h-4 w-4" />
+                    <span>Dynamic QR พร้อมให้ลูกค้าสแกน</span>
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center space-x-1.5 rounded-pill bg-red-50 px-3 py-1 text-xs font-semibold text-status-error border border-red-200 animate-pulse">
+                    <AlertTriangle className="h-4 w-4" />
+                    <span>QR หมดอายุ กรุณาทำรายการใหม่</span>
+                  </span>
+                )}
+
+                <span
+                  className={`inline-flex items-center space-x-1 rounded-pill px-2.5 py-1 text-xs font-mono font-bold border ${
+                    isExpired
+                      ? 'bg-red-100 text-red-700 border-red-300'
+                      : secondsRemaining < 60
+                      ? 'bg-amber-100 text-amber-800 border-amber-300 animate-pulse'
+                      : 'bg-blue-50 text-brand-blue border-blue-200'
+                  }`}
+                >
+                  <Clock className="h-3.5 w-3.5" />
+                  <span>{isExpired ? 'หมดอายุแล้ว (00:00)' : `อายุ QR: ${formattedTimer} น.`}</span>
+                </span>
+              </div>
 
               {/* ชื่อร้านค้า (ดึงจากระบบ) */}
               <h2 className="text-base font-bold text-ink mt-1">{qrResult.shopName}</h2>
@@ -321,9 +366,27 @@ export const MerchantPosQrPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Canvas QR Code ขนาด 280x280 ชัดเจนตรงกลางจอ */}
-              <div className="relative mx-auto my-3 flex items-center justify-center rounded-3xl border-2 border-hairline bg-white p-3 shadow-sm max-w-[305px]">
-                <canvas ref={canvasRef} className="mx-auto block" />
+              {/* Canvas QR Code ขนาด 280x280 ชัดเจนตรงกลางจอ พร้อม Overlay เมื่อหมดอายุ 3 นาที */}
+              <div className="relative mx-auto my-3 flex items-center justify-center rounded-3xl border-2 border-hairline bg-white p-3 shadow-sm max-w-[305px] overflow-hidden">
+                <canvas ref={canvasRef} className={`mx-auto block transition ${isExpired ? 'opacity-20 filter blur-[1.5px]' : ''}`} />
+                {isExpired && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/92 p-4 text-center animate-in fade-in">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-100 text-status-error mb-2">
+                      <AlertTriangle className="h-6 w-6" />
+                    </div>
+                    <p className="text-sm font-bold text-status-error">QR หมดอายุแล้ว (3 นาที)</p>
+                    <p className="text-xs text-ink-muted mt-1 mb-3">กรุณากดสร้างบิลใหม่เพื่อให้ลูกค้าสแกน</p>
+                    <button
+                      onClick={() => {
+                        setQrResult(null);
+                        setAmount(100);
+                      }}
+                      className="rounded-pill bg-brand-blue px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-brand-blue-hover active:scale-95"
+                    >
+                      สร้างบิลใหม่ทันที
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Reference number and copy button */}
