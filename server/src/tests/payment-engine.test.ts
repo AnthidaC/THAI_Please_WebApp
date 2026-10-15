@@ -145,13 +145,51 @@ async function testAiEngine() {
   assert.ok(suspiciousAssessment.decision === 'FLAGGED_FOR_REVIEW' || suspiciousAssessment.decision === 'REJECTED');
   assert.ok(suspiciousAssessment.riskScore >= 0.5, `คะแนนความเสี่ยงกรณีผิดปกติควรสูง ได้ ${suspiciousAssessment.riskScore}`);
   console.log(`  ✅ ผ่าน: Semi-AI ประเมินธุรกรรมห่างไกล -> ${suspiciousAssessment.decision} (Risk: ${suspiciousAssessment.riskScore})`);
+}
 
-  console.log('\n🎉 ผลการทดสอบ Unit Tests ทั้งหมด 8/8 ผ่านอย่างสมบูรณ์แบบ!');
+// 9. ทดสอบการปฏิเสธพิกัดไกลเกิน 1 กม., ระงับ QR ทันที, และแจ้งข้อความสุภาพ
+async function testDistanceCheckAndQrSuspension() {
+  const qr = await paymentService.generateDynamicQr({
+    amount: 150,
+    latitude: 13.7500,
+    longitude: 100.5000,
+    shopName: 'ร้านทดสอบระยะทาง',
+  });
+
+  // สแกนด้วยพิกัดห่างไกล 5 กม.
+  await assert.rejects(
+    async () => {
+      await paymentService.getQrDetails(
+        qr.qrReference,
+        undefined,
+        undefined,
+        { lat: 13.8000, lon: 100.5500 }
+      );
+    },
+    (err: any) => {
+      assert.match(err.message, /ตำแหน่งของคุณอยู่ห่างจากร้านค้าเกินระยะที่กำหนด/);
+      assert.doesNotMatch(err.message, /ทุจริต/);
+      return true;
+    },
+    'ควรระงับและแจ้งเตือนอย่างสุภาพเมื่อพิกัดห่างเกินกำหนด'
+  );
+
+  // ตรวจสอบว่า QR นั้นถูกระงับ/ลบไปแล้ว ไม่สามารถสแกนซ้ำได้
+  await assert.rejects(
+    async () => {
+      await paymentService.getQrDetails(qr.qrReference);
+    },
+    /ไม่พบข้อมูล QR Code นี้ หรือ QR Code อาจหมดอายุหรือถูกยกเลิกแล้ว/
+  );
+
+  console.log('  ✅ ผ่าน: ตรวจจับพิกัดไกลเกิน 1 กม. ระงับ QR อัตโนมัติ แจ้งข้อความสุภาพไม่กล่าวหาทุจริต');
+  console.log('\n🎉 ผลการทดสอบ Unit Tests ทั้งหมด 9/9 ผ่านอย่างสมบูรณ์แบบ!');
 }
 
 async function runAllTests() {
   await testDiscountValidation();
   await testAiEngine();
+  await testDistanceCheckAndQrSuspension();
 }
 
 runAllTests().catch((err) => {

@@ -25,11 +25,21 @@ export const getQrDetails = async (req: Request, res: Response): Promise<void> =
     const reference = Array.isArray(req.params.reference) ? req.params.reference[0] : req.params.reference;
     const userId = req.user?.userId;
     const discountCode = req.query.discountCode as string | undefined;
+    const userLatitude = req.query.userLatitude ? Number(req.query.userLatitude) : undefined;
+    const userLongitude = req.query.userLongitude ? Number(req.query.userLongitude) : undefined;
 
-    const details = await paymentService.getQrDetails(reference, userId, discountCode);
+    const userLocation =
+      userLatitude !== undefined &&
+      userLongitude !== undefined &&
+      !isNaN(userLatitude) &&
+      !isNaN(userLongitude)
+        ? { lat: userLatitude, lon: userLongitude }
+        : undefined;
+
+    const details = await paymentService.getQrDetails(reference, userId, discountCode, userLocation);
     sendSuccess(res, details, 'ดึงข้อมูล QR Code สำเร็จ');
   } catch (error: any) {
-    sendError(res, error.message || 'ไม่พบข้อมูล QR Code', 404);
+    sendError(res, error.message || 'ไม่พบข้อมูล QR Code', 400);
   }
 };
 

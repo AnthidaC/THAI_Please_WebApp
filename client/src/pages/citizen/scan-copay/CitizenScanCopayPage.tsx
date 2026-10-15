@@ -82,9 +82,10 @@ export const CitizenScanCopayPage: React.FC = () => {
     }
   }, []);
 
-  // Mutation ตรวจสอบรหัส QR เพื่อพรีวิวยอดเงิน Co-pay (รองรับ discountCode)
+  // Mutation ตรวจสอบรหัส QR เพื่อพรีวิวยอดเงิน Co-pay (ส่งพิกัด GPS ตรวจสอบทันทีตั้งแต่ตอนสแกน)
   const previewMutation = useMutation({
-    mutationFn: ({ ref, code }: { ref: string; code?: string }) => getQrDetails(ref, code),
+    mutationFn: ({ ref, code }: { ref: string; code?: string }) =>
+      getQrDetails(ref, code, userLocation),
     onSuccess: (data) => {
       setScannedData(data);
       if (data.discountInfo) {
@@ -93,7 +94,14 @@ export const CitizenScanCopayPage: React.FC = () => {
       setCheckoutError(null);
     },
     onError: (err: any) => {
-      setCheckoutError(err.response?.data?.message || err.message || 'ไม่พบข้อมูล QR Code');
+      // หากพิกัดไกลเกินหรือมีข้อผิดพลาด ให้เด้งอยู่หน้าสแกนใหม่ ไม่ต้องไปหน้าต่อไป
+      setScannedData(null);
+      setQrReference('');
+      setCheckoutError(
+        err.response?.data?.message ||
+          err.message ||
+          'ไม่สามารถทำรายการได้ เนื่องจากตำแหน่งของคุณอยู่ห่างจากร้านค้าเกินระยะที่กำหนด กรุณาสแกนใหม่อีกครั้งที่หน้าร้าน'
+      );
     },
   });
 
@@ -150,7 +158,14 @@ export const CitizenScanCopayPage: React.FC = () => {
       navigate(`/citizen/slip/${data.transactionId}`);
     },
     onError: (err: any) => {
-      setCheckoutError(err.response?.data?.message || err.message || 'การชำระเงินไม่สำเร็จ');
+      // หากไม่ผ่านหรือตำแหน่งอยู่นอกระยะ ให้เด้งกลับหน้าสแกนใหม่
+      setScannedData(null);
+      setQrReference('');
+      setCheckoutError(
+        err.response?.data?.message ||
+          err.message ||
+          'ไม่สามารถทำรายการได้ เนื่องจากตำแหน่งของคุณอยู่ห่างจากร้านค้าเกินระยะที่กำหนด'
+      );
     },
   });
 
@@ -302,19 +317,6 @@ export const CitizenScanCopayPage: React.FC = () => {
                     <span className="text-[10px] text-ink-muted block mt-0.5">ยอด ฿250 (ยอดเกินโควตา 150)</span>
                   </button>
 
-                  <button
-                    type="button"
-                    onClick={() => handleQuickDemoScan(500, 'ร้านของฝากชุมชน (ห่าง 6.2 กม. ทุจริต)', 6.2)}
-                    className="col-span-2 rounded-2xl border border-amber-200 bg-amber-50/60 p-2.5 text-left transition hover:border-amber-400"
-                  >
-                    <div className="flex items-center space-x-1.5 font-medium text-xs text-amber-900">
-                      <AlertTriangle className="h-3.5 w-3.5 text-status-warning" />
-                      <span>ทดสอบระบบตรวจทุจริต: ร้านอยู่ห่าง 6.2 กม. (เกินระยะ)</span>
-                    </div>
-                    <span className="text-[10px] text-amber-700 block mt-0.5">
-                      ทดสอบระบบ Semi-AI และ GPS Flagged แจ้งเตือนทุจริต
-                    </span>
-                  </button>
                 </div>
               </div>
             </div>
@@ -610,7 +612,7 @@ export const CitizenScanCopayPage: React.FC = () => {
         {/* แถบแจ้งมาตรฐานความปลอดภัยระดับสถาบัน */}
         <div className="pt-2 text-center text-[11px] text-ink-muted flex items-center justify-center space-x-1.5">
           <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
-          <span>ธุรกรรมนี้ได้รับการคุ้มครองด้วยการตรวจสอบพิกัด GPS สดร่วมกับ AI</span>
+          <span>ทำรายการอย่างปลอดภัยด้วยระบบยืนยันตำแหน่งหน้าร้านค้าตามมาตรฐานความปลอดภัย</span>
         </div>
       </main>
     </div>

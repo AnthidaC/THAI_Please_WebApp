@@ -1,6 +1,6 @@
 import prisma from '../utils/prisma';
 import { walletService } from './wallet.service';
-import { fraudService } from './fraud.service';
+import { fraudService, calculateHaversineDistance } from './fraud.service';
 
 export interface DiscountValidationResult {
   code: string;
@@ -304,9 +304,14 @@ export class PaymentService {
   }
 
   /**
-   * ดึงข้อมูล QR Code เพื่อพรีวิวยอดชำระเงินร่วม Co-pay 60/40 (รองรับส่วนลดคูปอง/โค้ดเพื่อน)
+   * ดึงข้อมูล QR Code เพื่อพรีวิวยอดชำระเงินร่วม Co-pay 60/40 (รองรับส่วนลดคูปอง/โค้ดเพื่อน และตรวจสอบพิกัด GPS)
    */
-  public async getQrDetails(qrReference: string, userId?: string, discountCode?: string) {
+  public async getQrDetails(
+    qrReference: string,
+    userId?: string,
+    discountCode?: string,
+    userLocation?: { lat: number; lon: number }
+  ) {
     let qrData = qrStore.get(qrReference);
 
     if (!qrData) {
@@ -329,7 +334,69 @@ export class PaymentService {
           estimatedCitizenPay: Number(tx.citizen_paid_amount),
         };
       } else {
-        throw new Error('ไม่พบข้อมูล QR Code นี้ หรือ QR Code อาจหมดอายุแล้ว');
+        throw new Error('ไม่พบข้อมูล QR Code นี้ หรือ QR Code อาจหมดอายุหรือถูกยกเลิกแล้ว');
+      }
+    }
+
+    // ตรวจสอบพิกัดระยะทางตั้งแต่ขั้นตอนสแกน QR
+    if (userLocation && userLocation.lat && userLocation.lon) {
+      const distanceMeters = calculateHaversineDistance(
+        userLocation.lat,
+        userLocation.lon,
+        qrData.merchantLatitude,
+        qrData.merchantLongitude
+      );
+
+      // ถ้าระยะห่างเกิน 1,000 เมตร (อยู่นอกพื้นที่หน้าร้าน)
+      if (distanceMeters > 1000) {
+        // 1. ระงับและลบ QR Code ทันที ไม่ให้สามารถใช้ต่อได้
+        qrStore.delete(qrReference);
+
+        // 2. จด log เก็บไว้เงียบๆ ในฐานข้อมูล เพื่อให้ Admin ตรวจสอบภายหลัง
+        try {
+          let targetUserId = userId;
+          if (!targetUserId) {
+            const firstUser = await prisma.user.findFirst({ select: { user_id: true } });
+            targetUserId = firstUser?.user_id;
+          }
+
+          if (targetUserId) {
+            const rejectedTx = await prisma.transactions.create({
+              data: {
+                qr_reference: qrReference,
+                user_id: targetUserId,
+                merchant_id: qrData.merchantId,
+                total_amount: qrData.totalAmount,
+                government_copay_amount: 0,
+                citizen_paid_amount: 0,
+                status: 'REJECTED',
+                completed_at: null,
+              },
+            });
+
+            await prisma.fraud_checks.create({
+              data: {
+                transaction_id: rejectedTx.transaction_id,
+                user_latitude: userLocation.lat,
+                user_longitude: userLocation.lon,
+                merchant_latitude: qrData.merchantLatitude,
+                merchant_longitude: qrData.merchantLongitude,
+                distance_meters: distanceMeters,
+                is_distance_valid: false,
+                risk_score: Math.min(1.0, Math.round((distanceMeters / 5000) * 100) / 100),
+                fraud_reason: `ระยะห่างจากร้านค้าเกินพิกัดที่กำหนด (${Math.round(distanceMeters)} เมตร) จากร้านค้า ${qrData.shopName}`,
+                decision: 'REJECTED',
+              },
+            });
+          }
+        } catch (logErr) {
+          console.error('[Fraud Log] Failed to save silent rejected log on scan:', logErr);
+        }
+
+        // 3. แจ้งเตือนผู้ใช้ด้วยข้อความสุภาพ แจ้งว่าไกลเกินไป (ไม่กล่าวหาว่าทุจริต)
+        throw new Error(
+          'ไม่สามารถทำรายการได้ เนื่องจากตำแหน่งของคุณอยู่ห่างจากร้านค้าเกินระยะที่กำหนด กรุณาสแกน QR Code ใหม่อีกครั้งที่หน้าร้าน'
+        );
       }
     }
 
@@ -441,9 +508,46 @@ export class PaymentService {
       merchantLon,
     });
 
-    if (fraudAssessment.decision === 'REJECTED') {
+    if (fraudAssessment.decision === 'REJECTED' || fraudAssessment.distanceMeters > 1000) {
+      // ระงับและลบ QR Code ทันที
+      qrStore.delete(params.qrReference);
+
+      // จด log เก็บไว้เงียบๆ สำหรับ Admin ตรวจสอบภายหลัง
+      try {
+        const rejectedTx = await prisma.transactions.create({
+          data: {
+            qr_reference: params.qrReference,
+            user_id: params.userId,
+            merchant_id: merchantId,
+            total_amount: copay.netTotalAmount,
+            government_copay_amount: 0,
+            citizen_paid_amount: 0,
+            status: 'REJECTED',
+            completed_at: null,
+          },
+        });
+
+        await prisma.fraud_checks.create({
+          data: {
+            transaction_id: rejectedTx.transaction_id,
+            user_latitude: params.userLatitude,
+            user_longitude: params.userLongitude,
+            merchant_latitude: merchantLat,
+            merchant_longitude: merchantLon,
+            distance_meters: fraudAssessment.distanceMeters,
+            is_distance_valid: false,
+            risk_score: fraudAssessment.riskScore,
+            fraud_reason: fraudAssessment.reason,
+            decision: 'REJECTED',
+          },
+        });
+      } catch (logErr) {
+        console.error('[Fraud Log] Failed to save rejected log on checkout:', logErr);
+      }
+
+      // แจ้งเตือนข้อความสุภาพ ไม่ระบุว่าทุจริต
       throw new Error(
-        `ระบบปฏิเสธการทำรายการชั่วคราว: ตรวจพบความเสี่ยงทุจริต (${fraudAssessment.reason})`
+        'ไม่สามารถทำรายการได้ เนื่องจากตำแหน่งของคุณอยู่ห่างจากร้านค้าเกินระยะที่กำหนด กรุณาสแกน QR Code ใหม่อีกครั้งที่หน้าร้าน'
       );
     }
 

@@ -196,9 +196,18 @@ export const generateDynamicQr = async (payload: {
   return res.data.data;
 };
 
-export const getQrDetails = async (reference: string, discountCode?: string): Promise<CopayPreviewData> => {
+export const getQrDetails = async (
+  reference: string,
+  discountCode?: string,
+  userLocation?: { lat: number; lon: number }
+): Promise<CopayPreviewData> => {
   const res = await axios.get(`/payment/qr/${reference}`, {
-    params: discountCode ? { discountCode } : {},
+    params: {
+      ...(discountCode ? { discountCode } : {}),
+      ...(userLocation
+        ? { userLatitude: userLocation.lat, userLongitude: userLocation.lon }
+        : {}),
+    },
   });
   return res.data.data;
 };
