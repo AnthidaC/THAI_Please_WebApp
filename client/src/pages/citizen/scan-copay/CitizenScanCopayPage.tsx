@@ -197,405 +197,453 @@ export const CitizenScanCopayPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-surface-soft pb-24 font-sans text-ink">
-      {/* Top Header Bar */}
-      <header className="sticky top-0 z-20 border-b border-hairline bg-white/95 px-4 py-3 backdrop-blur-md">
-        <div className="mx-auto flex max-w-md items-center justify-between">
-          <button
-            onClick={() => navigate(APP_ROUTES.CITIZEN_WALLET)}
-            className="flex items-center space-x-1.5 rounded-full p-1.5 text-xs font-medium text-ink-muted hover:bg-gray-100 hover:text-ink transition"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            <span>กลับกระเป๋าเงิน</span>
-          </button>
-          <div className="text-right">
-            <span className="text-xs font-semibold text-ink">สแกนชำระเงินร่วม</span>
-            <span className="block text-[10px] text-brand-blue">Co-pay (60/40)</span>
-          </div>
-        </div>
-      </header>
-
-      <main className="mx-auto max-w-md px-4 pt-4 space-y-4">
-        {/* แถบสถานะพิกัด GPS ผู้ใช้ */}
-        <div className="rounded-card border border-hairline bg-white p-3.5 shadow-sm flex items-center justify-between">
+    <div className="min-h-screen bg-surface-soft pb-24 md:pb-12 font-sans text-ink">
+      {/* Page Title & Action Bar */}
+      <div className="bg-white border-b border-hairline px-4 md:px-8 py-3.5 mb-4 shadow-2xs">
+        <div className="mx-auto flex max-w-5xl items-center justify-between">
           <div className="flex items-center space-x-2.5">
-            <div className={`flex h-8 w-8 items-center justify-center rounded-full ${isGpsLoading ? 'bg-amber-100 text-amber-600 animate-pulse' : 'bg-emerald-100 text-status-success'}`}>
-              <MapPin className="h-4 w-4" />
-            </div>
-            <div>
-              <div className="text-xs font-medium text-ink flex items-center space-x-1.5">
-                <span>พิกัด GPS ผู้ซื้อ:</span>
-                <span className="font-mono text-[11px] text-ink-muted">
-                  {userLocation.lat.toFixed(4)}, {userLocation.lon.toFixed(4)}
-                </span>
-              </div>
-              <span className="text-[10px] text-ink-muted">
-                {isGpsLoading ? 'กำลังดึงพิกัดผ่านดาวเทียม...' : gpsError || 'พร้อมตรวจสอบความปลอดภัยตำแหน่งจริง'}
-              </span>
+            <button
+              onClick={() => navigate(APP_ROUTES.CITIZEN_WALLET)}
+              className="flex items-center space-x-1.5 rounded-pill px-3 py-1.5 text-xs font-medium text-ink-muted bg-surface-soft hover:bg-gray-200 hover:text-ink transition border border-hairline"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              <span>กลับกระเป๋าเงิน</span>
+            </button>
+            <div className="border-l border-hairline pl-3">
+              <h1 className="text-base md:text-lg font-bold text-ink">สแกนชำระเงินร่วม (Co-pay 60/40)</h1>
+              <p className="text-xs text-brand-blue font-medium">สแกน Dynamic QR ร้านค้าเพื่อรับสิทธิรัฐช่วยจ่าย</p>
             </div>
           </div>
-          <button
-            onClick={() => {
-              setIsGpsLoading(true);
-              if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition((pos) => {
-                  setUserLocation({ lat: pos.coords.latitude, lon: pos.coords.longitude });
-                  setIsGpsLoading(false);
-                });
-              }
-            }}
-            className="rounded-full p-1 text-ink-muted hover:bg-gray-100"
-            title="รีเฟรชพิกัด GPS"
-          >
-            <RefreshCw className={`h-3.5 w-3.5 ${isGpsLoading ? 'animate-spin' : ''}`} />
-          </button>
+          <div className="hidden sm:flex items-center space-x-2 text-xs font-mono">
+            <span className="text-ink-muted">กระเป๋าส่วนตัว:</span>
+            <span className="font-bold text-ink">฿{(wallet?.balance ?? 0).toFixed(2)}</span>
+          </div>
         </div>
+      </div>
 
-        {/* ส่วนจำลองสแกน QR และเลือกตัวอย่างทดสอบ */}
+      <main className="mx-auto max-w-md md:max-w-5xl px-4 md:px-6 space-y-4">
+        {/* ส่วนจำลองสแกน QR และเลือกตัวอย่างทดสอบ (Responsive 2-Column บน Desktop) */}
         {!scannedData ? (
-          <section className="rounded-card border border-hairline bg-white p-6 text-center shadow-sm">
-            <div className="relative mx-auto flex h-48 w-48 items-center justify-center rounded-3xl border-2 border-dashed border-brand-blue bg-blue-50/50">
-              <QrCode className="h-20 w-20 text-brand-blue animate-pulse" />
-              <div className="absolute inset-x-4 top-1/2 h-0.5 bg-red-500 shadow-[0_0_8px_red] animate-bounce" />
-            </div>
-
-            <p className="mt-4 text-sm font-semibold text-ink">
-              สแกน QR Code รับเงินของร้านค้า
-            </p>
-            <p className="text-xs text-ink-muted mt-1">
-              รองรับ Dynamic QR โครงการไทยช่วยไทยพลีส
-            </p>
-
-            {/* ช่องกรอกหรือค้นหา QR Reference ด้วยตนเอง */}
-            <div className="mt-5 space-y-2">
-              <div className="flex space-x-2">
-                <input
-                  id="input-qr-ref"
-                  type="text"
-                  placeholder="กรอกหรือวางรหัส QR Reference"
-                  value={qrReference}
-                  onChange={(e) => setQrReference(e.target.value)}
-                  className="w-full rounded-pill border border-hairline px-4 py-2.5 text-xs text-ink focus:border-brand-blue focus:outline-none"
-                />
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start animate-in fade-in duration-200">
+            {/* Left Column: GPS & Scanner (md:col-span-6 space-y-4) */}
+            <div className="md:col-span-6 space-y-4">
+              {/* แถบสถานะพิกัด GPS ผู้ใช้ */}
+              <div className="rounded-card border border-hairline bg-white p-4 shadow-sm flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className={`flex h-10 w-10 items-center justify-center rounded-2xl ${isGpsLoading ? 'bg-amber-100 text-amber-600 animate-pulse' : 'bg-emerald-100 text-status-success'}`}>
+                    <MapPin className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-medium text-ink flex items-center space-x-1.5">
+                      <span>พิกัด GPS ผู้ซื้อ:</span>
+                      <span className="font-mono text-[11px] text-ink-muted">
+                        {userLocation.lat.toFixed(4)}, {userLocation.lon.toFixed(4)}
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-ink-muted">
+                      {isGpsLoading ? 'กำลังดึงพิกัดผ่านดาวเทียม...' : gpsError || 'พร้อมตรวจสอบความปลอดภัยตำแหน่งจริง'}
+                    </span>
+                  </div>
+                </div>
                 <button
-                  id="btn-inspect-qr"
-                  disabled={!qrReference || previewMutation.isPending}
-                  onClick={() => previewMutation.mutate({ ref: qrReference })}
-                  className="rounded-pill bg-brand-blue px-4 py-2.5 text-xs font-semibold text-white transition hover:bg-brand-blue-hover disabled:opacity-40"
+                  onClick={() => {
+                    setIsGpsLoading(true);
+                    if (navigator.geolocation) {
+                      navigator.geolocation.getCurrentPosition((pos) => {
+                        setUserLocation({ lat: pos.coords.latitude, lon: pos.coords.longitude });
+                        setIsGpsLoading(false);
+                      });
+                    }
+                  }}
+                  className="rounded-full p-2 text-ink-muted hover:bg-gray-100"
+                  title="รีเฟรชพิกัด GPS"
                 >
-                  {previewMutation.isPending ? 'ตรวจ...' : 'ตรวจสอบ'}
+                  <RefreshCw className={`h-4 w-4 ${isGpsLoading ? 'animate-spin' : ''}`} />
                 </button>
               </div>
 
-              {/* ปุ่มลัดสร้าง QR ตัวอย่างหน้าร้านสำหรับทดสอบความเร็วสูง */}
-              <div className="pt-3 border-t border-hairline">
-                <span className="text-[11px] font-medium text-ink-muted block mb-2">
-                  ⚡ เลือกทดสอบร้านค้าจำลองทันที:
-                </span>
-                <div className="grid grid-cols-2 gap-2 text-left">
+              {/* กล่องสแกน QR Code */}
+              <section className="rounded-card border border-hairline bg-white p-6 text-center shadow-sm">
+                <div className="relative mx-auto flex h-48 w-48 items-center justify-center rounded-3xl border-2 border-dashed border-brand-blue bg-blue-50/50">
+                  <QrCode className="h-20 w-20 text-brand-blue animate-pulse" />
+                  <div className="absolute inset-x-4 top-1/2 h-0.5 bg-red-500 shadow-[0_0_8px_red] animate-bounce" />
+                </div>
+
+                <p className="mt-4 text-sm font-semibold text-ink">
+                  สแกน QR Code รับเงินของร้านค้า
+                </p>
+                <p className="text-xs text-ink-muted mt-1">
+                  รองรับ Dynamic QR โครงการไทยช่วยไทยพลีส
+                </p>
+
+                {/* ช่องกรอกหรือค้นหา QR Reference ด้วยตนเอง */}
+                <div className="mt-5 space-y-2">
+                  <div className="flex space-x-2">
+                    <input
+                      id="input-qr-ref"
+                      type="text"
+                      placeholder="กรอกหรือวางรหัส QR Reference"
+                      value={qrReference}
+                      onChange={(e) => setQrReference(e.target.value)}
+                      className="w-full rounded-pill border border-hairline px-4 py-2.5 text-xs text-ink focus:border-brand-blue focus:outline-none"
+                    />
+                    <button
+                      id="btn-inspect-qr"
+                      disabled={!qrReference || previewMutation.isPending}
+                      onClick={() => previewMutation.mutate({ ref: qrReference })}
+                      className="rounded-pill bg-brand-blue px-4 py-2.5 text-xs font-semibold text-white transition hover:bg-brand-blue-hover disabled:opacity-40 flex-shrink-0"
+                    >
+                      {previewMutation.isPending ? 'ตรวจ...' : 'ตรวจสอบ'}
+                    </button>
+                  </div>
+                </div>
+              </section>
+            </div>
+
+            {/* Right Column: Demo Merchants & Co-pay Info (md:col-span-6 space-y-4) */}
+            <div className="md:col-span-6 space-y-4">
+              <div className="rounded-card border border-hairline bg-white p-5 shadow-sm space-y-3">
+                <div className="flex items-center space-x-2">
+                  <Sparkles className="h-4 w-4 text-brand-blue" />
+                  <h3 className="text-sm font-semibold text-ink">ทดสอบสแกนร้านค้าจำลองทันที</h3>
+                </div>
+                <p className="text-xs text-ink-muted">
+                  คลิกเลือกร้านค้าจำลองด้านล่างเพื่อทดสอบการคำนวณ Co-pay 60/40 และระบบตรวจจับพิกัด Geofence:
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-1 gap-2.5 pt-1">
                   <button
                     type="button"
                     onClick={() => handleQuickDemoScan(120, 'ร้านข้าวมันไก่ป้าณี (หน้าร้าน 40ม.)', 0.04)}
-                    className="rounded-2xl border border-hairline bg-surface-soft p-2.5 text-left transition hover:border-brand-blue hover:bg-blue-50/40"
+                    className="rounded-2xl border border-hairline bg-surface-soft p-3 text-left transition hover:border-brand-blue hover:bg-blue-50/40"
                   >
-                    <div className="flex items-center space-x-1.5 font-medium text-xs text-ink">
-                      <Store className="h-3.5 w-3.5 text-brand-blue" />
-                      <span className="truncate">ข้าวมันไก่ป้าณี</span>
+                    <div className="flex items-center space-x-2 font-medium text-xs text-ink">
+                      <Store className="h-4 w-4 text-brand-blue flex-shrink-0" />
+                      <span className="font-bold">ร้านข้าวมันไก่ป้าณี</span>
                     </div>
-                    <span className="text-[10px] text-ink-muted block mt-0.5">ยอด ฿120 (หน้าร้านปกติ)</span>
+                    <div className="mt-1 flex items-center justify-between text-[11px] text-ink-muted">
+                      <span>ยอด ฿120 (หน้าร้านปกติ)</span>
+                      <span className="text-status-success font-semibold">พิกัดตรง &lt; 50ม.</span>
+                    </div>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => handleQuickDemoScan(250, 'ร้านก๋วยเตี๋ยวเรืออยุธยา (หน้าร้าน 80ม.)', 0.08)}
-                    className="rounded-2xl border border-hairline bg-surface-soft p-2.5 text-left transition hover:border-brand-blue hover:bg-blue-50/40"
+                    className="rounded-2xl border border-hairline bg-surface-soft p-3 text-left transition hover:border-brand-blue hover:bg-blue-50/40"
                   >
-                    <div className="flex items-center space-x-1.5 font-medium text-xs text-ink">
-                      <Store className="h-3.5 w-3.5 text-brand-blue" />
-                      <span className="truncate">ก๋วยเตี๋ยวเรือ</span>
+                    <div className="flex items-center space-x-2 font-medium text-xs text-ink">
+                      <Store className="h-4 w-4 text-brand-blue flex-shrink-0" />
+                      <span className="font-bold">ก๋วยเตี๋ยวเรืออยุธยา</span>
                     </div>
-                    <span className="text-[10px] text-ink-muted block mt-0.5">ยอด ฿250 (ยอดเกินโควตา 150)</span>
+                    <div className="mt-1 flex items-center justify-between text-[11px] text-ink-muted">
+                      <span>ยอด ฿250 (ยอดเกินโควตา 150)</span>
+                      <span className="text-brand-blue font-semibold">ทดสอบ Co-pay เพดาน</span>
+                    </div>
                   </button>
-
                 </div>
+              </div>
+
+              {/* ข้อแนะนำโครงการ Co-pay */}
+              <div className="rounded-card border border-blue-100 bg-blue-50/50 p-4 space-y-2 text-xs">
+                <span className="font-semibold text-brand-blue block">💡 หลักการสแกนชำระ Co-pay 60/40:</span>
+                <ul className="space-y-1.5 text-ink-muted list-disc list-inside">
+                  <li>รัฐบาลออกให้ 60% สูงสุด ฿150 ต่อวัน</li>
+                  <li>ประชาชนจ่าย 40% จากยอดเงินในกระเป๋าดิจิทัล</li>
+                  <li>สแกนได้เฉพาะหน้าร้านค้าจริงในรัศมีที่ปลอดภัย</li>
+                </ul>
               </div>
             </div>
-          </section>
+          </div>
         ) : (
-          /* ส่วนแสดงรายละเอียดและยืนยันชำระเงินร่วม (Co-pay 60/40 Breakdown) */
-          <section className="space-y-4 animate-in fade-in duration-200">
-            {/* ข้อมูลร้านค้าที่สแกน */}
-            <div className="rounded-card border border-hairline bg-white p-5 shadow-sm">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2.5">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-brand-blue-light text-brand-blue">
-                    <Store className="h-5 w-5" />
+          /* ส่วนแสดงรายละเอียดและยืนยันชำระเงินร่วม (Co-pay 60/40 Breakdown บน Desktop 2 คอลัมน์) */
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start animate-in fade-in duration-200">
+            {/* Left Column: Shop Info, Coupon, Breakdown (md:col-span-7 space-y-4) */}
+            <div className="md:col-span-7 space-y-4">
+              {/* ข้อมูลร้านค้าที่สแกน */}
+              <div className="rounded-card border border-hairline bg-white p-5 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-brand-blue-light text-brand-blue shadow-xs">
+                      <Store className="h-6 w-6" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-sm text-ink">{scannedData.qrData.shopName}</h3>
+                      <p className="font-mono text-xs text-ink-muted">
+                        Ref: {scannedData.qrData.qrReference}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="font-semibold text-sm text-ink">{scannedData.qrData.shopName}</h3>
-                    <p className="font-mono text-[11px] text-ink-muted">
-                      Ref: {scannedData.qrData.qrReference}
-                    </p>
-                  </div>
+                  <button
+                    onClick={() => {
+                      setScannedData(null);
+                      setAppliedDiscount(null);
+                      setDiscountCodeInput('');
+                    }}
+                    className="rounded-pill bg-gray-100 px-3 py-1.5 text-xs text-brand-blue font-medium hover:bg-gray-200 transition"
+                  >
+                    สแกนใหม่
+                  </button>
                 </div>
-                <button
-                  onClick={() => {
-                    setScannedData(null);
-                    setAppliedDiscount(null);
-                    setDiscountCodeInput('');
-                  }}
-                  className="rounded-full text-xs text-brand-blue hover:underline"
-                >
-                  สแกนใหม่
-                </button>
-              </div>
 
-              {/* ส่วนกรอกคูปองส่วนลด / โค้ดคำชวนของเพื่อน */}
-              <div className="mt-4 pt-3 border-t border-hairline">
-                <div className="flex items-center justify-between mb-2">
-                  <label className="text-xs font-semibold text-ink flex items-center space-x-1.5">
-                    <Gift className="h-3.5 w-3.5 text-brand-blue" />
-                    <span>คูปองส่วนลด / โค้ดคำชวนของเพื่อน</span>
-                  </label>
-                  {appliedDiscount && (
-                    <span className="rounded-pill bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-status-success border border-emerald-200 flex items-center space-x-1">
-                      <Check className="h-3 w-3" />
-                      <span>ใช้โค้ดแล้ว</span>
-                    </span>
+                {/* ส่วนกรอกคูปองส่วนลด / โค้ดคำชวนของเพื่อน */}
+                <div className="mt-4 pt-4 border-t border-hairline">
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-xs font-semibold text-ink flex items-center space-x-1.5">
+                      <Gift className="h-3.5 w-3.5 text-brand-blue" />
+                      <span>คูปองส่วนลด / โค้ดคำชวนของเพื่อน</span>
+                    </label>
+                    {appliedDiscount && (
+                      <span className="rounded-pill bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-status-success border border-emerald-200 flex items-center space-x-1">
+                        <Check className="h-3 w-3" />
+                        <span>ใช้โค้ดแล้ว</span>
+                      </span>
+                    )}
+                  </div>
+
+                  {!appliedDiscount ? (
+                    <div className="space-y-2">
+                      <div className="flex space-x-2">
+                        <div className="relative flex-1">
+                          <Tag className="absolute left-3 top-2.5 h-3.5 w-3.5 text-ink-muted" />
+                          <input
+                            id="input-discount-code"
+                            type="text"
+                            placeholder="กรอกโค้ด เช่น FRIEND30, DUO50"
+                            value={discountCodeInput}
+                            onChange={(e) => setDiscountCodeInput(e.target.value.toUpperCase())}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                handleApplyDiscount(discountCodeInput);
+                              }
+                            }}
+                            className="w-full rounded-pill border border-hairline pl-8 pr-3 py-2 text-xs font-mono text-ink placeholder:font-sans focus:border-brand-blue focus:outline-none uppercase"
+                          />
+                        </div>
+                        <button
+                          id="btn-apply-discount"
+                          type="button"
+                          disabled={!discountCodeInput.trim() || discountMutation.isPending}
+                          onClick={() => handleApplyDiscount(discountCodeInput)}
+                          className="rounded-pill bg-brand-blue px-4 py-2 text-xs font-semibold text-white transition hover:bg-brand-blue-hover disabled:opacity-40"
+                        >
+                          {discountMutation.isPending ? 'ตรวจ...' : 'ใช้โค้ด'}
+                        </button>
+                      </div>
+
+                      {discountError && (
+                        <p className="text-[11px] text-status-error flex items-center space-x-1">
+                          <AlertTriangle className="h-3 w-3 flex-shrink-0" />
+                          <span>{discountError}</span>
+                        </p>
+                      )}
+
+                      {/* Quick pills สำหรับแนะนำโค้ดคำชวนเพื่อนและคูปองทดสอบ */}
+                      <div className="pt-1">
+                        <span className="text-[10px] text-ink-muted block mb-1">
+                          ⚡ โค้ดทดสอบด่วน:
+                        </span>
+                        <div className="flex flex-wrap gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setDiscountCodeInput('FRIEND30');
+                              handleApplyDiscount('FRIEND30');
+                            }}
+                            className="rounded-pill border border-emerald-200 bg-emerald-50/80 px-2.5 py-1 text-[10px] font-medium text-emerald-800 transition hover:bg-emerald-100 flex items-center space-x-1"
+                          >
+                            <Users className="h-3 w-3 text-emerald-600" />
+                            <span>FRIEND30 (ลด ฿30 เพื่อนสมชาย)</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setDiscountCodeInput('DUO50');
+                              handleApplyDiscount('DUO50');
+                            }}
+                            className="rounded-pill border border-blue-200 bg-blue-50/80 px-2.5 py-1 text-[10px] font-medium text-brand-blue transition hover:bg-blue-100 flex items-center space-x-1"
+                          >
+                            <Tag className="h-3 w-3 text-brand-blue" />
+                            <span>DUO50 (ลด ฿50 Duo Special)</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setDiscountCodeInput('WELCOME20');
+                              handleApplyDiscount('WELCOME20');
+                            }}
+                            className="rounded-pill border border-hairline bg-surface-soft px-2.5 py-1 text-[10px] font-medium text-ink transition hover:bg-gray-100 flex items-center space-x-1"
+                          >
+                            <Gift className="h-3 w-3 text-ink-muted" />
+                            <span>WELCOME20 (ลด ฿20)</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-3 flex items-start justify-between">
+                      <div className="space-y-0.5">
+                        <div className="flex items-center space-x-1.5 text-xs font-bold text-emerald-900">
+                          <Tag className="h-3.5 w-3.5 text-emerald-600" />
+                          <span className="font-mono">{appliedDiscount.code}</span>
+                          <span className="rounded-pill bg-emerald-200/80 px-2 py-0.2 text-[10px] text-emerald-800">
+                            {appliedDiscount.discountSource === 'FRIEND_REFERRAL'
+                              ? 'โค้ดคำชวนของเพื่อน'
+                              : 'คูปองส่วนลด'}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-emerald-800">
+                          {appliedDiscount.sourceDescription}
+                        </p>
+                        {appliedDiscount.referrerName && (
+                          <p className="text-[10px] text-emerald-700">
+                            เพื่อนผู้แนะนำ: คุณ {appliedDiscount.referrerName}
+                          </p>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleRemoveDiscount}
+                        className="rounded-full p-1 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-900 transition"
+                        title="ยกเลิกการใช้โค้ดนี้"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
                   )}
                 </div>
 
-                {!appliedDiscount ? (
-                  <div className="space-y-2">
-                    <div className="flex space-x-1.5">
-                      <div className="relative flex-1">
-                        <Tag className="absolute left-3 top-2.5 h-3.5 w-3.5 text-ink-muted" />
-                        <input
-                          id="input-discount-code"
-                          type="text"
-                          placeholder="กรอกโค้ด เช่น FRIEND30, DUO50"
-                          value={discountCodeInput}
-                          onChange={(e) => setDiscountCodeInput(e.target.value.toUpperCase())}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
-                              handleApplyDiscount(discountCodeInput);
-                            }
-                          }}
-                          className="w-full rounded-pill border border-hairline pl-8 pr-3 py-2 text-xs font-mono text-ink placeholder:font-sans focus:border-brand-blue focus:outline-none uppercase"
-                        />
-                      </div>
-                      <button
-                        id="btn-apply-discount"
-                        type="button"
-                        disabled={!discountCodeInput.trim() || discountMutation.isPending}
-                        onClick={() => handleApplyDiscount(discountCodeInput)}
-                        className="rounded-pill bg-brand-blue px-3.5 py-2 text-xs font-semibold text-white transition hover:bg-brand-blue-hover disabled:opacity-40"
-                      >
-                        {discountMutation.isPending ? 'ตรวจ...' : 'ใช้โค้ด'}
-                      </button>
-                    </div>
-
-                    {discountError && (
-                      <p className="text-[11px] text-status-error flex items-center space-x-1">
-                        <AlertTriangle className="h-3 w-3 flex-shrink-0" />
-                        <span>{discountError}</span>
-                      </p>
-                    )}
-
-                    {/* Quick pills สำหรับแนะนำโค้ดคำชวนเพื่อนและคูปองทดสอบ */}
-                    <div className="pt-1">
-                      <span className="text-[10px] text-ink-muted block mb-1">
-                        ⚡ โค้ดทดสอบด่วน:
-                      </span>
-                      <div className="flex flex-wrap gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setDiscountCodeInput('FRIEND30');
-                            handleApplyDiscount('FRIEND30');
-                          }}
-                          className="rounded-pill border border-emerald-200 bg-emerald-50/80 px-2 py-0.5 text-[10px] font-medium text-emerald-800 transition hover:bg-emerald-100 flex items-center space-x-1"
-                        >
-                          <Users className="h-3 w-3 text-emerald-600" />
-                          <span>FRIEND30 (ลด ฿30 เพื่อนสมชาย)</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setDiscountCodeInput('DUO50');
-                            handleApplyDiscount('DUO50');
-                          }}
-                          className="rounded-pill border border-blue-200 bg-blue-50/80 px-2 py-0.5 text-[10px] font-medium text-brand-blue transition hover:bg-blue-100 flex items-center space-x-1"
-                        >
-                          <Tag className="h-3 w-3 text-brand-blue" />
-                          <span>DUO50 (ลด ฿50 Duo Special)</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setDiscountCodeInput('WELCOME20');
-                            handleApplyDiscount('WELCOME20');
-                          }}
-                          className="rounded-pill border border-hairline bg-surface-soft px-2 py-0.5 text-[10px] font-medium text-ink transition hover:bg-gray-100 flex items-center space-x-1"
-                        >
-                          <Gift className="h-3 w-3 text-ink-muted" />
-                          <span>WELCOME20 (ลด ฿20)</span>
-                        </button>
-                      </div>
-                    </div>
+                {/* รายละเอียดการคำนวณ Co-pay 60/40 */}
+                <div className="mt-4 rounded-2xl border border-hairline bg-surface-soft p-4 space-y-2.5">
+                  {/* ยอดรวมสินค้าเดิม */}
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-ink-muted">ยอดรวมสินค้า (100%)</span>
+                    <span className={`font-mono ${scannedData.copaySplit?.discountAmount ? 'line-through text-ink-muted text-xs' : 'font-bold text-ink'}`}>
+                      ฿{(scannedData.copaySplit?.originalTotalAmount ?? scannedData.qrData.totalAmount).toFixed(2)}
+                    </span>
                   </div>
-                ) : (
-                  <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-3 flex items-start justify-between">
-                    <div className="space-y-0.5">
-                      <div className="flex items-center space-x-1.5 text-xs font-bold text-emerald-900">
-                        <Tag className="h-3.5 w-3.5 text-emerald-600" />
-                        <span className="font-mono">{appliedDiscount.code}</span>
-                        <span className="rounded-pill bg-emerald-200/80 px-2 py-0.2 text-[10px] text-emerald-800">
-                          {appliedDiscount.discountSource === 'FRIEND_REFERRAL'
-                            ? 'โค้ดคำชวนของเพื่อน'
-                            : 'คูปองส่วนลด'}
+
+                  {/* แถวแสดงส่วนลดคูปอง/โค้ดเพื่อน */}
+                  {scannedData.copaySplit?.discountAmount && scannedData.copaySplit.discountAmount > 0 ? (
+                    <>
+                      <div className="flex justify-between items-center text-sm text-emerald-700 font-medium">
+                        <span className="flex items-center space-x-1">
+                          <Gift className="h-3.5 w-3.5 text-emerald-600" />
+                          <span>ส่วนลดคูปอง / โค้ดชวนเพื่อน ({scannedData.copaySplit.discountCode})</span>
+                        </span>
+                        <span className="font-mono font-bold">
+                          - ฿{scannedData.copaySplit.discountAmount.toFixed(2)}
                         </span>
                       </div>
-                      <p className="text-[11px] text-emerald-800">
-                        {appliedDiscount.sourceDescription}
-                      </p>
-                      {appliedDiscount.referrerName && (
-                        <p className="text-[10px] text-emerald-700">
-                          เพื่อนผู้แนะนำ: คุณ {appliedDiscount.referrerName}
-                        </p>
-                      )}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={handleRemoveDiscount}
-                      className="rounded-full p-1 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-900 transition"
-                      title="ยกเลิกการใช้โค้ดนี้"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
+
+                      <div className="flex justify-between items-center text-xs text-ink-muted border-b border-hairline pb-2">
+                        <span>ยอดสุทธิก่อนแบ่ง Co-pay 60/40</span>
+                        <span className="font-mono font-semibold text-ink">
+                          ฿{scannedData.copaySplit.netTotalAmount?.toFixed(2)}
+                        </span>
+                      </div>
+                    </>
+                  ) : null}
+
+                  {/* รัฐบาลช่วยจ่าย 60% */}
+                  <div className="flex justify-between items-center text-sm text-brand-blue">
+                    <span className="flex items-center space-x-1">
+                      <Sparkles className="h-3.5 w-3.5" />
+                      <span>รัฐบาลช่วยจ่าย 60%</span>
+                    </span>
+                    <span className="font-mono font-bold">
+                      - ฿{(scannedData.copaySplit?.governmentCopayAmount ?? scannedData.qrData.estimatedGovCopay).toFixed(2)}
+                    </span>
                   </div>
+
+                  {/* ประชาชนจ่ายจริง 40% */}
+                  <div className="border-t border-hairline pt-2.5 flex justify-between items-center text-sm font-semibold">
+                    <span className="text-ink">ประชาชนจ่ายจริง (40%)</span>
+                    <span className="font-mono text-2xl font-bold text-status-error">
+                      ฿{(scannedData.copaySplit?.citizenPaidAmount ?? scannedData.qrData.estimatedCitizenPay).toFixed(2)}
+                    </span>
+                  </div>
+
+                  {/* ป้ายสรุปเงินที่ประหยัดได้ทั้งหมด */}
+                  <div className="mt-2 rounded-xl bg-blue-50 border border-blue-200 p-2.5 text-center">
+                    <span className="text-xs font-semibold text-brand-blue">
+                      🎉 คุณประหยัดเงินรวม ฿
+                      {(
+                        scannedData.copaySplit?.totalSavingsAmount ??
+                        ((scannedData.copaySplit?.governmentCopayAmount ?? scannedData.qrData.estimatedGovCopay) +
+                          (scannedData.copaySplit?.discountAmount || 0))
+                      ).toFixed(2)}
+                    </span>
+                    <span className="block text-[10px] text-brand-blue-hover mt-0.5">
+                      (รัฐสมทบ 60% ฿
+                      {(scannedData.copaySplit?.governmentCopayAmount ?? scannedData.qrData.estimatedGovCopay).toFixed(2)}
+                      {scannedData.copaySplit?.discountAmount ? ` + ส่วนลดพิเศษ ฿${scannedData.copaySplit.discountAmount.toFixed(2)}` : ''})
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column: Wallet Check, PIN & Confirm Checkout (md:col-span-5 space-y-4) */}
+            <div className="md:col-span-5 space-y-4">
+              {/* ยอดเงินในกระเป๋าคงเหลือเทียบกับยอดที่ต้องจ่าย */}
+              <div className="rounded-card border border-hairline bg-white p-4 shadow-sm">
+                <span className="text-xs text-ink-muted font-medium">ยอดเงินในกระเป๋าดิจิทัลคงเหลือ</span>
+                <div className="mt-1 font-mono text-2xl font-bold text-ink">
+                  ฿{(wallet?.balance ?? 0).toLocaleString('th-TH', { minimumFractionDigits: 2 })}
+                </div>
+                {wallet && wallet.balance < (scannedData.copaySplit?.citizenPaidAmount ?? scannedData.qrData.estimatedCitizenPay) ? (
+                  <p className="mt-1 text-xs text-status-error font-medium">
+                    ⚠️ ยอดเงินในกระเป๋าไม่เพียงพอ กรุณาเติมเงินก่อนทำรายการ
+                  </p>
+                ) : (
+                  <p className="mt-1 text-xs text-status-success font-medium">
+                    ✓ ยอดเงินเพียงพอสำหรับชำระส่วนของประชาชน
+                  </p>
                 )}
               </div>
 
-              {/* รายละเอียดการคำนวณ Co-pay 60/40 */}
-              <div className="mt-4 rounded-2xl border border-hairline bg-surface-soft p-4 space-y-2.5">
-                {/* ยอดรวมสินค้าเดิม */}
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-ink-muted">ยอดรวมสินค้า (100%)</span>
-                  <span className={`font-mono ${scannedData.copaySplit?.discountAmount ? 'line-through text-ink-muted text-xs' : 'font-bold text-ink'}`}>
-                    ฿{(scannedData.copaySplit?.originalTotalAmount ?? scannedData.qrData.totalAmount).toFixed(2)}
-                  </span>
-                </div>
+              {/* ช่องกรอก PIN 6 หลัก */}
+              <div className="rounded-card border border-hairline bg-white p-5 shadow-sm space-y-3">
+                <label className="block text-xs font-semibold text-ink flex items-center space-x-1.5">
+                  <Lock className="h-4 w-4 text-brand-blue" />
+                  <span>รหัส PIN ยืนยันการทำรายการ (6 หลัก)</span>
+                </label>
+                <input
+                  id="input-copay-pin"
+                  type="password"
+                  maxLength={6}
+                  value={pin}
+                  onChange={(e) => setPin(e.target.value)}
+                  placeholder="******"
+                  className="w-full text-center tracking-[0.5em] font-mono text-2xl rounded-pill border border-hairline py-3 focus:border-brand-blue focus:outline-none focus:ring-2 focus:ring-blue-100"
+                />
 
-                {/* แถวแสดงส่วนลดคูปอง/โค้ดเพื่อน */}
-                {scannedData.copaySplit?.discountAmount && scannedData.copaySplit.discountAmount > 0 ? (
-                  <>
-                    <div className="flex justify-between items-center text-sm text-emerald-700 font-medium">
-                      <span className="flex items-center space-x-1">
-                        <Gift className="h-3.5 w-3.5 text-emerald-600" />
-                        <span>ส่วนลดคูปอง / โค้ดชวนเพื่อน ({scannedData.copaySplit.discountCode})</span>
+                {/* ปุ่มยืนยันชำระเงิน */}
+                <button
+                  id="btn-confirm-checkout"
+                  disabled={checkoutMutation.isPending || (wallet ? wallet.balance < (scannedData.copaySplit?.citizenPaidAmount ?? scannedData.qrData.estimatedCitizenPay) : false)}
+                  onClick={() => checkoutMutation.mutate()}
+                  className="w-full flex items-center justify-center space-x-2 rounded-card bg-brand-blue py-4 text-white text-base font-semibold shadow-lg shadow-blue-500/20 transition hover:bg-brand-blue-hover active:scale-98 disabled:opacity-50 mt-2"
+                >
+                  {checkoutMutation.isPending ? (
+                    <>
+                      <RefreshCw className="h-5 w-5 animate-spin" />
+                      <span>ระบบ AI กำลังตรวจสอบความปลอดภัย...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="h-5 w-5" />
+                      <span>
+                        ยืนยันชำระเงิน ฿
+                        {(scannedData.copaySplit?.citizenPaidAmount ?? scannedData.qrData.estimatedCitizenPay).toFixed(2)}
                       </span>
-                      <span className="font-mono font-bold">
-                        - ฿{scannedData.copaySplit.discountAmount.toFixed(2)}
-                      </span>
-                    </div>
-
-                    <div className="flex justify-between items-center text-xs text-ink-muted border-b border-hairline pb-2">
-                      <span>ยอดสุทธิก่อนแบ่ง Co-pay 60/40</span>
-                      <span className="font-mono font-semibold text-ink">
-                        ฿{scannedData.copaySplit.netTotalAmount?.toFixed(2)}
-                      </span>
-                    </div>
-                  </>
-                ) : null}
-
-                {/* รัฐบาลช่วยจ่าย 60% */}
-                <div className="flex justify-between items-center text-sm text-brand-blue">
-                  <span className="flex items-center space-x-1">
-                    <Sparkles className="h-3.5 w-3.5" />
-                    <span>รัฐบาลช่วยจ่าย 60%</span>
-                  </span>
-                  <span className="font-mono font-bold">
-                    - ฿{(scannedData.copaySplit?.governmentCopayAmount ?? scannedData.qrData.estimatedGovCopay).toFixed(2)}
-                  </span>
-                </div>
-
-                {/* ประชาชนจ่ายจริง 40% */}
-                <div className="border-t border-hairline pt-2.5 flex justify-between items-center text-sm font-semibold">
-                  <span className="text-ink">ประชาชนจ่ายจริง (40%)</span>
-                  <span className="font-mono text-2xl font-bold text-status-error">
-                    ฿{(scannedData.copaySplit?.citizenPaidAmount ?? scannedData.qrData.estimatedCitizenPay).toFixed(2)}
-                  </span>
-                </div>
-
-                {/* ป้ายสรุปเงินที่ประหยัดได้ทั้งหมด */}
-                <div className="mt-2 rounded-xl bg-blue-50 border border-blue-200 p-2.5 text-center">
-                  <span className="text-xs font-semibold text-brand-blue">
-                    🎉 คุณประหยัดเงินรวม ฿
-                    {(
-                      scannedData.copaySplit?.totalSavingsAmount ??
-                      ((scannedData.copaySplit?.governmentCopayAmount ?? scannedData.qrData.estimatedGovCopay) +
-                        (scannedData.copaySplit?.discountAmount || 0))
-                    ).toFixed(2)}
-                  </span>
-                  <span className="block text-[10px] text-brand-blue-hover mt-0.5">
-                    (รัฐสมทบ 60% ฿
-                    {(scannedData.copaySplit?.governmentCopayAmount ?? scannedData.qrData.estimatedGovCopay).toFixed(2)}
-                    {scannedData.copaySplit?.discountAmount ? ` + ส่วนลดพิเศษ ฿${scannedData.copaySplit.discountAmount.toFixed(2)}` : ''})
-                  </span>
-                </div>
-              </div>
-
-              {/* ยอดเงินในกระเป๋าคงเหลือเทียบกับยอดที่ต้องจ่าย */}
-              <div className="mt-3 flex items-center justify-between text-xs text-ink-muted px-1">
-                <span>ยอดเงินในกระเป๋าของคุณ:</span>
-                <span className="font-mono font-semibold text-ink">
-                  ฿{(wallet?.balance ?? 0).toFixed(2)}
-                </span>
+                    </>
+                  )}
+                </button>
               </div>
             </div>
-
-            {/* ช่องกรอก PIN 6 หลัก */}
-            <div className="rounded-card border border-hairline bg-white p-4 shadow-sm">
-              <label className="block text-xs font-medium text-ink mb-2 flex items-center space-x-1.5">
-                <Lock className="h-3.5 w-3.5 text-brand-blue" />
-                <span>รหัส PIN ยืนยันการทำรายการ (6 หลัก)</span>
-              </label>
-              <input
-                id="input-copay-pin"
-                type="password"
-                maxLength={6}
-                value={pin}
-                onChange={(e) => setPin(e.target.value)}
-                placeholder="******"
-                className="w-full text-center tracking-[0.5em] font-mono text-lg rounded-pill border border-hairline py-2.5 focus:border-brand-blue focus:outline-none"
-              />
-            </div>
-
-            {/* ปุ่มยืนยันชำระเงิน */}
-            <button
-              id="btn-confirm-checkout"
-              disabled={checkoutMutation.isPending || (wallet ? wallet.balance < (scannedData.copaySplit?.citizenPaidAmount ?? scannedData.qrData.estimatedCitizenPay) : false)}
-              onClick={() => checkoutMutation.mutate()}
-              className="w-full flex items-center justify-center space-x-2 rounded-pill bg-brand-blue py-4 text-white text-base font-semibold shadow-lg shadow-blue-500/20 transition hover:bg-brand-blue-hover active:scale-98 disabled:opacity-50"
-            >
-              {checkoutMutation.isPending ? (
-                <>
-                  <RefreshCw className="h-5 w-5 animate-spin" />
-                  <span>ระบบ AI กำลังตรวจสอบความปลอดภัย...</span>
-                </>
-              ) : (
-                <>
-                  <CheckCircle2 className="h-5 w-5" />
-                  <span>
-                    ยืนยันชำระเงิน ฿
-                    {(scannedData.copaySplit?.citizenPaidAmount ?? scannedData.qrData.estimatedCitizenPay).toFixed(2)}
-                  </span>
-                </>
-              )}
-            </button>
-          </section>
+          </div>
         )}
 
         {/* แจ้งเตือนข้อผิดพลาด (ถ้ามี) */}
@@ -610,7 +658,7 @@ export const CitizenScanCopayPage: React.FC = () => {
         )}
 
         {/* แถบแจ้งมาตรฐานความปลอดภัยระดับสถาบัน */}
-        <div className="pt-2 text-center text-[11px] text-ink-muted flex items-center justify-center space-x-1.5">
+        <div className="pt-2 text-center text-[11px] text-ink-muted flex items-center justify-center space-x-1.5 pb-6">
           <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
           <span>ทำรายการอย่างปลอดภัยด้วยระบบยืนยันตำแหน่งหน้าร้านค้าตามมาตรฐานความปลอดภัย</span>
         </div>

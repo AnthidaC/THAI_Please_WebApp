@@ -64,22 +64,27 @@ export const CitizenPaymentSlipPage: React.FC = () => {
   const isFlagged = slip.status === 'FLAGGED';
 
   return (
-    <div className="min-h-screen bg-surface-soft pb-20 font-sans text-ink">
-      {/* Top Header Bar */}
-      <header className="sticky top-0 z-20 border-b border-hairline bg-white/95 px-4 py-3 backdrop-blur-md">
-        <div className="mx-auto flex max-w-md items-center justify-between">
-          <button
-            onClick={() => navigate(APP_ROUTES.CITIZEN_WALLET)}
-            className="flex items-center space-x-1.5 rounded-full p-1.5 text-xs font-medium text-ink-muted hover:bg-gray-100 hover:text-ink transition"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            <span>กระเป๋าเงิน</span>
-          </button>
-          <span className="text-xs font-semibold text-ink">หลักฐานการชำระเงิน (e-Slip)</span>
+    <div className="min-h-screen bg-surface-soft pb-24 md:pb-12 font-sans text-ink">
+      {/* Page Title & Action Bar */}
+      <div className="bg-white border-b border-hairline px-4 md:px-8 py-3.5 mb-4 shadow-2xs">
+        <div className="mx-auto flex max-w-xl items-center justify-between">
+          <div className="flex items-center space-x-2.5">
+            <button
+              onClick={() => navigate(APP_ROUTES.CITIZEN_WALLET)}
+              className="flex items-center space-x-1.5 rounded-pill px-3 py-1.5 text-xs font-medium text-ink-muted bg-surface-soft hover:bg-gray-200 hover:text-ink transition border border-hairline"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              <span>กลับกระเป๋าเงิน</span>
+            </button>
+            <div className="border-l border-hairline pl-3">
+              <h1 className="text-base font-bold text-ink">หลักฐานการชำระเงินดิจิทัล (e-Slip)</h1>
+              <p className="text-xs text-brand-blue font-medium">โครงการไทยช่วยไทยพลีส (Co-pay 60/40)</p>
+            </div>
+          </div>
         </div>
-      </header>
+      </div>
 
-      <main className="mx-auto max-w-md px-4 pt-4 space-y-4">
+      <main className="mx-auto max-w-md md:max-w-xl px-4 md:px-6 space-y-4">
         {/* บัตร e-Slip หลักฐานการชำระเงิน */}
         <div id="receipt-slip" className="relative overflow-hidden rounded-card border border-hairline bg-white p-6 shadow-md">
           {/* หัวสลิป */}

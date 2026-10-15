@@ -15,7 +15,7 @@ export const HomePage: React.FC = () => {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-[85vh] bg-surface-soft py-8 px-4 font-sans text-ink">
+    <div className="min-h-[85vh] bg-surface-soft py-6 md:py-8 px-4 pb-24 md:pb-12 font-sans text-ink">
       <div className="max-w-4xl mx-auto space-y-8">
         {/* Hero Section */}
         <div className="rounded-card border border-hairline bg-white p-8 shadow-sm text-center">

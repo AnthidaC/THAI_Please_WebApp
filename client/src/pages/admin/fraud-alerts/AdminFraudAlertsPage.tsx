@@ -37,7 +37,7 @@ export const AdminFraudAlertsPage: React.FC = () => {
   });
 
   return (
-    <div className="min-h-screen bg-surface-soft p-4 md:p-8 font-sans text-ink">
+    <div className="min-h-screen bg-surface-soft p-4 md:p-8 pb-24 md:pb-12 font-sans text-ink">
       <div className="mx-auto max-w-6xl">
         {/* Header */}
         <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
