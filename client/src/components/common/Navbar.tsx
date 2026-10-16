@@ -19,25 +19,25 @@ export const Navbar: React.FC = () => {
   return (
     <>
       {/* 1. TOP NAVBAR (Responsive: Full on Desktop, Clean & Compact on Mobile) */}
-      <nav className="bg-white border-b border-hairline px-4 lg:px-8 py-2.5 shadow-sm sticky top-0 z-30 font-sans">
-        <div className="flex items-center justify-between max-w-7xl mx-auto gap-3">
+      <nav className="bg-white border-b border-hairline px-3.5 sm:px-6 lg:px-8 py-2.5 shadow-sm sticky top-0 z-30 font-sans">
+        <div className="flex items-center justify-between max-w-7xl mx-auto gap-2 sm:gap-3">
           {/* Brand Logo & Name */}
           <div
             onClick={() => navigate(APP_ROUTES.HOME)}
-            className="flex items-center space-x-2.5 cursor-pointer select-none min-w-0"
+            className="flex items-center space-x-2 sm:space-x-2.5 cursor-pointer select-none min-w-0"
           >
-            <div className="h-9 w-9 shrink-0 rounded-2xl bg-brand-blue flex items-center justify-center text-white font-bold text-sm shadow-sm shadow-blue-500/25">
+            <div className="h-8 w-8 sm:h-9 sm:w-9 shrink-0 rounded-2xl bg-brand-blue flex items-center justify-center text-white font-bold text-xs sm:text-sm shadow-sm shadow-blue-500/25">
               TP
             </div>
             <div className="min-w-0">
-              <span className="font-bold text-base text-ink tracking-tight flex items-center space-x-1.5 leading-none">
-                <span>THAI Please</span>
-                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-brand-blue bg-brand-blue-light px-2 py-0.5 rounded-pill border border-blue-200 whitespace-nowrap">
-                  <RoleIcon className="h-3 w-3" />
-                  {ROLE_LABEL[role].label}
+              <span className="font-bold text-sm sm:text-base text-ink tracking-tight flex items-center space-x-1.5 leading-none">
+                <span className="truncate">THAI Please</span>
+                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-brand-blue bg-brand-blue-light px-1.5 sm:px-2 py-0.5 rounded-pill border border-blue-200 whitespace-nowrap shrink-0">
+                  <RoleIcon className="h-3 w-3 shrink-0" />
+                  <span className="hidden xs:inline">{ROLE_LABEL[role].label}</span>
                 </span>
               </span>
-              <span className="text-[11px] text-ink-muted block mt-0.5 truncate">
+              <span className="text-[10px] sm:text-[11px] text-ink-muted block mt-0.5 truncate">
                 กระเป๋าเงินดิจิทัล &amp; ระบบชำระเงินร่วม
               </span>
             </div>

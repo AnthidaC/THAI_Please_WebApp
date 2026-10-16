@@ -2,6 +2,7 @@ import prisma from '../utils/prisma';
 
 export interface MonthlyCycleInfo {
   currentMonthName: string;
+  validUntilDate: string;
   nextQuotaDate: string;
   cumulativeToMonthLabel: string;
   monthlyAllocationAmount: number;
@@ -35,14 +36,18 @@ export const getMonthlyCycleDetails = (now = new Date()): MonthlyCycleInfo => {
   const currentYearBuddhist = now.getFullYear() + 543;
   const currentMonthName = `${thaiMonths[currentMonthIdx]} ${currentYearBuddhist}`;
 
+  const lastDayOfMonth = new Date(now.getFullYear(), currentMonthIdx + 1, 0).getDate();
+  const validUntilDate = `${lastDayOfMonth} ${thaiMonths[currentMonthIdx]} ${currentYearBuddhist}`;
+
   const nextMonthIdx = (currentMonthIdx + 1) % 12;
   const nextMonthYear = currentMonthIdx === 11 ? currentYearBuddhist + 1 : currentYearBuddhist;
   const nextQuotaDate = `1 ${thaiShortMonths[nextMonthIdx]} ${nextMonthYear}`;
 
   return {
     currentMonthName,
+    validUntilDate,
     nextQuotaDate,
-    cumulativeToMonthLabel: `สะสมถึงเดือน${thaiMonths[currentMonthIdx]} ${currentYearBuddhist}`,
+    cumulativeToMonthLabel: `ใช้ได้ถึงวันที่ ${validUntilDate}`,
     monthlyAllocationAmount: 1000.0,
   };
 };

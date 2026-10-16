@@ -2,6 +2,7 @@ import axios from '../lib/axios';
 
 export interface MonthlyCycleInfo {
   currentMonthName: string;
+  validUntilDate?: string;
   nextQuotaDate?: string;
   cumulativeToMonthLabel?: string;
   monthlyAllocationAmount?: number;

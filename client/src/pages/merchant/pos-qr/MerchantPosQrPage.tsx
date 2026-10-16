@@ -425,12 +425,16 @@ export const MerchantPosQrPage: React.FC = () => {
   const currentShopName =
     merchantData?.merchant?.shopName || (isMerchantLoading ? 'กำลังโหลดข้อมูลร้าน...' : 'ร้านข้าวมันไก่ป้าณี (วิสาหกิจชุมชน)');
 
+  const govPreviewAmount = Math.min((amount || 0) * 0.6, 150);
+  const citizenPreviewAmount = Math.max(0, (amount || 0) - govPreviewAmount);
+  const govPercent = amount > 0 ? Math.round((govPreviewAmount / amount) * 100) : 60;
+
   return (
     <div className="min-h-screen bg-surface-soft pb-24 md:pb-12 font-sans text-ink">
       {/* Page Title & Action Bar (กระชับบนมือถือ เพื่อให้ปุ่มสร้าง QR อยู่ใน 1 จอ) */}
-      <div className="bg-white border-b border-hairline px-4 md:px-8 py-2.5 md:py-3.5 mb-3 md:mb-4 shadow-2xs">
-        <div className="mx-auto flex max-w-5xl items-center justify-between gap-3">
-          <div className="flex items-center space-x-2.5 min-w-0">
+      <div className="bg-white border-b border-hairline px-3.5 sm:px-6 lg:px-8 py-2.5 sm:py-3.5 mb-3 sm:mb-4 shadow-2xs">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 sm:gap-3">
+          <div className="flex items-center space-x-2 sm:space-x-2.5 min-w-0">
             <button
               onClick={() => {
                 if (qrResult) {
@@ -445,37 +449,39 @@ export const MerchantPosQrPage: React.FC = () => {
               <ArrowLeft className="h-4 w-4" />
               <span className="hidden sm:inline">{qrResult ? 'กลับหน้าตั้งยอด' : 'หน้าหลัก'}</span>
             </button>
-            <div className="border-l border-hairline pl-3 min-w-0">
-              <h1 className="text-base md:text-lg font-bold text-ink truncate flex items-center gap-1.5">
+            <div className="border-l border-hairline pl-2.5 sm:pl-3 min-w-0">
+              <h1 className="text-sm sm:text-base md:text-lg font-bold text-ink truncate flex items-center gap-1.5">
                 <span className="truncate">{currentShopName}</span>
                 <CheckCircle2 className="h-4 w-4 text-status-success shrink-0" aria-label="ร้านค้าลงทะเบียนถูกต้อง" />
               </h1>
-              <p className="hidden sm:block text-xs text-brand-blue font-medium">ระบบสร้าง QR รับเงินร้านค้า (Co-pay 60/40)</p>
+              <p className="hidden sm:block text-xs text-brand-blue font-medium truncate">
+                ระบบสร้าง QR รับเงินร้านค้า (Co-pay 60/40)
+              </p>
             </div>
           </div>
           <button
             onClick={() => navigate(APP_ROUTES.MERCHANT_SALES)}
-            className="hidden md:inline-flex items-center space-x-1.5 rounded-pill px-3 py-1.5 text-xs font-medium text-brand-blue bg-blue-50 hover:bg-blue-100 transition border border-blue-200 shrink-0"
+            className="inline-flex items-center space-x-1.5 rounded-pill px-2.5 sm:px-3 py-1.5 text-xs font-medium text-brand-blue bg-blue-50 hover:bg-blue-100 transition border border-blue-200 shrink-0"
           >
-            <TrendingUp className="h-3.5 w-3.5" />
-            <span>ดูประวัติยอดขาย</span>
+            <TrendingUp className="h-3.5 w-3.5 shrink-0" />
+            <span className="hidden xs:inline">ประวัติยอดขาย</span>
           </button>
         </div>
       </div>
 
-      <main className="mx-auto w-full max-w-5xl px-4 sm:px-6 lg:px-8 space-y-4">
-        {/* VIEW 1: หน้าตั้งยอดเงิน — ทุกอย่างที่ต้องกดบ่อยอยู่ในการ์ดเดียว ไม่ต้องเลื่อนจอ */}
+      <main className="mx-auto w-full max-w-6xl px-3.5 sm:px-6 lg:px-8 space-y-4">
+        {/* VIEW 1: หน้าตั้งยอดเงิน — ปรับขนาดอัตโนมัติทั้งมือถือ แท็บเล็ต และเดสก์ท็อป */}
         {!qrResult ? (
           <div className="animate-in fade-in duration-200">
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-6 items-start">
-              <div className="md:col-span-7 rounded-card border border-hairline bg-white p-4 md:p-6 shadow-sm space-y-3 md:space-y-4">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 items-start">
+              <div className="lg:col-span-7 rounded-card border border-hairline bg-white p-4 sm:p-6 shadow-sm space-y-4">
                 {/* ช่องระบุยอดเงิน */}
                 <div>
-                  <label htmlFor="input-pos-amount" className="block text-xs font-semibold text-ink mb-1.5">
+                  <label htmlFor="input-pos-amount" className="block text-xs sm:text-sm font-semibold text-ink mb-1.5">
                     ยอดเงินที่ต้องการเรียกเก็บ (บาท)
                   </label>
                   <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 font-mono text-2xl font-bold text-ink-muted">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 font-mono text-2xl sm:text-3xl font-bold text-ink-muted">
                       ฿
                     </span>
                     <input
@@ -486,38 +492,46 @@ export const MerchantPosQrPage: React.FC = () => {
                       max="100000"
                       value={amount || ''}
                       onChange={(e) => setAmount(Number(e.target.value))}
-                      className="w-full rounded-card border border-hairline pl-11 pr-4 py-3 font-mono text-3xl font-extrabold text-ink focus:border-brand-blue focus:outline-none focus:ring-2 focus:ring-blue-100"
+                      className="w-full rounded-card border border-hairline pl-11 pr-4 py-3 sm:py-3.5 font-mono text-2xl sm:text-3xl md:text-4xl font-extrabold text-ink focus:border-brand-blue focus:outline-none focus:ring-2 focus:ring-blue-100"
                       placeholder="0"
                     />
                   </div>
                 </div>
 
-                {/* ปุ่มลัดเลือกยอดเงินด่วน */}
-                <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
-                  {[40, 60, 100, 120, 150, 200, 250, 300].map((preset) => (
-                    <button
-                      key={preset}
-                      type="button"
-                      onClick={() => setAmount(preset)}
-                      className={`rounded-pill border py-2 text-xs font-mono font-medium transition active:scale-95 ${
-                        amount === preset
-                          ? 'border-brand-blue bg-blue-50 text-brand-blue font-bold ring-1 ring-brand-blue'
-                          : 'border-hairline text-ink hover:bg-gray-50'
-                      }`}
-                    >
-                      ฿{preset}
-                    </button>
-                  ))}
+                {/* ปุ่มลัดเลือกยอดเงินด่วน (8 ปุ่ม แบ่ง 4 คอลัมน์สมมาตรทุกหน้าจอ) */}
+                <div>
+                  <span className="block text-[11px] font-medium text-ink-muted mb-2">
+                    เลือกยอดเงินด่วน:
+                  </span>
+                  <div className="grid grid-cols-4 gap-2">
+                    {[40, 60, 100, 120, 150, 200, 250, 300].map((preset) => (
+                      <button
+                        key={preset}
+                        type="button"
+                        onClick={() => setAmount(preset)}
+                        className={`rounded-pill border py-2 sm:py-2.5 text-xs sm:text-sm font-mono font-medium transition active:scale-95 ${
+                          amount === preset
+                            ? 'border-brand-blue bg-blue-50 text-brand-blue font-bold ring-1 ring-brand-blue'
+                            : 'border-hairline text-ink hover:bg-gray-50'
+                        }`}
+                      >
+                        ฿{preset}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
-                {/* สรุปส่วนแบ่ง Co-pay แบบบรรทัดเดียว */}
-                <div className="flex items-center justify-between rounded-2xl border border-blue-100 bg-blue-50/50 px-3 py-2 text-[11px]">
+                {/* สรุปส่วนแบ่ง Co-pay แบบกระชับ (แสดงทุกขนาดจอ) */}
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-blue-100 bg-blue-50/50 px-3.5 py-2.5 text-xs">
                   <span className="text-ink-muted">
-                    ลูกค้าจ่าย <b className="font-mono text-ink">฿{Math.max(0, amount - Math.min(amount * 0.6, 150)).toFixed(2)}</b>
+                    ลูกค้าจ่าย (40%):{' '}
+                    <b className="font-mono text-ink">฿{citizenPreviewAmount.toFixed(2)}</b>
                   </span>
-                  <span className="text-brand-blue flex items-center gap-1">
-                    <Sparkles className="h-3 w-3" />
-                    รัฐช่วย <b className="font-mono">฿{Math.min(amount * 0.6, 150).toFixed(2)}</b>
+                  <span className="text-brand-blue flex items-center gap-1 font-medium">
+                    <Sparkles className="h-3.5 w-3.5 shrink-0" />
+                    <span>
+                      รัฐช่วย (60%): <b className="font-mono">฿{govPreviewAmount.toFixed(2)}</b>
+                    </span>
                   </span>
                 </div>
 
@@ -526,68 +540,100 @@ export const MerchantPosQrPage: React.FC = () => {
                   id="btn-generate-qr"
                   disabled={isGenerating || amount <= 0}
                   onClick={handleGenerate}
-                  className="w-full flex items-center justify-center space-x-2 rounded-card bg-brand-blue py-3.5 md:py-4 text-white text-base font-semibold shadow-lg shadow-blue-500/20 transition hover:bg-brand-blue-hover active:scale-98 disabled:opacity-50"
+                  className="w-full flex items-center justify-center space-x-2 rounded-card bg-brand-blue py-3.5 sm:py-4 text-white text-sm sm:text-base font-semibold shadow-lg shadow-blue-500/20 transition hover:bg-brand-blue-hover active:scale-98 disabled:opacity-50"
                 >
                   {isGenerating ? (
                     <>
-                      <RefreshCw className="h-5 w-5 animate-spin" />
+                      <RefreshCw className="h-5 w-5 animate-spin shrink-0" />
                       <span>กำลังสร้าง QR...</span>
                     </>
                   ) : (
                     <>
-                      <QrCode className="h-5 w-5" />
+                      <QrCode className="h-5 w-5 shrink-0" />
                       <span>สร้าง QR รับเงิน ฿{(amount || 0).toLocaleString()}</span>
                     </>
                   )}
                 </button>
               </div>
 
-              {/* ข้อมูลเสริม (จอใหญ่แสดงด้านขวา / มือถืออยู่ด้านล่าง) */}
-              <div className="md:col-span-5 space-y-4">
-                <div className="hidden md:block rounded-card border border-hairline bg-white p-5 shadow-sm text-xs space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-ink-muted">ลูกค้าสแกนจ่าย 40%</span>
-                    <span className="font-mono font-bold text-ink">฿{Math.max(0, amount - Math.min(amount * 0.6, 150)).toFixed(2)}</span>
+              {/* ข้อมูลสรุปสัดส่วนการรับเงิน (จอใหญ่แสดงด้านขวา / มือถือแสดงการ์ดสรุปด้านล่าง) */}
+              <div className="lg:col-span-5 space-y-4">
+                <div className="rounded-card border border-hairline bg-white p-4 sm:p-5 shadow-sm text-xs space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-bold text-ink">สรุปสัดส่วนรายรับร้านค้า</h3>
+                    <span className="rounded-pill bg-emerald-50 px-2.5 py-0.5 text-[10px] font-semibold text-status-success border border-emerald-200">
+                      โอนเข้าบัญชีร้าน 100%
+                    </span>
                   </div>
-                  <div className="flex justify-between text-brand-blue">
-                    <span>รัฐบาลสมทบ 60%</span>
-                    <span className="font-mono font-bold">฿{Math.min(amount * 0.6, 150).toFixed(2)}</span>
+
+                  {/* แถบแสดงสัดส่วน Co-pay */}
+                  <div className="space-y-1.5">
+                    <div className="h-2.5 w-full rounded-full bg-gray-100 overflow-hidden flex">
+                      <div
+                        className="h-full bg-brand-blue transition-all duration-300"
+                        style={{ width: `${govPercent}%` }}
+                        title={`รัฐสมทบ ${govPercent}%`}
+                      />
+                      <div
+                        className="h-full bg-emerald-500 transition-all duration-300"
+                        style={{ width: `${100 - govPercent}%` }}
+                        title={`ลูกค้าจ่าย ${100 - govPercent}%`}
+                      />
+                    </div>
+                    <div className="flex justify-between text-[10px] text-ink-muted">
+                      <span className="text-brand-blue font-medium">● รัฐสมทบ ({govPercent}%)</span>
+                      <span className="text-emerald-700 font-medium">● ลูกค้าจ่าย ({100 - govPercent}%)</span>
+                    </div>
                   </div>
-                  <div className="border-t border-hairline pt-2 flex justify-between font-semibold">
-                    <span className="text-ink">ยอดขายรวมที่ร้านได้รับ</span>
-                    <span className="font-mono text-status-success text-sm">฿{(amount || 0).toFixed(2)}</span>
+
+                  <div className="space-y-2 pt-1 border-t border-hairline">
+                    <div className="flex justify-between items-center">
+                      <span className="text-ink-muted">ลูกค้าสแกนจ่าย</span>
+                      <span className="font-mono font-bold text-ink">฿{citizenPreviewAmount.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-brand-blue">
+                      <span>รัฐบาลสมทบ (สูงสุด ฿150/วัน)</span>
+                      <span className="font-mono font-bold">฿{govPreviewAmount.toFixed(2)}</span>
+                    </div>
+                    <div className="border-t border-hairline pt-2.5 flex justify-between items-center font-semibold">
+                      <span className="text-ink">ยอดขายรวมที่ร้านได้รับ</span>
+                      <span className="font-mono text-status-success text-base sm:text-lg font-bold">
+                        ฿{(amount || 0).toFixed(2)}
+                      </span>
+                    </div>
                   </div>
                 </div>
+
                 <button
                   onClick={() => navigate(APP_ROUTES.MERCHANT_SALES)}
-                  className="md:hidden w-full flex items-center justify-center space-x-2 rounded-card border border-hairline bg-white py-3 px-4 text-xs font-semibold text-ink-muted hover:text-ink transition shadow-sm"
+                  className="w-full flex items-center justify-center space-x-2 rounded-card border border-hairline bg-white py-3 px-4 text-xs font-semibold text-ink-muted hover:text-ink hover:bg-gray-50 transition shadow-sm"
                 >
-                  <TrendingUp className="h-4 w-4 text-brand-blue" />
-                  <span>ดูสรุปยอดขาย</span>
+                  <TrendingUp className="h-4 w-4 text-brand-blue shrink-0" />
+                  <span>ดูสรุปยอดขายและประวัติการรับเงินทั้งหมด</span>
                 </button>
               </div>
             </div>
           </div>
         ) : (
-          /* VIEW 2: หน้าจอแสดงผล QR Code ให้ลูกค้าสแกนทันที (เด้งหน้าใหม่ เต็มตา ไม่ต้องเลื่อนจอ บนคอมกึ่งกลาง) */
+          /* VIEW 2: หน้าจอแสดงผล QR Code ให้ลูกค้าสแกนทันที (ปรับตัวตามขนาดจอตั้งแต่ 320px ถึงจอใหญ่) */
           <div className="max-w-lg mx-auto animate-in fade-in zoom-in-95 duration-200">
-            <div className="rounded-card border border-hairline bg-white p-6 md:p-8 shadow-lg text-center">
+            <div className="rounded-card border border-hairline bg-white p-4 sm:p-6 md:p-8 shadow-lg text-center">
               {/* Badge สถานะพร้อมสแกน & Countdown Timer 3 นาที */}
-              <div className="flex flex-wrap items-center justify-center gap-2 mb-2">
+              <div className="flex flex-wrap items-center justify-center gap-1.5 sm:gap-2 mb-2">
                 {!isExpired ? (
-                  <span className="inline-flex items-center space-x-1.5 rounded-pill bg-emerald-50 px-3 py-1 text-xs font-semibold text-status-success border border-emerald-200">
-                    <CheckCircle2 className="h-4 w-4" />
-                    <span>Dynamic QR พร้อมให้ลูกค้าสแกน</span>
+                  <span className="inline-flex items-center space-x-1.5 rounded-pill bg-emerald-50 px-2.5 sm:px-3 py-1 text-[11px] sm:text-xs font-semibold text-status-success border border-emerald-200">
+                    <CheckCircle2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
+                    <span>Dynamic QR พร้อมสแกน</span>
                   </span>
                 ) : (
-                  <span className="inline-flex items-center space-x-1.5 rounded-pill bg-red-50 px-3 py-1 text-xs font-semibold text-status-error border border-red-200 animate-pulse">
-                    <AlertTriangle className="h-4 w-4" />
+                  <span className="inline-flex items-center space-x-1.5 rounded-pill bg-red-50 px-2.5 sm:px-3 py-1 text-[11px] sm:text-xs font-semibold text-status-error border border-red-200 animate-pulse">
+                    <AlertTriangle className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
                     <span>QR หมดอายุ กรุณาทำรายการใหม่</span>
                   </span>
                 )}
 
                 <span
-                  className={`inline-flex items-center space-x-1 rounded-pill px-2.5 py-1 text-xs font-mono font-bold border ${
+                  className={`inline-flex items-center space-x-1 rounded-pill px-2.5 py-1 text-[11px] sm:text-xs font-mono font-bold border ${
                     isExpired
                       ? 'bg-red-100 text-red-700 border-red-300'
                       : secondsRemaining < 60
@@ -595,29 +641,38 @@ export const MerchantPosQrPage: React.FC = () => {
                       : 'bg-blue-50 text-brand-blue border-blue-200'
                   }`}
                 >
-                  <Clock className="h-3.5 w-3.5" />
+                  <Clock className="h-3.5 w-3.5 shrink-0" />
                   <span>{isExpired ? 'หมดอายุแล้ว (00:00)' : `อายุ QR: ${formattedTimer} น.`}</span>
                 </span>
               </div>
 
               {/* ชื่อร้านค้า (ดึงจากระบบ) */}
-              <h2 className="text-sm md:text-base font-bold text-ink mt-1 truncate">{qrResult.shopName}</h2>
+              <h2 className="text-sm sm:text-base font-bold text-ink mt-1 truncate">{qrResult.shopName}</h2>
 
               {/* ยอดเงินใหญ่ ชัดเจน */}
-              <div className="my-1">
-                <div className="font-mono text-3xl md:text-4xl font-extrabold text-brand-blue">
+              <div className="my-1.5">
+                <div className="font-mono text-2xl sm:text-3xl md:text-4xl font-extrabold text-brand-blue">
                   ฿ {qrResult.totalAmount.toLocaleString('th-TH', { minimumFractionDigits: 2 })}
                 </div>
-                <div className="mt-0.5 text-[11px] text-ink-muted">
-                  ลูกค้าจ่าย <b className="font-mono text-ink">฿{qrResult.estimatedCitizenPay.toFixed(2)}</b>
-                  {' • '}
-                  <span className="text-brand-blue">รัฐช่วย <b className="font-mono">฿{qrResult.estimatedGovCopay.toFixed(2)}</b></span>
+                <div className="mt-1 flex flex-wrap items-center justify-center gap-x-2 gap-y-0.5 text-[11px] sm:text-xs text-ink-muted">
+                  <span>
+                    ลูกค้าจ่าย <b className="font-mono text-ink">฿{qrResult.estimatedCitizenPay.toFixed(2)}</b>
+                  </span>
+                  <span>•</span>
+                  <span className="text-brand-blue">
+                    รัฐช่วย <b className="font-mono">฿{qrResult.estimatedGovCopay.toFixed(2)}</b>
+                  </span>
                 </div>
               </div>
 
-              {/* Canvas QR Code ขนาด 280x280 ชัดเจนตรงกลางจอ พร้อม Overlay เมื่อหมดอายุ 3 นาที */}
-              <div className="relative mx-auto my-3 flex items-center justify-center rounded-3xl border-2 border-hairline bg-white p-3 shadow-sm max-w-[305px] overflow-hidden">
-                <canvas ref={canvasRef} className={`mx-auto block transition ${isExpired ? 'opacity-20 filter blur-[1.5px]' : ''}`} />
+              {/* Canvas QR Code ย่อ-ขยายตามหน้าจออัตโนมัติ พร้อม Overlay เมื่อหมดอายุ 3 นาที */}
+              <div className="relative mx-auto my-3 flex items-center justify-center rounded-3xl border-2 border-hairline bg-white p-2.5 sm:p-3 shadow-sm w-full max-w-[290px] sm:max-w-[305px] overflow-hidden">
+                <canvas
+                  ref={canvasRef}
+                  className={`mx-auto block max-w-full h-auto transition ${
+                    isExpired ? 'opacity-20 filter blur-[1.5px]' : ''
+                  }`}
+                />
                 {isExpired && (
                   <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/92 p-4 text-center animate-in fade-in">
                     <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-100 text-status-error mb-2">
@@ -639,43 +694,43 @@ export const MerchantPosQrPage: React.FC = () => {
               </div>
 
               {/* Reference number and copy button */}
-              <div className="mt-3 flex items-center justify-between text-xs font-mono text-ink-muted bg-surface-soft px-3.5 py-2.5 rounded-pill border border-hairline">
-                <span className="truncate">Ref: {qrResult.qrReference}</span>
+              <div className="mt-3 flex items-center justify-between gap-2 text-xs font-mono text-ink-muted bg-surface-soft px-3.5 py-2.5 rounded-pill border border-hairline">
+                <span className="truncate min-w-0">Ref: {qrResult.qrReference}</span>
                 <button
                   onClick={handleCopyRef}
-                  className="flex items-center space-x-1 text-brand-blue font-sans font-semibold hover:underline ml-2 flex-shrink-0"
+                  className="flex items-center space-x-1 text-brand-blue font-sans font-semibold hover:underline shrink-0"
                 >
                   {copied ? (
                     <>
-                      <Check className="h-3 w-3 text-status-success" />
+                      <Check className="h-3.5 w-3.5 text-status-success" />
                       <span className="text-status-success">คัดลอกแล้ว</span>
                     </>
                   ) : (
                     <>
-                      <Copy className="h-3 w-3" />
+                      <Copy className="h-3.5 w-3.5" />
                       <span>คัดลอก</span>
                     </>
                   )}
                 </button>
               </div>
 
-              {/* ปุ่มสร้างบิลใหม่ และบันทึกรูป */}
-              <div className="mt-5 grid grid-cols-2 gap-3">
+              {/* ปุ่มสร้างบิลใหม่ และบันทึกรูป (เรียง 1 คอลัมน์บนจอเล็ก และ 2 คอลัมน์บนจอปกติ) */}
+              <div className="mt-4 sm:mt-5 grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
                 <button
                   id="btn-download-qr"
                   disabled={isDownloading}
                   onClick={handleDownloadQr}
-                  className="flex items-center justify-center space-x-1.5 rounded-pill border border-blue-200 bg-blue-50/70 py-3 text-xs font-semibold text-brand-blue shadow-sm hover:bg-blue-100 transition active:scale-95 disabled:opacity-50"
+                  className="flex items-center justify-center space-x-1.5 rounded-pill border border-blue-200 bg-blue-50/70 py-3 px-4 text-xs font-semibold text-brand-blue shadow-sm hover:bg-blue-100 transition active:scale-95 disabled:opacity-50"
                   title="บันทึกรูปป้าย QR พร้อมเพย์เต็มรูปแบบ"
                 >
                   {isDownloading ? (
                     <>
-                      <RefreshCw className="h-4 w-4 animate-spin text-brand-blue" />
+                      <RefreshCw className="h-4 w-4 animate-spin text-brand-blue shrink-0" />
                       <span>กำลังสร้างรูปป้าย...</span>
                     </>
                   ) : (
                     <>
-                      <Download className="h-4 w-4 text-brand-blue" />
+                      <Download className="h-4 w-4 text-brand-blue shrink-0" />
                       <span>บันทึกรูป QR พร้อมเพย์</span>
                     </>
                   )}
@@ -687,9 +742,9 @@ export const MerchantPosQrPage: React.FC = () => {
                     setQrResult(null);
                     setAmount(100);
                   }}
-                  className="flex items-center justify-center space-x-1.5 rounded-pill bg-brand-blue py-3 text-xs font-semibold text-white shadow-md hover:bg-brand-blue-hover transition active:scale-95"
+                  className="flex items-center justify-center space-x-1.5 rounded-pill bg-brand-blue py-3 px-4 text-xs font-semibold text-white shadow-md hover:bg-brand-blue-hover transition active:scale-95"
                 >
-                  <RefreshCw className="h-4 w-4" />
+                  <RefreshCw className="h-4 w-4 shrink-0" />
                   <span>สร้างบิลใหม่</span>
                 </button>
               </div>
