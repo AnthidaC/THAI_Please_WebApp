@@ -1,10 +1,15 @@
 import React from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, ScrollRestoration } from 'react-router-dom';
 import { Navbar } from '../components/common/Navbar';
+import { ScrollToTop } from '../components/common/ScrollToTop';
 
 export const RootLayout: React.FC = () => {
   return (
     <div className="min-h-screen flex flex-col bg-surface-soft font-sans text-ink">
+      {/* เลื่อนหน้าจอขึ้นบนสุดเสมอเมื่อเปลี่ยนหน้า (Route change) รองรับทุกอุปกรณ์ */}
+      <ScrollToTop />
+      <ScrollRestoration />
+
       {/* Unified Responsive Navigation (Top bar on Desktop, Top & Bottom Nav on Mobile) */}
       <Navbar />
 
