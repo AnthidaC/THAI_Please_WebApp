@@ -84,7 +84,7 @@ export const CitizenWalletPage: React.FC = () => {
         </div>
       </div>
 
-      <main className="mx-auto max-w-md md:max-w-5xl px-4 md:px-6 space-y-4 pb-24 md:pb-12">
+      <main className="mx-auto w-full max-w-5xl px-4 sm:px-6 lg:px-8 space-y-4 pb-24 md:pb-12">
         {/* ข้อความแจ้งเตือนข้อผิดพลาด (ถ้ามี) */}
         {isWalletError && (
           <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-status-error flex items-start space-x-3">
@@ -100,7 +100,7 @@ export const CitizenWalletPage: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
           {/* Left Column: Balances & Quota (md:col-span-7) */}
           <div className="md:col-span-7 space-y-4">
-            {/* 1. การ์ดยอดเงินส่วนตัว (Personal Wallet Balance) */}
+            {/* 1. การ์ดยอดเงินส่วนตัว (Personal Wallet Balance) + ปุ่มด่วนด้านบนสำหรับมือถือ */}
             <section className="relative overflow-hidden rounded-card border border-hairline bg-white p-5 shadow-sm transition hover:shadow-md">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-medium uppercase tracking-wider text-ink-muted">
@@ -112,7 +112,7 @@ export const CitizenWalletPage: React.FC = () => {
                 </span>
               </div>
 
-              <div className="mt-3 flex items-baseline justify-between">
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <div className="font-mono text-3xl font-bold tracking-tight text-ink">
                     ฿ {isWalletLoading ? '---.--' : (wallet?.balance ?? 0).toLocaleString('th-TH', { minimumFractionDigits: 2 })}
@@ -121,14 +121,23 @@ export const CitizenWalletPage: React.FC = () => {
                     ใช้สำหรับชำระส่วนของประชาชน (40% หรือส่วนเกิน)
                   </p>
                 </div>
-                <button
-                  id="btn-open-topup"
-                  onClick={() => setShowTopUpModal(true)}
-                  className="inline-flex items-center space-x-1.5 rounded-pill bg-brand-blue px-3.5 py-2 text-xs font-medium text-white shadow-sm transition hover:bg-brand-blue-hover active:scale-95"
-                >
-                  <PlusCircle className="h-4 w-4" />
-                  <span>เติมเงิน</span>
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    id="btn-open-topup"
+                    onClick={() => setShowTopUpModal(true)}
+                    className="inline-flex items-center space-x-1.5 rounded-pill border border-blue-200 bg-blue-50 px-3.5 py-2 text-xs font-semibold text-brand-blue transition hover:bg-blue-100 active:scale-95"
+                  >
+                    <PlusCircle className="h-4 w-4" />
+                    <span>เติมเงิน</span>
+                  </button>
+                  <button
+                    onClick={() => navigate(APP_ROUTES.CITIZEN_SCAN_COPAY)}
+                    className="md:hidden inline-flex items-center space-x-1.5 rounded-pill bg-brand-blue px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-brand-blue-hover active:scale-95"
+                  >
+                    <QrCode className="h-4 w-4" />
+                    <span>สแกนจ่าย</span>
+                  </button>
+                </div>
               </div>
             </section>
 
@@ -293,7 +302,7 @@ export const CitizenWalletPage: React.FC = () => {
             {/* Institutional Calm Badge */}
             <section className="flex items-center justify-center space-x-2 py-2 text-xs text-ink-muted">
               <ShieldCheck className="h-4 w-4 text-emerald-600" />
-              <span>ระบบตรวจจับความปลอดภัยพิกัด GPS & Semi-AI ทำงานตลอดเวลา</span>
+              <span>ธุรกรรมได้รับการคุ้มครองตามมาตรฐานความปลอดภัย</span>
             </section>
           </div>
         </div>

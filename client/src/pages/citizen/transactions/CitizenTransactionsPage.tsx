@@ -64,7 +64,7 @@ export const CitizenTransactionsPage: React.FC = () => {
         </div>
       </div>
 
-      <main className="mx-auto max-w-md md:max-w-4xl px-4 md:px-6 space-y-4">
+      <main className="mx-auto w-full max-w-4xl px-4 sm:px-6 lg:px-8 space-y-4">
         {/* ช่องค้นหา */}
         <div className="relative">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-ink-muted" />

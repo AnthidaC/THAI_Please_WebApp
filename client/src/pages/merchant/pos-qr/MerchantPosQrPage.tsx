@@ -5,10 +5,8 @@ import { useNavigate } from 'react-router-dom';
 import {
   QrCode,
   Sparkles,
-  MapPin,
   RefreshCw,
   Download,
-  Store,
   CheckCircle2,
   TrendingUp,
   ArrowLeft,
@@ -381,7 +379,7 @@ export const MerchantPosQrPage: React.FC = () => {
 
     ctx.fillStyle = '#94a3b8';
     ctx.font = '12px "Prompt", "Sarabun", -apple-system, sans-serif';
-    ctx.fillText('ระบบความปลอดภัยระดับสถาบันการเงิน • ตรวจสอบพิกัด Geofence อัตโนมัติ', w / 2, footerY + 48);
+    ctx.fillText('โครงการไทยช่วยไทยพลีส (THAI Please) • กระทรวงการคลัง', w / 2, footerY + 48);
 
     return canvas.toDataURL('image/png');
   };
@@ -429,10 +427,10 @@ export const MerchantPosQrPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-surface-soft pb-24 md:pb-12 font-sans text-ink">
-      {/* Page Title & Action Bar */}
-      <div className="bg-white border-b border-hairline px-4 md:px-8 py-3.5 mb-4 shadow-2xs">
-        <div className="mx-auto flex max-w-5xl items-center justify-between">
-          <div className="flex items-center space-x-2.5">
+      {/* Page Title & Action Bar (กระชับบนมือถือ เพื่อให้ปุ่มสร้าง QR อยู่ใน 1 จอ) */}
+      <div className="bg-white border-b border-hairline px-4 md:px-8 py-2.5 md:py-3.5 mb-3 md:mb-4 shadow-2xs">
+        <div className="mx-auto flex max-w-5xl items-center justify-between gap-3">
+          <div className="flex items-center space-x-2.5 min-w-0">
             <button
               onClick={() => {
                 if (qrResult) {
@@ -441,19 +439,23 @@ export const MerchantPosQrPage: React.FC = () => {
                   navigate(APP_ROUTES.HOME);
                 }
               }}
-              className="flex items-center space-x-1.5 rounded-pill px-3 py-1.5 text-xs font-medium text-ink-muted bg-surface-soft hover:bg-gray-200 hover:text-ink transition border border-hairline"
+              className="flex items-center space-x-1.5 rounded-pill px-2.5 py-1.5 text-xs font-medium text-ink-muted bg-surface-soft hover:bg-gray-200 hover:text-ink transition border border-hairline shrink-0"
+              title={qrResult ? 'กลับหน้าตั้งยอด' : 'หน้าหลัก'}
             >
               <ArrowLeft className="h-4 w-4" />
-              <span>{qrResult ? 'กลับหน้าตั้งยอด' : 'หน้าหลัก'}</span>
+              <span className="hidden sm:inline">{qrResult ? 'กลับหน้าตั้งยอด' : 'หน้าหลัก'}</span>
             </button>
-            <div className="border-l border-hairline pl-3">
-              <h1 className="text-base md:text-lg font-bold text-ink">ระบบสร้าง QR รับเงินร้านค้า (POS)</h1>
-              <p className="text-xs text-brand-blue font-medium">โครงการไทยช่วยไทยพลีส (Co-pay 60/40)</p>
+            <div className="border-l border-hairline pl-3 min-w-0">
+              <h1 className="text-base md:text-lg font-bold text-ink truncate flex items-center gap-1.5">
+                <span className="truncate">{currentShopName}</span>
+                <CheckCircle2 className="h-4 w-4 text-status-success shrink-0" aria-label="ร้านค้าลงทะเบียนถูกต้อง" />
+              </h1>
+              <p className="hidden sm:block text-xs text-brand-blue font-medium">ระบบสร้าง QR รับเงินร้านค้า (Co-pay 60/40)</p>
             </div>
           </div>
           <button
             onClick={() => navigate(APP_ROUTES.MERCHANT_SALES)}
-            className="hidden sm:inline-flex items-center space-x-1.5 rounded-pill px-3 py-1.5 text-xs font-medium text-brand-blue bg-blue-50 hover:bg-blue-100 transition border border-blue-200"
+            className="hidden md:inline-flex items-center space-x-1.5 rounded-pill px-3 py-1.5 text-xs font-medium text-brand-blue bg-blue-50 hover:bg-blue-100 transition border border-blue-200 shrink-0"
           >
             <TrendingUp className="h-3.5 w-3.5" />
             <span>ดูประวัติยอดขาย</span>
@@ -461,138 +463,108 @@ export const MerchantPosQrPage: React.FC = () => {
         </div>
       </div>
 
-      <main className="mx-auto max-w-md md:max-w-5xl px-4 md:px-6 space-y-4">
-        {/* VIEW 1: หน้าฟอร์มตั้งยอดเงิน (Responsive 2-Column บน Desktop, Stacked บน Mobile) */}
+      <main className="mx-auto w-full max-w-5xl px-4 sm:px-6 lg:px-8 space-y-4">
+        {/* VIEW 1: หน้าตั้งยอดเงิน — ทุกอย่างที่ต้องกดบ่อยอยู่ในการ์ดเดียว ไม่ต้องเลื่อนจอ */}
         {!qrResult ? (
           <div className="animate-in fade-in duration-200">
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
-              {/* Left Column: ข้อมูลร้านค้าและปุ่มลัดเลือกยอดเงินด่วน (md:col-span-6 space-y-4) */}
-              <div className="md:col-span-6 space-y-4">
-                {/* ข้อมูลร้านค้าดึงจากระบบอัตโนมัติ (ไม่ต้องพิมพ์ตั้งชื่อเอง) */}
-                <div className="rounded-card border border-hairline bg-white p-5 shadow-sm">
-                  <div className="flex items-start space-x-3.5">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-blue-light text-brand-blue flex-shrink-0 shadow-xs">
-                      <Store className="h-6 w-6" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-[10px] text-ink-muted font-medium">ร้านค้าที่เข้าสู่ระบบ (ดึงจากระบบ)</div>
-                      <div className="text-base font-bold text-ink flex items-center space-x-1.5 mt-0.5 truncate">
-                        <span className="truncate">{currentShopName}</span>
-                        <span className="rounded-full bg-emerald-100 p-0.5 text-status-success flex-shrink-0" title="ร้านค้าลงทะเบียนถูกต้อง">
-                          <CheckCircle2 className="h-3.5 w-3.5" />
-                        </span>
-                      </div>
-                      <div className="text-xs text-ink-muted font-mono mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
-                        <span className="flex items-center">
-                          <MapPin className="h-3.5 w-3.5 text-brand-blue mr-1 flex-shrink-0" />
-                          {merchantCoords.lat.toFixed(4)}, {merchantCoords.lon.toFixed(4)}
-                        </span>
-                        <span>• {merchantData?.merchant?.taxId || 'TAX-0105567890'}</span>
-                      </div>
-                    </div>
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-6 items-start">
+              <div className="md:col-span-7 rounded-card border border-hairline bg-white p-4 md:p-6 shadow-sm space-y-3 md:space-y-4">
+                {/* ช่องระบุยอดเงิน */}
+                <div>
+                  <label htmlFor="input-pos-amount" className="block text-xs font-semibold text-ink mb-1.5">
+                    ยอดเงินที่ต้องการเรียกเก็บ (บาท)
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 font-mono text-2xl font-bold text-ink-muted">
+                      ฿
+                    </span>
+                    <input
+                      id="input-pos-amount"
+                      type="number"
+                      inputMode="decimal"
+                      min="1"
+                      max="100000"
+                      value={amount || ''}
+                      onChange={(e) => setAmount(Number(e.target.value))}
+                      className="w-full rounded-card border border-hairline pl-11 pr-4 py-3 font-mono text-3xl font-extrabold text-ink focus:border-brand-blue focus:outline-none focus:ring-2 focus:ring-blue-100"
+                      placeholder="0"
+                    />
                   </div>
                 </div>
 
-                {/* ปุ่มลัดเลือกยอดเงินด่วนยอดนิยม */}
-                <div className="rounded-card border border-hairline bg-white p-5 shadow-sm">
-                  <span className="text-xs font-semibold text-ink mb-3 block">
-                    ⚡ เลือกยอดเงินด่วนยอดนิยม:
+                {/* ปุ่มลัดเลือกยอดเงินด่วน */}
+                <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
+                  {[40, 60, 100, 120, 150, 200, 250, 300].map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => setAmount(preset)}
+                      className={`rounded-pill border py-2 text-xs font-mono font-medium transition active:scale-95 ${
+                        amount === preset
+                          ? 'border-brand-blue bg-blue-50 text-brand-blue font-bold ring-1 ring-brand-blue'
+                          : 'border-hairline text-ink hover:bg-gray-50'
+                      }`}
+                    >
+                      ฿{preset}
+                    </button>
+                  ))}
+                </div>
+
+                {/* สรุปส่วนแบ่ง Co-pay แบบบรรทัดเดียว */}
+                <div className="flex items-center justify-between rounded-2xl border border-blue-100 bg-blue-50/50 px-3 py-2 text-[11px]">
+                  <span className="text-ink-muted">
+                    ลูกค้าจ่าย <b className="font-mono text-ink">฿{Math.max(0, amount - Math.min(amount * 0.6, 150)).toFixed(2)}</b>
                   </span>
-                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-3 gap-2.5">
-                    {[40, 60, 100, 120, 150, 200, 250, 300, 500].map((preset) => (
-                      <button
-                        key={preset}
-                        type="button"
-                        onClick={() => setAmount(preset)}
-                        className={`rounded-pill border py-2.5 text-xs font-mono font-medium transition active:scale-95 ${
-                          amount === preset
-                            ? 'border-brand-blue bg-blue-50 text-brand-blue font-bold shadow-sm ring-1 ring-brand-blue'
-                            : 'border-hairline text-ink hover:bg-gray-50'
-                        }`}
-                      >
-                        ฿{preset}
-                      </button>
-                    ))}
-                  </div>
+                  <span className="text-brand-blue flex items-center gap-1">
+                    <Sparkles className="h-3 w-3" />
+                    รัฐช่วย <b className="font-mono">฿{Math.min(amount * 0.6, 150).toFixed(2)}</b>
+                  </span>
                 </div>
 
-                {/* ปุ่มทางลัดไปหน้าดูประวัติยอดขาย */}
+                {/* ปุ่มสร้าง QR รับเงิน (กดแล้วเด้งไปหน้า QR ทันที) */}
                 <button
-                  onClick={() => navigate(APP_ROUTES.MERCHANT_SALES)}
-                  className="w-full flex items-center justify-center space-x-2 rounded-card border border-hairline bg-white py-3.5 px-4 text-xs font-semibold text-ink-muted hover:text-ink hover:bg-gray-50 transition shadow-sm"
+                  id="btn-generate-qr"
+                  disabled={isGenerating || amount <= 0}
+                  onClick={handleGenerate}
+                  className="w-full flex items-center justify-center space-x-2 rounded-card bg-brand-blue py-3.5 md:py-4 text-white text-base font-semibold shadow-lg shadow-blue-500/20 transition hover:bg-brand-blue-hover active:scale-98 disabled:opacity-50"
                 >
-                  <TrendingUp className="h-4 w-4 text-brand-blue" />
-                  <span>ดูสรุปยอดขายและเงินอุดหนุนรัฐบาล 60%</span>
+                  {isGenerating ? (
+                    <>
+                      <RefreshCw className="h-5 w-5 animate-spin" />
+                      <span>กำลังสร้าง QR...</span>
+                    </>
+                  ) : (
+                    <>
+                      <QrCode className="h-5 w-5" />
+                      <span>สร้าง QR รับเงิน ฿{(amount || 0).toLocaleString()}</span>
+                    </>
+                  )}
                 </button>
               </div>
 
-              {/* Right Column: ช่องระบุยอดเงิน, สรุปส่วนแบ่ง Co-pay 60/40 และปุ่มสร้าง QR (md:col-span-6 space-y-4) */}
-              <div className="md:col-span-6 space-y-4">
-                <div className="rounded-card border border-hairline bg-white p-5 md:p-6 shadow-sm space-y-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-ink mb-2">
-                      ระบุยอดเงินค่าสินค้า / บริการที่ต้องการเรียกเก็บ (บาท)
-                    </label>
-                    <div className="relative">
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 font-mono text-2xl font-bold text-ink-muted">
-                        ฿
-                      </span>
-                      <input
-                        id="input-pos-amount"
-                        type="number"
-                        min="1"
-                        max="100000"
-                        value={amount}
-                        onChange={(e) => setAmount(Number(e.target.value))}
-                        className="w-full rounded-card border border-hairline pl-11 pr-4 py-3.5 font-mono text-3xl font-extrabold text-ink focus:border-brand-blue focus:outline-none focus:ring-2 focus:ring-blue-100"
-                        placeholder="0"
-                      />
-                    </div>
+              {/* ข้อมูลเสริม (จอใหญ่แสดงด้านขวา / มือถืออยู่ด้านล่าง) */}
+              <div className="md:col-span-5 space-y-4">
+                <div className="hidden md:block rounded-card border border-hairline bg-white p-5 shadow-sm text-xs space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-ink-muted">ลูกค้าสแกนจ่าย 40%</span>
+                    <span className="font-mono font-bold text-ink">฿{Math.max(0, amount - Math.min(amount * 0.6, 150)).toFixed(2)}</span>
                   </div>
-
-                  {/* สรุปสัดส่วน Co-pay 60/40 ล่วงหน้า */}
-                  <div className="rounded-2xl border border-blue-100 bg-blue-50/50 p-4 space-y-2 text-xs">
-                    <div className="flex justify-between items-center">
-                      <span className="text-ink-muted">ลูกค้าสแกนจ่าย 40%:</span>
-                      <span className="font-mono font-bold text-ink text-sm">
-                        ฿{Math.max(0, amount - Math.min(amount * 0.6, 150)).toFixed(2)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center text-brand-blue">
-                      <span className="flex items-center space-x-1">
-                        <Sparkles className="h-3.5 w-3.5" />
-                        <span>รัฐบาลสมทบ 60%:</span>
-                      </span>
-                      <span className="font-mono font-bold text-sm">
-                        ฿{Math.min(amount * 0.6, 150).toFixed(2)}
-                      </span>
-                    </div>
-                    <div className="border-t border-blue-200/60 pt-2 flex justify-between font-semibold">
-                      <span className="text-ink">ยอดขายรวมที่ร้านได้รับ:</span>
-                      <span className="font-mono text-status-success text-base">฿{amount.toFixed(2)}</span>
-                    </div>
+                  <div className="flex justify-between text-brand-blue">
+                    <span>รัฐบาลสมทบ 60%</span>
+                    <span className="font-mono font-bold">฿{Math.min(amount * 0.6, 150).toFixed(2)}</span>
                   </div>
-
-                  {/* ปุ่มสร้าง QR รับเงิน (กดแล้วเด้งไปหน้า QR ทันที ไม่ต้องเลื่อนจอ) */}
-                  <button
-                    id="btn-generate-qr"
-                    disabled={isGenerating || amount <= 0}
-                    onClick={handleGenerate}
-                    className="w-full flex items-center justify-center space-x-2 rounded-card bg-brand-blue py-4 text-white text-base font-semibold shadow-lg shadow-blue-500/20 transition hover:bg-brand-blue-hover active:scale-98 disabled:opacity-50"
-                  >
-                    {isGenerating ? (
-                      <>
-                        <RefreshCw className="h-5 w-5 animate-spin" />
-                        <span>กำลังสร้าง QR รับเงิน...</span>
-                      </>
-                    ) : (
-                      <>
-                        <QrCode className="h-5 w-5" />
-                        <span>สร้าง Dynamic QR รับเงิน (฿{amount.toLocaleString()})</span>
-                      </>
-                    )}
-                  </button>
+                  <div className="border-t border-hairline pt-2 flex justify-between font-semibold">
+                    <span className="text-ink">ยอดขายรวมที่ร้านได้รับ</span>
+                    <span className="font-mono text-status-success text-sm">฿{(amount || 0).toFixed(2)}</span>
+                  </div>
                 </div>
+                <button
+                  onClick={() => navigate(APP_ROUTES.MERCHANT_SALES)}
+                  className="md:hidden w-full flex items-center justify-center space-x-2 rounded-card border border-hairline bg-white py-3 px-4 text-xs font-semibold text-ink-muted hover:text-ink transition shadow-sm"
+                >
+                  <TrendingUp className="h-4 w-4 text-brand-blue" />
+                  <span>ดูสรุปยอดขาย</span>
+                </button>
               </div>
             </div>
           </div>
@@ -629,25 +601,17 @@ export const MerchantPosQrPage: React.FC = () => {
               </div>
 
               {/* ชื่อร้านค้า (ดึงจากระบบ) */}
-              <h2 className="text-base font-bold text-ink mt-1">{qrResult.shopName}</h2>
+              <h2 className="text-sm md:text-base font-bold text-ink mt-1 truncate">{qrResult.shopName}</h2>
 
-              {/* ยอดเงินใหญ่ ชัดเจน ไม่ต้องเลื่อนจอ */}
-              <div className="my-2">
-                <span className="text-[11px] text-ink-muted">ยอดรวมที่ต้องชำระ</span>
-                <div className="font-mono text-4xl font-extrabold text-brand-blue">
+              {/* ยอดเงินใหญ่ ชัดเจน */}
+              <div className="my-1">
+                <div className="font-mono text-3xl md:text-4xl font-extrabold text-brand-blue">
                   ฿ {qrResult.totalAmount.toLocaleString('th-TH', { minimumFractionDigits: 2 })}
                 </div>
-              </div>
-
-              {/* สรุปสัดส่วน Co-pay */}
-              <div className="rounded-2xl border border-blue-100 bg-blue-50/60 p-3 text-xs space-y-1 mb-3">
-                <div className="flex justify-between text-ink-muted">
-                  <span>ลูกค้าสแกนจ่าย 40%:</span>
-                  <span className="font-mono font-bold text-ink">฿{(qrResult.estimatedCitizenPay).toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-brand-blue">
-                  <span>รัฐช่วยสมทบ 60%:</span>
-                  <span className="font-mono font-bold">฿{(qrResult.estimatedGovCopay).toFixed(2)}</span>
+                <div className="mt-0.5 text-[11px] text-ink-muted">
+                  ลูกค้าจ่าย <b className="font-mono text-ink">฿{qrResult.estimatedCitizenPay.toFixed(2)}</b>
+                  {' • '}
+                  <span className="text-brand-blue">รัฐช่วย <b className="font-mono">฿{qrResult.estimatedGovCopay.toFixed(2)}</b></span>
                 </div>
               </div>
 
