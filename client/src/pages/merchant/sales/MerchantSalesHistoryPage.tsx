@@ -163,9 +163,9 @@ export const MerchantSalesHistoryPage: React.FC = () => {
             {(
               [
                 { key: 'ALL', label: 'ทั้งหมด' },
-                { key: 'SUCCESS', label: 'สำเร็จ (SUCCESS)' },
-                { key: 'FLAGGED', label: 'รอตรวจสอบพิกัด (FLAGGED)' },
-                { key: 'REJECTED', label: 'ถูกระงับ/นอกพิกัด (REJECTED)' },
+                { key: 'SUCCESS', label: 'สำเร็จ' },
+                { key: 'FLAGGED', label: 'รอตรวจสอบรายการ' },
+                { key: 'REJECTED', label: 'ไม่สำเร็จ / ยกเลิก' },
               ] as const
             ).map((tab) => (
               <button
@@ -220,11 +220,6 @@ export const MerchantSalesHistoryPage: React.FC = () => {
                         </td>
                         <td className="py-3 font-mono text-[11px] text-ink font-semibold">
                           <span>{tx.qrReference}</span>
-                          {tx.fraudReason && (
-                            <span className="block text-[10px] text-status-error font-sans font-normal mt-0.5">
-                              {tx.fraudReason}
-                            </span>
-                          )}
                         </td>
                         <td className="py-3 font-medium text-ink">{tx.customerName}</td>
                         <td className="py-3 text-right font-mono font-bold text-ink">

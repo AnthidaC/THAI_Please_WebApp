@@ -84,7 +84,7 @@ export const CitizenPaymentSlipPage: React.FC = () => {
         </div>
       </div>
 
-      <main className="mx-auto max-w-md md:max-w-xl px-4 md:px-6 space-y-4">
+      <main className="mx-auto w-full max-w-xl px-4 sm:px-6 space-y-4">
         {/* บัตร e-Slip หลักฐานการชำระเงิน */}
         <div id="receipt-slip" className="relative overflow-hidden rounded-card border border-hairline bg-white p-6 shadow-md">
           {/* หัวสลิป */}
@@ -97,7 +97,7 @@ export const CitizenPaymentSlipPage: React.FC = () => {
               )}
             </div>
             <h1 className="text-lg font-bold text-ink">
-              {isFlagged ? 'ชำระเงินสำเร็จ (รอดำเนินการตรวจสอบพิกัด)' : 'ชำระเงินร่วมสำเร็จ'}
+              {isFlagged ? 'ชำระเงินร่วมสำเร็จ (อยู่ระหว่างตรวจสอบรายการ)' : 'ชำระเงินร่วมสำเร็จ'}
             </h1>
             <p className="text-xs text-brand-blue font-medium mt-0.5">
               โครงการไทยช่วยไทยพลีส (Co-pay 60/40)
@@ -202,29 +202,15 @@ export const CitizenPaymentSlipPage: React.FC = () => {
             </div>
           </div>
 
-          {/* ตราประทับยืนยันความปลอดภัย GPS & AI */}
-          <div className="mt-4 rounded-2xl bg-surface-soft p-3.5 text-[11px] space-y-1.5">
-            <div className="flex items-center justify-between font-medium">
-              <span className="flex items-center space-x-1.5 text-emerald-800">
-                <ShieldCheck className="h-4 w-4 text-emerald-600" />
-                <span>การตรวจสอบความปลอดภัย</span>
-              </span>
-              <span className="rounded-pill bg-white px-2 py-0.5 text-[10px] text-emerald-700 font-mono border border-emerald-200">
-                {slip.securityVerification.decision}
-              </span>
-            </div>
-            <div className="text-ink-muted flex justify-between">
-              <span>ระยะห่างพิกัด GPS:</span>
-              <span className="font-mono text-ink">
-                {slip.securityVerification.distanceMeters.toFixed(1)} เมตร
-              </span>
-            </div>
-            <div className="text-ink-muted flex justify-between">
-              <span>AI Risk Score:</span>
-              <span className="font-mono text-ink">
-                {slip.securityVerification.riskScore.toFixed(2)} (ปกติ)
-              </span>
-            </div>
+          {/* ตราประทับยืนยันสลิปอิเล็กทรอนิกส์ (ไม่แสดงค่าการตรวจสอบภายในให้ผู้ใช้เห็น) */}
+          <div className="mt-4 rounded-2xl bg-surface-soft px-3.5 py-2.5 text-[11px] flex items-center justify-between">
+            <span className="flex items-center space-x-1.5 text-emerald-800 font-medium">
+              <ShieldCheck className="h-4 w-4 text-emerald-600" />
+              <span>ยืนยันหลักฐานการชำระเงินอิเล็กทรอนิกส์</span>
+            </span>
+            <span className="rounded-pill bg-white px-2.5 py-0.5 text-[10px] text-emerald-700 font-semibold border border-emerald-200">
+              e-Slip Verified
+            </span>
           </div>
         </div>
 
