@@ -1,3 +1,4 @@
+import { EventEmitter } from 'events';
 import prisma from '../utils/prisma';
 import { walletService } from './wallet.service';
 import {
@@ -5,6 +6,7 @@ import {
   calculateHaversineDistance,
   MAX_ALLOWED_DISTANCE_METERS,
 } from './fraud.service';
+
 
 export interface DiscountValidationResult {
   code: string;
@@ -65,6 +67,9 @@ export const QR_EXPIRATION_MS = 3 * 60 * 1000;
 const qrStore = new Map<string, DynamicQrData>();
 
 export class PaymentService {
+  // Real-time Event Emitter สำหรับ Server-Sent Events (SSE) แจ้งเตือน POS ทันที
+  public qrPaymentEvents = new EventEmitter();
+
   /**
    * คำนวณยอด Co-pay 60/40 ตามสูตรและเพดานสิทธิ์ ร่วมกับคูปอง/โค้ดคำชวนของเพื่อน
    */
@@ -783,6 +788,9 @@ export class PaymentService {
       completedAt: completedAtDate.toISOString(),
     };
     qrStore.set(params.qrReference, qrData);
+
+    // ส่งสัญญาณ Real-time ผ่าน SSE ไปยังหน้าจอ POS ของร้านค้าทันที (0 ms Latency)
+    this.qrPaymentEvents.emit(`payment:${params.qrReference}`, qrData.paidTransaction);
 
     return {
       transactionId: transactionRecord.transaction_id,

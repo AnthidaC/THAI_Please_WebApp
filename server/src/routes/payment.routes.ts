@@ -3,6 +3,7 @@ import {
   generateDynamicQr,
   getQrDetails,
   getQrPaymentStatus,
+  streamQrPaymentStatus,
   checkoutCopay,
   validateDiscount,
 } from '../controllers/payment.controller';
@@ -19,11 +20,15 @@ const router = Router();
 // POST /api/payment/qr/generate
 router.post('/qr/generate', validate(generateQrSchema), generateDynamicQr);
 
-// GET /api/payment/qr/:reference/status (สำหรับร้านค้าตรวจสอบสถานะการชำระเงินแบบ Real-time)
+// GET /api/payment/qr/:reference/stream (Server-Sent Events: แจ้งเตือน POS ร้านค้าแบบ Real-Time ทันที 0 ms)
+router.get('/qr/:reference/stream', streamQrPaymentStatus);
+
+// GET /api/payment/qr/:reference/status (สำหรับร้านค้าตรวจสอบสถานะการชำระเงินแบบ Real-time Polling Fallback)
 router.get('/qr/:reference/status', getQrPaymentStatus);
 
 // GET /api/payment/qr/:reference
 router.get('/qr/:reference', getQrDetails);
+
 
 // POST /api/payment/discount/validate
 router.post(

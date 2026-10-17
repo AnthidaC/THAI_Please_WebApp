@@ -19,8 +19,10 @@ import {
   FraudAlertItem,
   FraudResolveAction,
 } from '../../../services/paymentApi';
+import { FraudLocationMap } from '../../../components/admin/FraudLocationMap';
 
 export const AdminFraudAlertsPage: React.FC = () => {
+
   const queryClient = useQueryClient();
   const [selectedAlert, setSelectedAlert] = useState<FraudAlertItem | null>(null);
   const [resolveNote, setResolveNote] = useState<string>('');
@@ -514,31 +516,26 @@ export const AdminFraudAlertsPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* แผนภาพเปรียบเทียบพิกัด */}
-              <div className="rounded-2xl border border-hairline bg-slate-900 p-3.5 sm:p-4 text-white text-center">
-                <div className="flex items-center justify-around py-3 sm:py-4">
-                  <div className="text-center shrink-0">
-                    <div className="h-8 w-8 sm:h-9 sm:w-9 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center mx-auto mb-1">
-                      <MapPin className="h-4 w-4 sm:h-5 sm:w-5" />
-                    </div>
-                    <span className="text-[10px]">จุดผู้ซื้อ</span>
-                  </div>
-
-                  <div className="flex-1 px-2 sm:px-4 text-center">
-                    <div className="border-t-2 border-dashed border-amber-400 relative">
-                      <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-slate-900 px-1.5 sm:px-2 text-[10px] text-amber-400 font-mono font-bold whitespace-nowrap">
-                        ห่าง {(selectedAlert.distanceMeters / 1000).toFixed(2)} กม.
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="text-center shrink-0">
-                    <div className="h-8 w-8 sm:h-9 sm:w-9 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto mb-1">
-                      <MapPin className="h-4 w-4 sm:h-5 sm:w-5" />
-                    </div>
-                    <span className="text-[10px]">จุดร้านค้า</span>
-                  </div>
+              {/* แผนที่จำลองพิกัดจริงด้วย OpenStreetMap (OSM ฟรี 100%) */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5 px-0.5">
+                  <span className="text-[11px] font-semibold text-ink flex items-center space-x-1.5">
+                    <MapPin className="h-3.5 w-3.5 text-brand-blue" />
+                    <span>แผนที่พิกัดจริงเปรียบเทียบตำแหน่งร้านค้าและผู้ซื้อ (OpenStreetMap)</span>
+                  </span>
+                  <span className="text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-pill px-2 py-0.2 font-medium">
+                    ● Real-Time OSM
+                  </span>
                 </div>
+                <FraudLocationMap
+                  userLat={selectedAlert.userLat}
+                  userLon={selectedAlert.userLon}
+                  merchantLat={selectedAlert.merchantLat}
+                  merchantLon={selectedAlert.merchantLon}
+                  customerName={selectedAlert.customerName}
+                  shopName={selectedAlert.shopName}
+                  distanceMeters={selectedAlert.distanceMeters}
+                />
               </div>
 
               <div className="rounded-2xl border border-blue-100 bg-blue-50/60 p-3">
