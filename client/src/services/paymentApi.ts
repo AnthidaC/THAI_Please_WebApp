@@ -101,11 +101,29 @@ export interface TransactionItem {
   governmentCopayAmount: number;
   citizenPaidAmount: number;
   status: string;
+  transactionType?: 'COPAY' | 'TOPUP' | 'REFUND';
+  paymentChannel?: string;
   createdAt: string;
   completedAt?: string;
   isEligibleForReview: boolean;
   hasReview: boolean;
   reviewExpiresAt: string;
+}
+
+export interface QrPaymentStatusResponse {
+  qrReference: string;
+  status: 'ACTIVE' | 'USED' | 'SUSPENDED' | 'EXPIRED' | 'REJECTED';
+  shopName?: string;
+  totalAmount?: number;
+  expiresAt?: string;
+  paidTransaction?: {
+    transactionId: string;
+    customerName: string;
+    totalAmount: number;
+    governmentCopayAmount: number;
+    citizenPaidAmount: number;
+    completedAt: string;
+  } | null;
 }
 
 export interface MerchantSalesSummary {
@@ -137,9 +155,16 @@ export interface MerchantSalesSummary {
   }>;
 }
 
+export type FraudResolveAction = 'APPROVE' | 'REJECT' | 'SUSPEND_MERCHANT' | 'SUSPEND_USER';
+
 export interface FraudAlertItem {
   fraudCheckId: string;
   transactionId: string;
+  userId?: string;
+  merchantId?: string;
+  merchantTaxId?: string;
+  isMerchantApproved?: boolean;
+  userWalletStatus?: string;
   totalAmount: number;
   copayAmount: number;
   citizenPaidAmount: number;
@@ -154,6 +179,12 @@ export interface FraudAlertItem {
   merchantLat: number;
   merchantLon: number;
   createdAt: string;
+  repeatCount?: number;
+  systemStats?: {
+    totalChecksCount: number;
+    autoApprovedCount: number;
+    approvalRate: number;
+  };
 }
 
 export interface SlipData {
@@ -204,6 +235,13 @@ export const generateDynamicQr = async (payload: {
   merchantId?: string;
 }): Promise<DynamicQrResponse> => {
   const res = await axios.post('/payment/qr/generate', payload);
+  return res.data.data;
+};
+
+export const getQrPaymentStatus = async (
+  reference: string
+): Promise<QrPaymentStatusResponse> => {
+  const res = await axios.get(`/payment/qr/${reference}/status`);
   return res.data.data;
 };
 
@@ -268,7 +306,12 @@ export const getFraudAlerts = async (): Promise<FraudAlertItem[]> => {
   return res.data.data;
 };
 
-export const resolveFraudAlert = async (id: string, action: 'APPROVE' | 'REJECT', note?: string) => {
+export const resolveFraudAlert = async (
+  id: string,
+  action: FraudResolveAction,
+  note?: string
+) => {
   const res = await axios.post(`/fraud/resolve/${id}`, { action, note });
   return res.data.data;
 };
+

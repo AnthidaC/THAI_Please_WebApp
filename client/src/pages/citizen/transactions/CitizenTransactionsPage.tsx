@@ -43,14 +43,17 @@ export const CitizenTransactionsPage: React.FC = () => {
     });
   }, [transactions, filterType, searchQuery]);
 
-  // คำนวณสรุปยอดรวมจากรายการที่แสดง
+  // คำนวณสรุปยอดรวมจากรายการที่แสดง (นับเฉพาะ Co-pay ที่ไม่ได้ถูกยกเลิกในยอดสะสม)
   const summary = useMemo(() => {
     const list = transactions || [];
     return list.reduce(
       (acc, tx) => {
         acc.count += 1;
-        acc.citizenPaid += tx.citizenPaidAmount || 0;
-        acc.govCopay += tx.governmentCopayAmount || 0;
+        const isCopay = (!tx.transactionType || tx.transactionType === 'COPAY') && tx.status !== 'REJECTED';
+        if (isCopay) {
+          acc.citizenPaid += tx.citizenPaidAmount || 0;
+          acc.govCopay += tx.governmentCopayAmount || 0;
+        }
         if (tx.status === 'SUCCESS') acc.successCount += 1;
         if (tx.status === 'FLAGGED') acc.flaggedCount += 1;
         return acc;
@@ -193,6 +196,11 @@ export const CitizenTransactionsPage: React.FC = () => {
             <div className="divide-y divide-hairline">
               {filtered.map((tx) => {
                 const isFlagged = tx.status === 'FLAGGED';
+                const isRejected = tx.status === 'REJECTED';
+                const isTopUp = tx.transactionType === 'TOPUP';
+                const isRefund = tx.transactionType === 'REFUND';
+                const isPositive = isTopUp || isRefund;
+
                 const formattedDate = new Date(tx.createdAt).toLocaleDateString('th-TH', {
                   day: 'numeric',
                   month: 'short',
@@ -204,19 +212,29 @@ export const CitizenTransactionsPage: React.FC = () => {
                 return (
                   <div
                     key={tx.transactionId}
-                    onClick={() => navigate(`/citizen/slip/${tx.transactionId}`)}
-                    className="py-3 sm:py-3.5 px-2 sm:px-3 flex flex-col xs:flex-row xs:items-center justify-between gap-2.5 xs:gap-3 cursor-pointer hover:bg-surface-soft/70 rounded-xl transition group"
+                    onClick={() => {
+                      if (!isTopUp) {
+                        navigate(`/citizen/slip/${tx.transactionId}`);
+                      }
+                    }}
+                    className={`py-3 sm:py-3.5 px-2 sm:px-3 flex flex-col xs:flex-row xs:items-center justify-between gap-2.5 xs:gap-3 ${
+                      isTopUp ? 'cursor-default' : 'cursor-pointer hover:bg-surface-soft/70'
+                    } rounded-xl transition group`}
                   >
                     {/* ด้านซ้าย: ไอคอน + ชื่อร้านค้า + สถานะ + วันเวลา */}
                     <div className="flex items-start xs:items-center space-x-2.5 sm:space-x-3.5 min-w-0 flex-1">
                       <div
                         className={`flex h-10 w-10 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-2xl font-bold text-xs border ${
-                          isFlagged
+                          isPositive
+                            ? 'bg-emerald-50 text-status-success border-emerald-200'
+                            : isRejected
+                            ? 'bg-red-50 text-status-error border-red-200'
+                            : isFlagged
                             ? 'bg-amber-50 text-amber-700 border-amber-200'
                             : 'bg-brand-blue-light text-brand-blue border-blue-200'
                         }`}
                       >
-                        Co
+                        {isPositive ? '+฿' : 'Co'}
                       </div>
 
                       <div className="min-w-0 flex-1">
@@ -226,7 +244,12 @@ export const CitizenTransactionsPage: React.FC = () => {
                           </span>
 
                           {/* ป้ายสถานะรายการ */}
-                          {isFlagged ? (
+                          {isRejected ? (
+                            <span className="inline-flex shrink-0 items-center space-x-1 rounded-pill bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-status-error border border-red-200">
+                              <AlertTriangle className="h-2.5 w-2.5 text-status-error" />
+                              <span>ยกเลิกและคืนเงินแล้ว</span>
+                            </span>
+                          ) : isFlagged ? (
                             <span className="inline-flex shrink-0 items-center space-x-1 rounded-pill bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-800 border border-amber-200">
                               <AlertTriangle className="h-2.5 w-2.5 text-amber-600" />
                               <span>รอตรวจสอบ</span>
@@ -238,7 +261,7 @@ export const CitizenTransactionsPage: React.FC = () => {
                             </span>
                           )}
 
-                          {tx.isEligibleForReview && (
+                          {tx.isEligibleForReview && !isPositive && !isRejected && (
                             <span className="inline-flex shrink-0 items-center space-x-0.5 rounded-pill bg-amber-50 px-2 py-0.5 text-[10px] text-amber-700 font-medium border border-amber-200">
                               <Star className="h-2.5 w-2.5 fill-amber-500 text-amber-500" />
                               <span>รีวิวได้</span>
@@ -261,28 +284,44 @@ export const CitizenTransactionsPage: React.FC = () => {
                     <div className="flex items-center justify-between xs:justify-end gap-3 pl-12 xs:pl-0 shrink-0 border-t xs:border-t-0 border-hairline/60 pt-2 xs:pt-0">
                       {/* บนจอ Tablet/Desktop แสดงยอดรวม 100% เพิ่มเติม */}
                       <div className="hidden lg:block text-right pr-3 border-r border-hairline">
-                        <div className="text-[10px] text-ink-muted">ยอดเต็ม (100%)</div>
+                        <div className="text-[10px] text-ink-muted">
+                          {isTopUp ? 'ยอดเติมเงิน' : 'ยอดเต็ม (100%)'}
+                        </div>
                         <div className="font-mono text-xs font-semibold text-ink">
                           ฿{tx.totalAmount.toFixed(2)}
                         </div>
                       </div>
 
                       <div className="text-left xs:text-right">
-                        <div className="font-mono text-xs sm:text-sm font-bold text-status-error whitespace-nowrap">
-                          -฿{tx.citizenPaidAmount.toFixed(2)}
+                        <div
+                          className={`font-mono text-xs sm:text-sm font-bold whitespace-nowrap ${
+                            isPositive
+                              ? 'text-status-success'
+                              : isRejected
+                              ? 'text-ink-muted line-through'
+                              : 'text-status-error'
+                          }`}
+                        >
+                          {isPositive ? '+' : '-'}฿{tx.citizenPaidAmount.toFixed(2)}
                         </div>
                         <div className="text-[10px] sm:text-[11px] text-brand-blue font-medium whitespace-nowrap">
-                          รัฐช่วย ฿{tx.governmentCopayAmount.toFixed(2)}
+                          {isTopUp
+                            ? `ช่องทาง ${tx.paymentChannel || 'PROMPTPAY'}`
+                            : isRefund
+                            ? `คืนโควตารัฐ ฿${tx.governmentCopayAmount.toFixed(2)}`
+                            : `รัฐช่วย ฿${tx.governmentCopayAmount.toFixed(2)}`}
                         </div>
                       </div>
 
-                      <div className="flex items-center space-x-1 rounded-pill bg-surface-soft group-hover:bg-blue-50 px-2.5 py-1.5 border border-hairline group-hover:border-blue-200 transition">
-                        <Receipt className="h-3.5 w-3.5 text-brand-blue shrink-0" />
-                        <span className="text-[11px] font-semibold text-brand-blue hidden sm:inline">
-                          ดูสลิป
-                        </span>
-                        <ChevronRight className="h-3.5 w-3.5 text-ink-muted group-hover:text-brand-blue group-hover:translate-x-0.5 transition shrink-0" />
-                      </div>
+                      {!isTopUp && (
+                        <div className="flex items-center space-x-1 rounded-pill bg-surface-soft group-hover:bg-blue-50 px-2.5 py-1.5 border border-hairline group-hover:border-blue-200 transition">
+                          <Receipt className="h-3.5 w-3.5 text-brand-blue shrink-0" />
+                          <span className="text-[11px] font-semibold text-brand-blue hidden sm:inline">
+                            ดูสลิป
+                          </span>
+                          <ChevronRight className="h-3.5 w-3.5 text-ink-muted group-hover:text-brand-blue group-hover:translate-x-0.5 transition shrink-0" />
+                        </div>
+                      )}
                     </div>
                   </div>
                 );

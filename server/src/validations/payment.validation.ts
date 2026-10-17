@@ -38,7 +38,10 @@ export const checkoutCopaySchema = z.object({
     .number({ required_error: 'กรุณาระบุพิกัด Longitude ปัจจุบันของผู้ใช้' })
     .min(-180)
     .max(180),
-  pin: z.string().optional(),
+  pin: z
+    .string()
+    .regex(/^\d{6}$/, 'รหัส PIN ยืนยันการชำระเงินต้องเป็นตัวเลข 6 หลัก')
+    .optional(),
   discountCode: z.string().optional(),
 });
 
@@ -49,8 +52,10 @@ export const validateDiscountSchema = z.object({
 });
 
 export const resolveFraudAlertSchema = z.object({
-  action: z.enum(['APPROVE', 'REJECT'], {
-    required_error: 'กรุณาระบุผลการตรวจสอบ (APPROVE หรือ REJECT)',
+  action: z.enum(['APPROVE', 'REJECT', 'SUSPEND_MERCHANT', 'SUSPEND_USER'], {
+    required_error:
+      'กรุณาระบุผลการตรวจสอบ (APPROVE, REJECT, SUSPEND_MERCHANT หรือ SUSPEND_USER)',
   }),
   note: z.string().optional(),
 });
+

@@ -2,58 +2,107 @@ import prisma from '../utils/prisma';
 
 export class TransactionService {
   /**
-   * ดึงประวัติการสั่งซื้อและสิทธิการประเมินรีวิวของประชาชน
+   * ดึงประวัติการสั่งซื้อ การเติมเงินกระเป๋า และสิทธิการประเมินรีวิวของประชาชน
    */
   public async getBuyerHistory(userId: string) {
-    const transactions = await prisma.transactions.findMany({
-      where: { user_id: userId },
-      include: {
-        merchants: {
-          select: {
-            merchant_id: true,
-            shop_name: true,
-            average_rating_stars: true,
+    const [transactions, userWallet] = await Promise.all([
+      prisma.transactions.findMany({
+        where: { user_id: userId },
+        include: {
+          merchants: {
+            select: {
+              merchant_id: true,
+              shop_name: true,
+              average_rating_stars: true,
+            },
+          },
+          reviews: true,
+          fraud_checks: true,
+        },
+        orderBy: { created_at: 'desc' },
+      }),
+      prisma.wallets.findUnique({
+        where: { user_id: userId },
+        include: {
+          wallet_transactions: {
+            where: {
+              transaction_type: { in: ['TOPUP', 'REFUND'] },
+            },
+            orderBy: { created_at: 'desc' },
           },
         },
-        reviews: true,
-        fraud_checks: true,
-      },
-      orderBy: { created_at: 'desc' },
-    });
+      }),
+    ]);
 
     const now = Date.now();
     const twentyFourHoursMs = 24 * 60 * 60 * 1000;
 
-    return transactions.map((tx: any) => {
-      const createdAtMs = new Date(tx.created_at).getTime();
-      const isWithin24Hours = now - createdAtMs <= twentyFourHoursMs;
-      const hasReview = Boolean(tx.reviews);
-      const isEligibleForReview = tx.status === 'SUCCESS' && isWithin24Hours && !hasReview;
+    // กรองเฉพาะธุรกรรมที่มีการทำรายการชำระเงินจริง (ไม่นำ Silent Log จากการสแกนพิกัดไกลเกิน 2 กม. ที่ยอดชำระ 0 บาท มาปะปนในหน้ากระเป๋าประชาชน)
+    const copayHistory = transactions
+      .filter((tx: any) => !(tx.status === 'REJECTED' && Number(tx.citizen_paid_amount) === 0))
+      .map((tx: any) => {
+        const createdAtMs = new Date(tx.created_at).getTime();
+        const isWithin24Hours = now - createdAtMs <= twentyFourHoursMs;
+        const hasReview = Boolean(tx.reviews);
+        const isEligibleForReview =
+          (tx.status === 'SUCCESS' || tx.status === 'FLAGGED') && isWithin24Hours && !hasReview;
 
+        return {
+          transactionId: tx.transaction_id,
+          qrReference: tx.qr_reference,
+          merchantId: tx.merchant_id,
+          shopName: tx.merchants.shop_name,
+          merchantRating: Number(tx.merchants.average_rating_stars),
+          totalAmount: Number(tx.total_amount),
+          governmentCopayAmount: Number(tx.government_copay_amount),
+          citizenPaidAmount: Number(tx.citizen_paid_amount),
+          status: tx.status,
+          transactionType: 'COPAY' as const,
+          createdAt: tx.created_at.toISOString(),
+          completedAt: tx.completed_at ? tx.completed_at.toISOString() : null,
+          isEligibleForReview,
+          hasReview,
+          reviewExpiresAt: new Date(createdAtMs + twentyFourHoursMs).toISOString(),
+          fraudCheck: tx.fraud_checks
+            ? {
+                distanceMeters: Number(tx.fraud_checks.distance_meters),
+                decision: tx.fraud_checks.decision,
+                riskScore: Number(tx.fraud_checks.risk_score),
+              }
+            : null,
+        };
+      });
+
+    // รวมรายการเติมเงินเข้ากระเป๋า (TOPUP) และเงินคืน (REFUND)
+    const walletTopUps = (userWallet?.wallet_transactions || []).map((wtx: any) => {
+      const isRefund = wtx.transaction_type === 'REFUND';
+      const amt = Number(wtx.amount);
       return {
-        transactionId: tx.transaction_id,
-        qrReference: tx.qr_reference,
-        merchantId: tx.merchant_id,
-        shopName: tx.merchants.shop_name,
-        merchantRating: Number(tx.merchants.average_rating_stars),
-        totalAmount: Number(tx.total_amount),
-        governmentCopayAmount: Number(tx.government_copay_amount),
-        citizenPaidAmount: Number(tx.citizen_paid_amount),
-        status: tx.status,
-        createdAt: tx.created_at.toISOString(),
-        completedAt: tx.completed_at ? tx.completed_at.toISOString() : null,
-        isEligibleForReview,
-        hasReview,
-        reviewExpiresAt: new Date(createdAtMs + twentyFourHoursMs).toISOString(),
-        fraudCheck: tx.fraud_checks
-          ? {
-              distanceMeters: Number(tx.fraud_checks.distance_meters),
-              decision: tx.fraud_checks.decision,
-              riskScore: Number(tx.fraud_checks.risk_score),
-            }
-          : null,
+        transactionId: wtx.transaction_id || wtx.wallet_transaction_id,
+        qrReference: wtx.reference_number || undefined,
+        merchantId: 'wallet-system',
+        shopName: isRefund
+          ? 'คืนเงินเข้ากระเป๋า (รายการถูกยกเลิก)'
+          : `เติมเงินเข้ากระเป๋า (${wtx.payment_channel || 'PROMPTPAY'})`,
+        merchantRating: 5.0,
+        totalAmount: amt,
+        governmentCopayAmount: 0,
+        citizenPaidAmount: amt,
+        status: 'SUCCESS',
+        transactionType: (isRefund ? 'REFUND' : 'TOPUP') as 'TOPUP' | 'REFUND',
+        paymentChannel: wtx.payment_channel || 'PROMPTPAY',
+        createdAt: wtx.created_at.toISOString(),
+        completedAt: wtx.created_at.toISOString(),
+        isEligibleForReview: false,
+        hasReview: false,
+        reviewExpiresAt: wtx.created_at.toISOString(),
+        fraudCheck: null,
       };
     });
+
+    return [...copayHistory, ...walletTopUps].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
   }
 
   /**
@@ -100,16 +149,19 @@ export class TransactionService {
     let totalRevenue = 0;
     let governmentSubsidyTotal = 0;
     let citizenPaidTotal = 0;
+    let validSalesCount = 0;
 
     const mappedTransactions = transactions.map((tx: any) => {
       const total = Number(tx.total_amount);
       const gov = Number(tx.government_copay_amount);
       const cit = Number(tx.citizen_paid_amount);
 
-      if (tx.status === 'SUCCESS') {
+      // นโยบาย: AI ไม่บล็อกร้านค้าทันที ดังนั้นทั้ง SUCCESS และ FLAGGED นับเป็นยอดขายของร้านค้า (ยกเว้น REJECTED)
+      if (tx.status === 'SUCCESS' || tx.status === 'FLAGGED') {
         totalRevenue += total;
         governmentSubsidyTotal += gov;
         citizenPaidTotal += cit;
+        validSalesCount += 1;
       }
 
       return {
@@ -141,7 +193,7 @@ export class TransactionService {
         totalRevenue: Math.round(totalRevenue * 100) / 100,
         governmentSubsidyTotal: Math.round(governmentSubsidyTotal * 100) / 100,
         citizenPaidTotal: Math.round(citizenPaidTotal * 100) / 100,
-        totalTransactions: transactions.length,
+        totalTransactions: validSalesCount,
       },
       transactions: mappedTransactions,
     };

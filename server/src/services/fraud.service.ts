@@ -12,6 +12,8 @@ export interface FraudFeatureVector {
   recentTxCountIn10Min: number;
   estimatedSpeedKmH: number;
   timeHour: number;
+  repeatedSuspiciousCount?: number;
+  samePairRepeatCountToday?: number;
 }
 
 export interface AiFraudAssessment {
@@ -21,6 +23,9 @@ export interface AiFraudAssessment {
   confidence: number;
   model: string;
 }
+
+// รัศมีพิกัดสูงสุดที่อนุญาตให้ทำธุรกรรมหน้าร้านได้ (ไม่เกิน 2 กิโลเมตร = 2,000 เมตร)
+export const MAX_ALLOWED_DISTANCE_METERS = 2000;
 
 /**
  * คำนวณระยะห่างระหว่างจุดพิกัด 2 จุด ด้วยสูตร Haversine Formula (หน่วย: เมตร)
@@ -47,9 +52,11 @@ export const calculateHaversineDistance = (
 
 /**
  * AI Fraud Detection Client (Semi-AI Model Interface)
- * ออกแบบเพื่อรองรับการเชื่อมต่อกับ AI API (เช่น Google Gemini API, OpenAI หรือ Custom ML Service)
- * โดยขณะนี้มี Anomaly Scoring Model จำลองการวิเคราะห์พหุมิติ (Multi-factor Machine Learning / Probabilistic)
- * ไม่ใช้ Hardcoded Rule-based
+ * นโยบายสำคัญ:
+ * - อนุญาตให้ทำธุรกรรมได้ในรัศมีไม่เกิน 2 กิโลเมตร (2,000 เมตร)
+ * - AI จะไม่บล็อกผู้ใช้หรือร้านค้าทันที (ไม่ส่งค่า REJECTED เพื่อขัดจังหวะการค้าขายปกติ)
+ * - แต่ AI ทำหน้าที่ตรวจจับพฤติกรรมน่าสงสัย โดยเฉพาะ "ความน่าสงสัยซ้ำๆ" (Repeated Anomalies)
+ *   เพื่อส่งเรื่องให้ Admin ตรวจสอบในคิว FLAGGED_FOR_REVIEW
  */
 export class AiFraudEngine {
   private static instance: AiFraudEngine;
@@ -83,15 +90,19 @@ export class AiFraudEngine {
           },
           body: JSON.stringify({
             features,
-            prompt: `วิเคราะห์ความเสี่ยงการทุจริตธุรกรรม Co-pay โดยพิจารณาระยะทาง ${features.distanceMeters} เมตร, ความเร็ว ${features.estimatedSpeedKmH} กม./ชม., ยอดเงิน ${features.amount} บาท, ความถี่ ${features.recentTxCountIn10Min} ครั้งใน 10 นาที`,
+            prompt: `วิเคราะห์ความเสี่ยงการทุจริตธุรกรรม Co-pay โดยไม่บล็อกผู้ใช้ทันที แต่ให้ส่งเรื่องให้ Admin เมื่อพบความน่าสงสัยซ้ำๆ (ระยะทาง ${features.distanceMeters} เมตร, ความเร็ว ${features.estimatedSpeedKmH} กม./ชม., ยอดเงิน ${features.amount} บาท, ความถี่ ${features.recentTxCountIn10Min} ครั้งใน 10 นาที, ประวัติความน่าสงสัยซ้ำ ${features.repeatedSuspiciousCount || 0} ครั้ง)`,
           }),
         });
 
         if (response.ok) {
           const aiResult = (await response.json()) as any;
+          const rawDecision = aiResult.decision || 'AUTO_APPROVED';
+          // นโยบาย: AI ไม่บล็อกทันที หาก AI ภายนอกส่ง REJECTED ให้เปลี่ยนเป็น FLAGGED_FOR_REVIEW เพื่อให้ Admin ตัดสินใจ
+          const safeDecision =
+            rawDecision === 'REJECTED' ? 'FLAGGED_FOR_REVIEW' : rawDecision;
           return {
             riskScore: Number(aiResult.riskScore || 0),
-            decision: aiResult.decision || 'AUTO_APPROVED',
+            decision: safeDecision,
             reason: aiResult.reason || 'AI Model ประเมินผลสำเร็จ',
             confidence: Number(aiResult.confidence || 0.95),
             model: 'external-ai-api',
@@ -103,55 +114,74 @@ export class AiFraudEngine {
     }
 
     // 2. Intelligent Semi-AI Anomaly Scoring Engine (Local Multi-factor Model)
-    // ประเมินความเสี่ยงด้วย Normalized Feature Weighting & Anomaly Deviation (ไม่ใช่ Rule-based แข็งทื่อ)
-    const distanceRiskWeight = Math.min(1.0, features.distanceMeters / 3000); // 3 กม.
-    const speedRiskWeight = Math.min(1.0, features.estimatedSpeedKmH / 120); // เกิน 120 กม./ชม. มีความผิดปกติสูง
-    const frequencyRiskWeight = Math.min(1.0, (features.recentTxCountIn10Min - 1) / 5);
-    const amountRiskWeight = features.amount > 3000 ? 0.3 : 0.05;
+    const repeatSuspicious = features.repeatedSuspiciousCount ?? 0;
+    const samePairRepeats = features.samePairRepeatCountToday ?? 1;
 
-    // คำนวณความเสี่ยงรวมแบบ Softmax-like weighted anomaly score
+    // คำนวณน้ำหนักความเสี่ยงแต่ละมิติ
+    const distanceRiskWeight = Math.min(1.0, features.distanceMeters / MAX_ALLOWED_DISTANCE_METERS);
+    const speedRiskWeight = Math.min(1.0, features.estimatedSpeedKmH / 120);
+    const frequencyRiskWeight = Math.min(1.0, Math.max(0, features.recentTxCountIn10Min - 1) / 3);
+    const repeatOffenseWeight = Math.min(1.0, (repeatSuspicious * 0.35) + Math.max(0, samePairRepeats - 2) * 0.25);
+    const amountRiskWeight = features.amount > 1500 ? 0.25 : 0.05;
+
+    // คำนวณความเสี่ยงรวมแบบ Multi-factor Weighted Anomaly Score
     const combinedAnomalyScore =
-      distanceRiskWeight * 0.45 +
-      speedRiskWeight * 0.30 +
-      frequencyRiskWeight * 0.15 +
-      amountRiskWeight * 0.10;
+      distanceRiskWeight * 0.30 +
+      repeatOffenseWeight * 0.30 +
+      frequencyRiskWeight * 0.20 +
+      speedRiskWeight * 0.15 +
+      amountRiskWeight * 0.05;
 
-    const roundedScore = Math.min(1.0, Math.max(0.0, Math.round(combinedAnomalyScore * 100) / 100));
+    const roundedScore = Math.min(0.99, Math.max(0.01, Math.round(combinedAnomalyScore * 100) / 100));
 
-    let decision: 'AUTO_APPROVED' | 'FLAGGED_FOR_REVIEW' | 'REJECTED' = 'AUTO_APPROVED';
+    let decision: 'AUTO_APPROVED' | 'FLAGGED_FOR_REVIEW' = 'AUTO_APPROVED';
     const reasons: string[] = [];
 
-    if (features.distanceMeters > 5000) {
-      reasons.push(`พิกัดผู้ซื้ออยู่ห่างจากร้านค้า ${Math.round(features.distanceMeters / 1000)} กม. เกินรัศมีการใช้จ่ายหน้าร้าน`);
-    } else if (features.distanceMeters > 1000) {
-      reasons.push(`พิกัดผู้ซื้อห่างจากร้านค้า ${Math.round(features.distanceMeters)} เมตร ซึ่งอยู่นอกพื้นที่แนะนำเล็กน้อย`);
+    if (repeatSuspicious >= 2) {
+      reasons.push(`ตรวจพบประวัติความน่าสงสัยซ้ำสะสม (${repeatSuspicious} ครั้ง) จากบัญชีผู้ใช้หรือร้านค้านี้`);
     }
 
-    if (features.estimatedSpeedKmH > 100) {
-      reasons.push(`ตรวจพบการเปลี่ยนตำแหน่งรวดเร็วผิดปกติ (${Math.round(features.estimatedSpeedKmH)} กม./ชม.) สงสัยการใช้ GPS จำลอง`);
+    if (samePairRepeats >= 3) {
+      reasons.push(`ผู้ใช้สแกนชำระเงินซ้ำกับร้านค้าเดิม ${samePairRepeats} ครั้งภายในวันเดียวกัน (สงสัยการซอยบิล)`);
     }
 
-    if (features.recentTxCountIn10Min >= 4) {
-      reasons.push(`ความถี่ในการทำธุรกรรมสูงผิดปกติ (${features.recentTxCountIn10Min} ครั้งใน 10 นาที)`);
+    if (features.recentTxCountIn10Min >= 3) {
+      reasons.push(`ความถี่ในการทำธุรกรรมซ้ำสูงผิดปกติ (${features.recentTxCountIn10Min} ครั้งภายใน 10 นาที)`);
     }
 
-    if (roundedScore >= 0.85) {
-      decision = 'REJECTED';
-      if (reasons.length === 0) reasons.push('AI ตรวจพบรูปแบบธุรกรรมที่มีความเสี่ยงทุจริตในระดับวิกฤต');
-    } else if (roundedScore >= 0.50 || features.distanceMeters > 1500) {
+    if (features.distanceMeters > 1500) {
+      reasons.push(`พิกัดผู้ซื้อห่างจากร้านค้า ${Math.round(features.distanceMeters)} เมตร (ใกล้ขอบรัศมี 2 กม. ที่กำหนด)`);
+    }
+
+    if (features.estimatedSpeedKmH > 90) {
+      reasons.push(`ตรวจพบการเคลื่อนที่ข้ามพิกัดรวดเร็วผิดปกติ (${Math.round(features.estimatedSpeedKmH)} กม./ชม.)`);
+    }
+
+    // AI ไม่บล็อกผู้ใช้หรือร้านค้าทันที แต่ส่งเรื่องให้ Admin ตรวจสอบเมื่อมีพฤติกรรมน่าสงสัยซ้ำๆ หรือคะแนนความเสี่ยงถึงเกณฑ์
+    const isSuspiciousForAdmin =
+      roundedScore >= 0.45 ||
+      repeatSuspicious >= 2 ||
+      samePairRepeats >= 3 ||
+      features.recentTxCountIn10Min >= 3 ||
+      features.distanceMeters > 1500 ||
+      features.estimatedSpeedKmH > 90;
+
+    if (isSuspiciousForAdmin) {
       decision = 'FLAGGED_FOR_REVIEW';
-      if (reasons.length === 0) reasons.push('AI แนะนำให้ตรวจสอบพิกัดเพิ่มเติมเนื่องจากมีค่าความเบี่ยงเบนทางสถิติ');
+      if (reasons.length === 0) {
+        reasons.push('AI ตรวจพบรูปแบบพฤติกรรมน่าสงสัยซ้ำซ้อน จึงส่งเรื่องให้ผู้ดูแลระบบตรวจสอบ');
+      }
     } else {
       decision = 'AUTO_APPROVED';
-      reasons.push('พิกัดและพฤติกรรมการใช้จ่ายสอดคล้องกับมาตรฐานหน้าร้านปกติ');
+      reasons.push('พิกัดอยู่ในรัศมี 2 กม. และไม่พบรูปแบบความน่าสงสัยซ้ำ');
     }
 
     return {
       riskScore: roundedScore,
       decision,
-      reason: reasons.join('; '),
-      confidence: 0.92,
-      model: 'semi-ai-anomaly-detector-v1',
+      reason: reasons.join(' • '),
+      confidence: 0.94,
+      model: 'semi-ai-anomaly-detector-v2',
     };
   }
 }
@@ -160,7 +190,7 @@ export class FraudService {
   private aiEngine = AiFraudEngine.getInstance();
 
   /**
-   * ตรวจสอบธุรกรรมและสร้าง Feature Vector เพื่อให้ AI วิเคราะห์
+   * ตรวจสอบธุรกรรมและสร้าง Feature Vector เพื่อให้ AI วิเคราะห์พฤติกรรมซ้ำๆ
    */
   public async evaluateTransaction(params: {
     userId: string;
@@ -178,8 +208,12 @@ export class FraudService {
       params.merchantLon
     );
 
-    // ดึงประวัติธุรกรรมล่าสุดของผู้ใช้เพื่อคำนวณความเร็วและพฤติกรรม
-    const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
+    const now = Date.now();
+    const tenMinutesAgo = new Date(now - 10 * 60 * 1000);
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+
+    // 1. ดึงประวัติธุรกรรมล่าสุดของผู้ใช้ใน 10 นาที เพื่อดูความถี่และความเร็วการเปลี่ยนพิกัด
     const recentTx = await prisma.transactions.findMany({
       where: {
         user_id: params.userId,
@@ -189,8 +223,33 @@ export class FraudService {
         fraud_checks: true,
       },
       orderBy: { created_at: 'desc' },
-      take: 5,
+      take: 10,
     });
+
+    // 2. นับจำนวนครั้งที่ผู้ใช้ทำรายการซ้ำกับร้านค้าเดิมในวันนี้ (ตรวจจับการซอยบิลซ้ำๆ)
+    const samePairTodayCount = await prisma.transactions.count({
+      where: {
+        user_id: params.userId,
+        merchant_id: params.merchantId,
+        created_at: { gte: startOfToday },
+      },
+    });
+
+    // 3. นับจำนวนประวัติความน่าสงสัยซ้ำๆ (FLAGGED_FOR_REVIEW / REJECTED) ของทั้งผู้ใช้และร้านค้า
+    const [userPrevFlags, merchantPrevFlags] = await Promise.all([
+      prisma.fraud_checks.count({
+        where: {
+          transactions: { user_id: params.userId },
+          decision: { in: ['FLAGGED_FOR_REVIEW', 'REJECTED', 'REJECTED_BY_ADMIN'] },
+        },
+      }),
+      prisma.fraud_checks.count({
+        where: {
+          transactions: { merchant_id: params.merchantId },
+          decision: { in: ['FLAGGED_FOR_REVIEW', 'REJECTED', 'REJECTED_BY_ADMIN'] },
+        },
+      }),
+    ]);
 
     let estimatedSpeedKmH = 0;
     if (recentTx.length > 0 && recentTx[0].fraud_checks) {
@@ -203,9 +262,9 @@ export class FraudService {
         params.userLat,
         params.userLon
       );
-      const diffHours = (Date.now() - new Date(recentTx[0].created_at).getTime()) / (1000 * 3600);
+      const diffHours = (now - new Date(recentTx[0].created_at).getTime()) / (1000 * 3600);
       if (diffHours > 0) {
-        estimatedSpeedKmH = (prevDistanceMeters / 1000) / diffHours;
+        estimatedSpeedKmH = prevDistanceMeters / 1000 / diffHours;
       }
     }
 
@@ -221,6 +280,8 @@ export class FraudService {
       recentTxCountIn10Min: recentTx.length + 1,
       estimatedSpeedKmH: Math.round(estimatedSpeedKmH),
       timeHour: new Date().getHours(),
+      repeatedSuspiciousCount: Math.max(userPrevFlags, merchantPrevFlags),
+      samePairRepeatCountToday: samePairTodayCount + 1,
     };
 
     const assessment = await this.aiEngine.evaluate(featureVector);
@@ -232,62 +293,124 @@ export class FraudService {
   }
 
   /**
-   * ดึงรายการที่ถูกส่งตรวจจับทุจริตสำหรับผู้ดูแลระบบ (Admin)
+   * ดึงรายการที่ถูกส่งตรวจจับทุจริตสำหรับผู้ดูแลระบบ (Admin) พร้อมนับความถี่ซ้ำ
    */
   public async getFlaggedAlerts() {
-    const alerts = await prisma.fraud_checks.findMany({
-      where: {
-        decision: {
-          in: ['FLAGGED_FOR_REVIEW', 'REJECTED'],
+    const [alerts, totalChecksCount, autoApprovedCount] = await Promise.all([
+      prisma.fraud_checks.findMany({
+        where: {
+          decision: {
+            in: ['FLAGGED_FOR_REVIEW', 'REJECTED'],
+          },
         },
-      },
-      include: {
-        transactions: {
-          include: {
-            users: {
-              select: {
-                user_id: true,
-                full_name: true,
-                province_code: true,
+        include: {
+          transactions: {
+            include: {
+              users: {
+                select: {
+                  user_id: true,
+                  full_name: true,
+                  province_code: true,
+                  wallets: {
+                    select: {
+                      status: true,
+                      eligibility_status: true,
+                    },
+                  },
+                },
               },
-            },
-            merchants: {
-              select: {
-                merchant_id: true,
-                shop_name: true,
-                average_rating_stars: true,
+              merchants: {
+                select: {
+                  merchant_id: true,
+                  tax_id: true,
+                  shop_name: true,
+                  average_rating_stars: true,
+                  is_approved: true,
+                },
               },
             },
           },
         },
-      },
-      orderBy: { created_at: 'desc' },
-    });
+        orderBy: { created_at: 'desc' },
+      }),
+      prisma.fraud_checks.count(),
+      prisma.fraud_checks.count({
+        where: {
+          decision: { in: ['AUTO_APPROVED', 'MANUALLY_APPROVED'] },
+        },
+      }),
+    ]);
 
-    return alerts.map((a: any) => ({
-      fraudCheckId: a.fraud_check_id,
-      transactionId: a.transaction_id,
-      totalAmount: Number(a.transactions.total_amount),
-      copayAmount: Number(a.transactions.government_copay_amount),
-      citizenPaidAmount: Number(a.transactions.citizen_paid_amount),
-      customerName: a.transactions.users.full_name,
-      shopName: a.transactions.merchants.shop_name,
-      distanceMeters: Number(a.distance_meters),
-      riskScore: Number(a.risk_score),
-      fraudReason: a.fraud_reason,
-      decision: a.decision,
-      userLat: Number(a.user_latitude),
-      userLon: Number(a.user_longitude),
-      merchantLat: Number(a.merchant_latitude),
-      merchantLon: Number(a.merchant_longitude),
-      createdAt: a.created_at,
-    }));
+    // นับความถี่ที่ผู้ใช้หรือร้านค้าปรากฏในรายการต้องสงสัยซ้ำๆ
+    const userOccurrenceMap: Record<string, number> = {};
+    const merchantOccurrenceMap: Record<string, number> = {};
+
+    for (const a of alerts) {
+      const uid = a.transactions?.user_id;
+      const mid = a.transactions?.merchant_id;
+      if (uid) userOccurrenceMap[uid] = (userOccurrenceMap[uid] || 0) + 1;
+      if (mid) merchantOccurrenceMap[mid] = (merchantOccurrenceMap[mid] || 0) + 1;
+    }
+
+    const approvalRate =
+      totalChecksCount > 0
+        ? Math.round((autoApprovedCount / totalChecksCount) * 1000) / 10
+        : 100.0;
+
+    return alerts.map((a: any) => {
+      const uid = a.transactions?.user_id;
+      const mid = a.transactions?.merchant_id;
+      const repeatCount = Math.max(
+        uid ? userOccurrenceMap[uid] || 1 : 1,
+        mid ? merchantOccurrenceMap[mid] || 1 : 1
+      );
+
+      return {
+        fraudCheckId: a.fraud_check_id,
+        transactionId: a.transaction_id,
+        userId: uid,
+        merchantId: mid,
+        merchantTaxId: a.transactions.merchants?.tax_id || '-',
+        isMerchantApproved: a.transactions.merchants?.is_approved ?? true,
+        userWalletStatus: a.transactions.users?.wallets?.status || 'ACTIVE',
+        totalAmount: Number(a.transactions.total_amount),
+        copayAmount: Number(a.transactions.government_copay_amount),
+        citizenPaidAmount: Number(a.transactions.citizen_paid_amount),
+        customerName: a.transactions.users.full_name,
+        shopName: a.transactions.merchants.shop_name,
+        distanceMeters: Number(a.distance_meters),
+        riskScore: Number(a.risk_score),
+        fraudReason: a.fraud_reason,
+        decision: a.decision,
+        userLat: Number(a.user_latitude),
+        userLon: Number(a.user_longitude),
+        merchantLat: Number(a.merchant_latitude),
+        merchantLon: Number(a.merchant_longitude),
+        createdAt: a.created_at,
+        repeatCount,
+        systemStats: {
+          totalChecksCount,
+          autoApprovedCount,
+          approvalRate,
+        },
+      };
+    });
   }
 
   /**
-   * ผู้ดูแลระบบอนุมัติหรือปฏิเสธรายการที่ถูก Flag
+   * ผู้ดูแลระบบจัดการรายการที่ถูก Flag (โดยไม่ดึงเงินคืนอัตโนมัติ เพื่อป้องกันร้านค้าเสียหายฟรีหลังส่งมอบสินค้าแล้ว)
+   * รองรับ 4 มาตรการ:
+   * - APPROVE: ยืนยันธุรกรรมปกติ
+   * - REJECT: บันทึกเคสส่งตรวจสอบเบื้องหลัง (ไม่คืนเงินอัตโนมัติ)
+   * - SUSPEND_MERCHANT: ระงับสิทธิ์ร้านค้าชั่วคราวเพื่อส่งเจ้าหน้าที่เข้าตรวจสอบร้านค้า
+   * - SUSPEND_USER: ระงับสิทธิ์ Co-pay ของประชาชนที่น่าสงสัยชั่วคราว
    */
-  public async resolveAlert(fraudCheckId: string, action: 'APPROVE' | 'REJECT', adminId?: string, note?: string) {
+  public async resolveAlert(
+    fraudCheckId: string,
+    action: 'APPROVE' | 'REJECT' | 'SUSPEND_MERCHANT' | 'SUSPEND_USER',
+    adminId?: string,
+    note?: string
+  ) {
     const fraudCheck = await prisma.fraud_checks.findUnique({
       where: { fraud_check_id: fraudCheckId },
       include: { transactions: true },
@@ -297,26 +420,76 @@ export class FraudService {
       throw new Error('ไม่พบข้อมูลรายการตรวจสอบทุจริตนี้');
     }
 
-    const newDecision = action === 'APPROVE' ? 'MANUALLY_APPROVED' : 'REJECTED_BY_ADMIN';
-    const newTxStatus = action === 'APPROVE' ? 'SUCCESS' : 'REJECTED';
+    const txRecord = fraudCheck.transactions;
 
-    await prisma.$transaction([
-      prisma.fraud_checks.update({
+    const decisionMap: Record<string, string> = {
+      APPROVE: 'MANUALLY_APPROVED',
+      REJECT: 'REJECTED_BY_ADMIN',
+      SUSPEND_MERCHANT: 'MERCHANT_SUSPENDED',
+      SUSPEND_USER: 'USER_SUSPENDED',
+    };
+    const newDecision = decisionMap[action] || 'REJECTED_BY_ADMIN';
+
+    // ไม่ดึงเงินคืนอัตโนมัติ: คงสถานะธุรกรรมเดิมไว้เป็น SUCCESS (เมื่อชำระเงินแล้ว) หรือ REJECTED (เฉพาะรายการสแกนไม่ผ่าน 0 บาท)
+    const newTxStatus =
+      action === 'APPROVE'
+        ? 'SUCCESS'
+        : Number(txRecord?.total_amount || 0) > 0 && Number(txRecord?.citizen_paid_amount || 0) > 0
+        ? 'SUCCESS'
+        : 'REJECTED';
+
+    await prisma.$transaction(async (tx: any) => {
+      await tx.fraud_checks.update({
         where: { fraud_check_id: fraudCheckId },
         data: {
           decision: newDecision,
-          fraud_reason: note ? `${fraudCheck.fraud_reason || ''} [บันทึกผู้ดูแลระบบ: ${note}]` : fraudCheck.fraud_reason,
+          fraud_reason: note
+            ? `${fraudCheck.fraud_reason || ''} [มติ Admin (${action}): ${note}]`.slice(0, 255)
+            : fraudCheck.fraud_reason,
           reviewed_by_admin_id: adminId || null,
         },
-      }),
-      prisma.transactions.update({
-        where: { transaction_id: fraudCheck.transaction_id },
-        data: { status: newTxStatus },
-      }),
-    ]);
+      });
 
-    return { success: true, decision: newDecision, transactionStatus: newTxStatus };
+      if (txRecord) {
+        await tx.transactions.update({
+          where: { transaction_id: fraudCheck.transaction_id },
+          data: {
+            status: newTxStatus,
+            ...(action === 'APPROVE' && !txRecord.completed_at ? { completed_at: new Date() } : {}),
+          },
+        });
+
+        // กรณี Admin สั่งระงับสิทธิ์ร้านค้าเพื่อเข้าตรวจสอบร้านค้า
+        if (action === 'SUSPEND_MERCHANT' && txRecord.merchant_id) {
+          await tx.merchants.update({
+            where: { merchant_id: txRecord.merchant_id },
+            data: {
+              is_approved: false,
+            },
+          });
+        }
+
+        // กรณี Admin สั่งระงับสิทธิ์ประชาชนที่น่าสงสัย
+        if (action === 'SUSPEND_USER' && txRecord.user_id) {
+          await tx.wallets.updateMany({
+            where: { user_id: txRecord.user_id },
+            data: {
+              status: 'SUSPENDED',
+              eligibility_status: 'SUSPENDED',
+            },
+          });
+        }
+      }
+    });
+
+    return {
+      success: true,
+      action,
+      decision: newDecision,
+      transactionStatus: newTxStatus,
+    };
   }
 }
 
 export const fraudService = new FraudService();
+

@@ -108,7 +108,7 @@ async function testDiscountValidation() {
   console.log('  ✅ ผ่าน: ปฏิเสธโค้ดส่วนลดที่ไม่ถูกต้องตามมาตรฐาน');
 }
 
-// 8. ทดสอบ Semi-AI Anomaly Evaluator
+// 8. ทดสอบ Semi-AI Anomaly Evaluator (Non-Blocking AI: ไม่บล็อกอัตโนมัติ แต่ส่ง Flagged ให้ Admin เมื่อพบพฤติกรรมน่าสงสัยซ้ำๆ)
 async function testAiEngine() {
   const aiEngine = AiFraudEngine.getInstance();
 
@@ -120,47 +120,78 @@ async function testAiEngine() {
     userLon: 100.5014,
     merchantLat: 13.7528,
     merchantLon: 100.5016,
-    distanceMeters: 40,
+    distanceMeters: 400,
     recentTxCountIn10Min: 1,
     estimatedSpeedKmH: 0,
     timeHour: 12,
+    repeatedSuspiciousCount: 0,
+    samePairRepeatCountToday: 0,
   });
   assert.strictEqual(normalAssessment.decision, 'AUTO_APPROVED');
   assert.ok(normalAssessment.riskScore < 0.3, `คะแนนความเสี่ยงกรณีปกติควรต่ำ ได้ ${normalAssessment.riskScore}`);
   console.log(`  ✅ ผ่าน: Semi-AI ประเมินธุรกรรมปกติ -> AUTO_APPROVED (Risk: ${normalAssessment.riskScore})`);
 
-  const suspiciousAssessment = await aiEngine.evaluate({
+  const repeatedSuspiciousAssessment = await aiEngine.evaluate({
     userId: 'u-2',
     merchantId: 'm-1',
     amount: 1500,
     userLat: 13.7525,
     userLon: 100.5014,
-    merchantLat: 13.8000,
-    merchantLon: 100.5500,
-    distanceMeters: 6200,
-    recentTxCountIn10Min: 3,
+    merchantLat: 13.7680,
+    merchantLon: 100.5014,
+    distanceMeters: 1750,
+    recentTxCountIn10Min: 4,
     estimatedSpeedKmH: 45,
     timeHour: 2,
+    repeatedSuspiciousCount: 3,
+    samePairRepeatCountToday: 3,
   });
-  assert.ok(suspiciousAssessment.decision === 'FLAGGED_FOR_REVIEW' || suspiciousAssessment.decision === 'REJECTED');
-  assert.ok(suspiciousAssessment.riskScore >= 0.5, `คะแนนความเสี่ยงกรณีผิดปกติควรสูง ได้ ${suspiciousAssessment.riskScore}`);
-  console.log(`  ✅ ผ่าน: Semi-AI ประเมินธุรกรรมห่างไกล -> ${suspiciousAssessment.decision} (Risk: ${suspiciousAssessment.riskScore})`);
+  assert.strictEqual(
+    repeatedSuspiciousAssessment.decision,
+    'FLAGGED_FOR_REVIEW',
+    'AI ต้องไม่บล็อกผู้ใช้หรือร้านค้าทันที (ห้ามคืน REJECTED) แต่ต้องส่งเรื่องให้ Admin ตรวจสอบ (FLAGGED_FOR_REVIEW)'
+  );
+  assert.ok(
+    repeatedSuspiciousAssessment.riskScore >= 0.45,
+    `คะแนนความเสี่ยงกรณีมีความน่าสงสัยซ้ำๆ ควรสูง ได้ ${repeatedSuspiciousAssessment.riskScore}`
+  );
+  console.log(
+    `  ✅ ผ่าน: Semi-AI ตรวจพบพฤติกรรมน่าสงสัยซ้ำๆ -> ${repeatedSuspiciousAssessment.decision} ส่งให้ Admin ตรวจสอบโดยไม่บล็อกทันที (Risk: ${repeatedSuspiciousAssessment.riskScore})`
+  );
 }
 
-// 9. ทดสอบการปฏิเสธพิกัดไกลเกิน 1 กม., ระงับ QR ทันที, และแจ้งข้อความสุภาพ
+// 9. ทดสอบอนุญาตธุรกรรมไม่เกิน 2 กม. (<= 2,000 ม.) และปฏิเสธเมื่อเกิน 2 กม. พร้อมระงับ QR ทันทีและแจ้งข้อความสุภาพ
 async function testDistanceCheckAndQrSuspension() {
-  const qr = await paymentService.generateDynamicQr({
+  // 9.1 ทดสอบระยะทางประมาณ 1.5 กม. (ไม่เกิน 2 กม.) ต้องอนุญาตให้ทำรายการได้
+  const qrWithin2Km = await paymentService.generateDynamicQr({
     amount: 150,
     latitude: 13.7500,
     longitude: 100.5000,
-    shopName: 'ร้านทดสอบระยะทาง',
+    shopName: 'ร้านทดสอบระยะไม่เกิน 2 กม.',
   });
 
-  // สแกนด้วยพิกัดห่างไกล 5 กม.
+  // พิกัดห่างประมาณ 1.55 กม. (13.7640, 100.5000) -> ต้องผ่านเพราะไม่เกิน 2 กม.
+  const scanWithin2Km = await paymentService.getQrDetails(
+    qrWithin2Km.qrReference,
+    undefined,
+    undefined,
+    { lat: 13.7640, lon: 100.5000 }
+  );
+  assert.strictEqual(scanWithin2Km.qrData.qrReference, qrWithin2Km.qrReference);
+  console.log('  ✅ ผ่าน: อนุญาตให้ทำธุรกรรมเมื่ออยู่ห่างไม่เกิน 2 กิโลเมตร (~1.55 กม.)');
+
+  // 9.2 ทดสอบระยะทางเกิน 2 กม. (เช่น ~5 กม.) ต้องระงับ QR และแจ้งเตือนอย่างสุภาพ
+  const qrBeyond2Km = await paymentService.generateDynamicQr({
+    amount: 150,
+    latitude: 13.7500,
+    longitude: 100.5000,
+    shopName: 'ร้านทดสอบระยะทางเกิน 2 กม.',
+  });
+
   await assert.rejects(
     async () => {
       await paymentService.getQrDetails(
-        qr.qrReference,
+        qrBeyond2Km.qrReference,
         undefined,
         undefined,
         { lat: 13.8000, lon: 100.5500 }
@@ -171,18 +202,18 @@ async function testDistanceCheckAndQrSuspension() {
       assert.doesNotMatch(err.message, /ทุจริต/);
       return true;
     },
-    'ควรระงับและแจ้งเตือนอย่างสุภาพเมื่อพิกัดห่างเกินกำหนด'
+    'ควรระงับและแจ้งเตือนอย่างสุภาพเมื่อพิกัดห่างเกิน 2 กม.'
   );
 
   // ตรวจสอบว่า QR นั้นถูกระงับ/ลบไปแล้ว ไม่สามารถสแกนซ้ำได้
   await assert.rejects(
     async () => {
-      await paymentService.getQrDetails(qr.qrReference);
+      await paymentService.getQrDetails(qrBeyond2Km.qrReference);
     },
     /ไม่พบข้อมูล QR Code นี้ หรือ QR Code อาจหมดอายุหรือถูกยกเลิกแล้ว/
   );
 
-  console.log('  ✅ ผ่าน: ตรวจจับพิกัดไกลเกิน 1 กม. ระงับ QR อัตโนมัติ แจ้งข้อความสุภาพไม่กล่าวหาทุจริต');
+  console.log('  ✅ ผ่าน: ตรวจจับพิกัดไกลเกิน 2 กม. ระงับ QR อัตโนมัติ แจ้งข้อความสุภาพไม่กล่าวหาทุจริต');
 }
 
 // 10. ทดสอบอายุ QR Code 3 นาที (180,000 มิลลิวินาที) และการแจ้งเตือน "QR หมดอายุ กรุณาทำรายการใหม่"

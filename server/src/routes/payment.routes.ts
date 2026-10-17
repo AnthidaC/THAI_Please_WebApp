@@ -2,6 +2,7 @@ import { Router } from 'express';
 import {
   generateDynamicQr,
   getQrDetails,
+  getQrPaymentStatus,
   checkoutCopay,
   validateDiscount,
 } from '../controllers/payment.controller';
@@ -17,6 +18,9 @@ const router = Router();
 
 // POST /api/payment/qr/generate
 router.post('/qr/generate', validate(generateQrSchema), generateDynamicQr);
+
+// GET /api/payment/qr/:reference/status (สำหรับร้านค้าตรวจสอบสถานะการชำระเงินแบบ Real-time)
+router.get('/qr/:reference/status', getQrPaymentStatus);
 
 // GET /api/payment/qr/:reference
 router.get('/qr/:reference', getQrDetails);

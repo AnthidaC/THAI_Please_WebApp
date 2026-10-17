@@ -281,40 +281,63 @@ export const CitizenWalletPage: React.FC = () => {
                 </div>
               ) : (
                 <div className="divide-y divide-hairline">
-                  {transactions.slice(0, 4).map((tx) => (
-                    <div
-                      key={tx.transactionId}
-                      onClick={() => navigate(`/citizen/slip/${tx.transactionId}`)}
-                      className="flex items-center justify-between gap-3 py-3 cursor-pointer hover:bg-surface-soft/60 px-2 rounded-xl transition"
-                    >
-                      <div className="flex items-center space-x-3 min-w-0 flex-1">
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-status-success font-semibold text-xs">
-                          ฿
+                  {transactions.slice(0, 4).map((tx) => {
+                    const isTopUp = tx.transactionType === 'TOPUP';
+                    const isRefund = tx.transactionType === 'REFUND';
+                    const isPositive = isTopUp || isRefund;
+                    return (
+                      <div
+                        key={tx.transactionId}
+                        onClick={() =>
+                          isTopUp
+                            ? navigate(APP_ROUTES.CITIZEN_TRANSACTIONS)
+                            : navigate(`/citizen/slip/${tx.transactionId}`)
+                        }
+                        className="flex items-center justify-between gap-3 py-3 cursor-pointer hover:bg-surface-soft/60 px-2 rounded-xl transition"
+                      >
+                        <div className="flex items-center space-x-3 min-w-0 flex-1">
+                          <div
+                            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full font-semibold text-xs ${
+                              isPositive
+                                ? 'bg-emerald-50 text-status-success'
+                                : 'bg-blue-50 text-brand-blue'
+                            }`}
+                          >
+                            {isPositive ? '+฿' : '฿'}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs sm:text-sm font-medium text-ink leading-snug truncate">
+                              {tx.shopName}
+                            </p>
+                            <p className="text-[11px] text-ink-muted truncate">
+                              {new Date(tx.createdAt).toLocaleDateString('th-TH', {
+                                day: 'numeric',
+                                month: 'short',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })}
+                            </p>
+                          </div>
                         </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-xs sm:text-sm font-medium text-ink leading-snug truncate">
-                            {tx.shopName}
-                          </p>
-                          <p className="text-[11px] text-ink-muted truncate">
-                            {new Date(tx.createdAt).toLocaleDateString('th-TH', {
-                              day: 'numeric',
-                              month: 'short',
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })}
-                          </p>
+                        <div className="text-right shrink-0">
+                          <div
+                            className={`font-mono text-xs sm:text-sm font-semibold whitespace-nowrap ${
+                              isPositive ? 'text-status-success' : 'text-status-error'
+                            }`}
+                          >
+                            {isPositive ? '+' : '-'}฿{tx.citizenPaidAmount.toFixed(2)}
+                          </div>
+                          <div className="text-[10px] text-brand-blue whitespace-nowrap">
+                            {isTopUp
+                              ? 'เติมเงินสำเร็จ'
+                              : isRefund
+                              ? `คืนโควตารัฐ ฿${tx.governmentCopayAmount.toFixed(2)}`
+                              : `รัฐช่วย ฿${tx.governmentCopayAmount.toFixed(2)}`}
+                          </div>
                         </div>
                       </div>
-                      <div className="text-right shrink-0">
-                        <div className="font-mono text-xs sm:text-sm font-semibold text-status-error whitespace-nowrap">
-                          -฿{tx.citizenPaidAmount.toFixed(2)}
-                        </div>
-                        <div className="text-[10px] text-brand-blue whitespace-nowrap">
-                          รัฐช่วย ฿{tx.governmentCopayAmount.toFixed(2)}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </section>

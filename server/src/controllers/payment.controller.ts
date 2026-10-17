@@ -43,6 +43,18 @@ export const getQrDetails = async (req: Request, res: Response): Promise<void> =
   }
 };
 
+export const getQrPaymentStatus = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const reference = Array.isArray(req.params.reference)
+      ? req.params.reference[0]
+      : req.params.reference;
+    const statusData = await paymentService.getQrPaymentStatus(reference);
+    sendSuccess(res, statusData, 'ตรวจสอบสถานะ QR Code สำเร็จ');
+  } catch (error: any) {
+    sendError(res, error.message || 'ไม่สามารถตรวจสอบสถานะ QR Code ได้', 400);
+  }
+};
+
 export const validateDiscount = async (req: Request, res: Response): Promise<void> => {
   try {
     const { code, merchantId, totalAmount } = req.body;
@@ -69,7 +81,7 @@ export const checkoutCopay = async (req: Request, res: Response): Promise<void> 
       return;
     }
 
-    const { qrReference, userLatitude, userLongitude, merchantId, discountCode } = req.body;
+    const { qrReference, userLatitude, userLongitude, merchantId, discountCode, pin } = req.body;
 
     const result = await paymentService.checkout({
       userId,
@@ -78,6 +90,7 @@ export const checkoutCopay = async (req: Request, res: Response): Promise<void> 
       userLongitude: Number(userLongitude),
       merchantId,
       discountCode,
+      pin,
     });
 
     sendSuccess(res, result, 'ชำระเงินร่วม (Co-pay 60/40) สำเร็จ');

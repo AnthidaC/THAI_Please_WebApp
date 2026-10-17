@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import QRCode from 'qrcode';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import {
   QrCode,
@@ -14,26 +14,138 @@ import {
   Check,
   Clock,
   AlertTriangle,
+  Volume2,
+  VolumeX,
+  UserCheck,
+  ShieldCheck,
 } from 'lucide-react';
-import { generateDynamicQr, getMerchantHistory, DynamicQrResponse } from '../../../services/paymentApi';
+import {
+  generateDynamicQr,
+  getMerchantHistory,
+  getQrPaymentStatus,
+  DynamicQrResponse,
+  QrPaymentStatusResponse,
+} from '../../../services/paymentApi';
 import { APP_ROUTES } from '../../../constants/routes';
+
+const MERCHANT_SOUND_PREF_KEY = 'thai_please_merchant_pos_sound_enabled';
+
+/**
+ * สร้างเสียงแจ้งเตือนเงินเข้ามาตรฐานเครื่อง POS ธนาคาร (Web Audio Chime + เสียงแจ้งยอดภาษาไทย)
+ */
+function playMerchantPaymentAlertSound(totalAmount: number) {
+  try {
+    const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    if (AudioCtx) {
+      const ctx = new AudioCtx();
+      const now = ctx.currentTime;
+
+      // โน้ต 3 จังหวะสไตล์เครื่อง POS ธนาคาร (C6 -> E6 -> G6)
+      const notes = [
+        { freq: 1046.5, start: 0, duration: 0.14 },
+        { freq: 1318.5, start: 0.13, duration: 0.14 },
+        { freq: 1567.98, start: 0.26, duration: 0.42 },
+      ];
+
+      notes.forEach(({ freq, start, duration }) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, now + start);
+
+        gain.gain.setValueAtTime(0.001, now + start);
+        gain.gain.exponentialRampToValueAtTime(0.28, now + start + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + start + duration);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now + start);
+        osc.stop(now + start + duration);
+      });
+    }
+  } catch (e) {
+    console.warn('Audio chime failed:', e);
+  }
+
+  // เสียงพูดแจ้งยอดเงินเข้าภาษาไทย (ถ้าระบบเบราว์เซอร์รองรับ)
+  try {
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(
+        `ได้รับเงินชำระ ${totalAmount.toFixed(0)} บาท เรียบร้อยแล้วค่ะ`
+      );
+      utterance.lang = 'th-TH';
+      utterance.rate = 1.05;
+      window.speechSynthesis.speak(utterance);
+    }
+  } catch {
+    // ignore speech synthesis error
+  }
+}
 
 export const MerchantPosQrPage: React.FC = () => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [amount, setAmount] = useState<number>(100);
   const [merchantCoords, setMerchantCoords] = useState<{ lat: number; lon: number }>({
     lat: 13.7563,
     lon: 100.5018,
   });
   const [qrResult, setQrResult] = useState<DynamicQrResponse | null>(null);
+  const [paidInfo, setPaidInfo] = useState<NonNullable<QrPaymentStatusResponse['paidTransaction']> | null>(null);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [copied, setCopied] = useState<boolean>(false);
   const [secondsRemaining, setSecondsRemaining] = useState<number>(180);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const notifiedQrRef = useRef<string | null>(null);
+
+  // สถานะเปิด/ปิดเสียงแจ้งเตือนเมื่อมีเงินเข้า (ร้านค้าเลือกเปิด/ปิดได้ และจำค่าไว้ในเครื่อง)
+  const [soundEnabled, setSoundEnabled] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem(MERCHANT_SOUND_PREF_KEY);
+      return saved === null ? true : saved === 'true';
+    } catch {
+      return true;
+    }
+  });
+
+  const handleToggleSound = useCallback(() => {
+    setSoundEnabled((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(MERCHANT_SOUND_PREF_KEY, String(next));
+      } catch {
+        // ignore storage error
+      }
+      if (next) {
+        // เล่นเสียงติ๊งสั้นๆ เพื่อยืนยันการเปิดเสียงและปลดล็อก AudioContext ของเบราว์เซอร์
+        try {
+          const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+          if (AudioCtx) {
+            const ctx = new AudioCtx();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.frequency.setValueAtTime(1318.5, ctx.currentTime);
+            gain.gain.setValueAtTime(0.15, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.15);
+          }
+        } catch {
+          // ignore
+        }
+      } else if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+      return next;
+    });
+  }, []);
 
   // คำนวณเวลานับถอยหลังของ QR Code (อายุ 3 นาที)
   useEffect(() => {
-    if (!qrResult) return;
+    if (!qrResult || paidInfo) return;
 
     const updateTimer = () => {
       const expiryTime = new Date(qrResult.expiresAt).getTime();
@@ -44,12 +156,48 @@ export const MerchantPosQrPage: React.FC = () => {
     updateTimer();
     const interval = setInterval(updateTimer, 1000);
     return () => clearInterval(interval);
-  }, [qrResult]);
+  }, [qrResult, paidInfo]);
 
-  const isExpired = secondsRemaining <= 0;
+  const isExpired = secondsRemaining <= 0 && !paidInfo;
   const timerMinutes = Math.floor(secondsRemaining / 60);
   const timerSeconds = secondsRemaining % 60;
   const formattedTimer = `${String(timerMinutes).padStart(2, '0')}:${String(timerSeconds).padStart(2, '0')}`;
+
+  // ตรวจสอบสถานะการจ่ายเงินของ QR Code แบบ Real-time (ทุก 2 วินาที)
+  useEffect(() => {
+    if (!qrResult || paidInfo || isExpired) return;
+
+    let active = true;
+    const checkPaymentStatus = async () => {
+      try {
+        const res = await getQrPaymentStatus(qrResult.qrReference);
+        if (!active) return;
+
+        if (res.status === 'USED' && res.paidTransaction) {
+          setPaidInfo(res.paidTransaction);
+          queryClient.invalidateQueries({ queryKey: ['merchant-sales'] });
+          queryClient.invalidateQueries({ queryKey: ['merchant-profile'] });
+
+          if (notifiedQrRef.current !== qrResult.qrReference) {
+            notifiedQrRef.current = qrResult.qrReference;
+            if (soundEnabled) {
+              playMerchantPaymentAlertSound(res.paidTransaction.totalAmount);
+            }
+          }
+        } else if (res.status === 'EXPIRED') {
+          setSecondsRemaining(0);
+        }
+      } catch {
+        // ignore transient network error during polling
+      }
+    };
+
+    const pollInterval = setInterval(checkPaymentStatus, 2000);
+    return () => {
+      active = false;
+      clearInterval(pollInterval);
+    };
+  }, [qrResult, paidInfo, isExpired, soundEnabled, queryClient]);
 
   // ดึงข้อมูลร้านค้าจริงจากระบบอัตโนมัติ (ไม่ต้องกรอกเองทุกครั้ง)
   const { data: merchantData, isLoading: isMerchantLoading } = useQuery({
@@ -76,7 +224,7 @@ export const MerchantPosQrPage: React.FC = () => {
 
   // วาด QR Code ลงบน Canvas เมื่อสลับเข้าสู่หน้า QR Result
   useEffect(() => {
-    if (qrResult && canvasRef.current) {
+    if (qrResult && !paidInfo && canvasRef.current) {
       QRCode.toCanvas(
         canvasRef.current,
         qrResult.qrReference,
@@ -93,7 +241,7 @@ export const MerchantPosQrPage: React.FC = () => {
         }
       );
     }
-  }, [qrResult]);
+  }, [qrResult, paidInfo]);
 
   const handleGenerate = async () => {
     if (amount <= 0) return;
@@ -111,6 +259,7 @@ export const MerchantPosQrPage: React.FC = () => {
         merchantId: activeMerchantId,
       });
       // เด้งเข้าสู่หน้าแสดง QR Code ทันที ไม่ต้องเลื่อนจอ
+      setPaidInfo(null);
       setQrResult(result);
     } catch (err: any) {
       console.error(err);
@@ -431,7 +580,7 @@ export const MerchantPosQrPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-surface-soft pb-24 md:pb-12 font-sans text-ink">
-      {/* Page Title & Action Bar (กระชับบนมือถือ เพื่อให้ปุ่มสร้าง QR อยู่ใน 1 จอ) */}
+      {/* Page Title & Action Bar (พร้อมปุ่มเลือกเปิด/ปิดเสียงแจ้งเตือนเมื่อมีเงินเข้า) */}
       <div className="bg-white border-b border-hairline px-3.5 sm:px-6 lg:px-8 py-2.5 sm:py-3.5 mb-3 sm:mb-4 shadow-2xs">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 sm:gap-3">
           <div className="flex items-center space-x-2 sm:space-x-2.5 min-w-0">
@@ -439,6 +588,7 @@ export const MerchantPosQrPage: React.FC = () => {
               onClick={() => {
                 if (qrResult) {
                   setQrResult(null);
+                  setPaidInfo(null);
                 } else {
                   navigate(APP_ROUTES.HOME);
                 }
@@ -459,15 +609,165 @@ export const MerchantPosQrPage: React.FC = () => {
               </p>
             </div>
           </div>
-          <button
-            onClick={() => navigate(APP_ROUTES.MERCHANT_SALES)}
-            className="inline-flex items-center space-x-1.5 rounded-pill px-2.5 sm:px-3 py-1.5 text-xs font-medium text-brand-blue bg-blue-50 hover:bg-blue-100 transition border border-blue-200 shrink-0"
-          >
-            <TrendingUp className="h-3.5 w-3.5 shrink-0" />
-            <span className="hidden xs:inline">ประวัติยอดขาย</span>
-          </button>
+
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            {/* ปุ่มเลือกเปิด-ปิดเสียงแจ้งเตือนเมื่อมีเงินชำระเข้ามา */}
+            <button
+              id="btn-toggle-merchant-sound"
+              type="button"
+              onClick={handleToggleSound}
+              className={`inline-flex items-center space-x-1.5 rounded-pill px-2.5 sm:px-3 py-1.5 text-xs font-semibold transition border ${
+                soundEnabled
+                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
+                  : 'bg-surface-soft text-ink-muted border-hairline hover:bg-gray-200 hover:text-ink'
+              }`}
+              title={
+                soundEnabled
+                  ? 'เปิดเสียงแจ้งเตือนเงินเข้าอยู่ (คลิกเพื่อปิดเสียง)'
+                  : 'ปิดเสียงแจ้งเตือนเงินเข้าอยู่ (คลิกเพื่อเปิดเสียง)'
+              }
+            >
+              {soundEnabled ? (
+                <>
+                  <Volume2 className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                  <span className="hidden xs:inline">เสียงแจ้งเตือน: เปิด</span>
+                </>
+              ) : (
+                <>
+                  <VolumeX className="h-3.5 w-3.5 text-ink-muted shrink-0" />
+                  <span className="hidden xs:inline">เสียงแจ้งเตือน: ปิด</span>
+                </>
+              )}
+            </button>
+
+            <button
+              onClick={() => navigate(APP_ROUTES.MERCHANT_SALES)}
+              className="inline-flex items-center space-x-1.5 rounded-pill px-2.5 sm:px-3 py-1.5 text-xs font-medium text-brand-blue bg-blue-50 hover:bg-blue-100 transition border border-blue-200 shrink-0"
+            >
+              <TrendingUp className="h-3.5 w-3.5 shrink-0" />
+              <span className="hidden sm:inline">ประวัติยอดขาย</span>
+            </button>
+          </div>
         </div>
       </div>
+
+      {/* กล่องเด้งและหน้าจอมาตรฐานแจ้งเตือนเมื่อธุรกรรมเสร็จสมบูรณ์ (Standard POS Payment Completed Modal) */}
+      {paidInfo && qrResult && (
+        <div
+          id="modal-merchant-payment-success"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/65 p-4 backdrop-blur-xs animate-in fade-in duration-200"
+        >
+          <div className="w-full max-w-md overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl animate-in zoom-in-95 duration-200">
+            {/* แถบหัวมาตรฐานธนาคารสีเขียวมรกต */}
+            <div className="bg-gradient-to-r from-emerald-700 via-emerald-600 to-teal-600 px-6 py-6 text-center text-white">
+              <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-white text-emerald-600 shadow-lg">
+                <CheckCircle2 className="h-10 w-10" />
+              </div>
+              <span className="inline-flex items-center space-x-1 rounded-pill bg-white/20 px-3 py-0.5 text-[11px] font-semibold text-white">
+                <ShieldCheck className="h-3.5 w-3.5" />
+                <span>ธุรกรรมเสร็จสมบูรณ์ (Payment Completed)</span>
+              </span>
+              <h2 className="mt-2 text-lg sm:text-xl font-bold">ได้รับเงินชำระเรียบร้อยแล้ว</h2>
+              <p className="mt-0.5 font-mono text-xs text-emerald-100">
+                {new Date(paidInfo.completedAt).toLocaleString('th-TH', {
+                  day: 'numeric',
+                  month: 'short',
+                  year: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  second: '2-digit',
+                })}{' '}
+                น.
+              </p>
+            </div>
+
+            {/* รายละเอียดจำนวนเงินที่ร้านค้าได้รับ */}
+            <div className="p-5 sm:p-6 space-y-4">
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 text-center">
+                <span className="text-xs font-semibold text-emerald-900 block">
+                  ยอดเงินรวมที่เข้าบัญชีร้านค้า (100%)
+                </span>
+                <div className="mt-1 font-mono text-3xl sm:text-4xl font-extrabold text-emerald-700">
+                  + ฿{paidInfo.totalAmount.toLocaleString('th-TH', { minimumFractionDigits: 2 })}
+                </div>
+              </div>
+
+              {/* ตารางแจกแจงสัดส่วน Co-pay 60/40 และข้อมูลผู้จ่าย */}
+              <div className="rounded-2xl border border-hairline bg-surface-soft p-4 space-y-2.5 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-ink-muted flex items-center space-x-1.5">
+                    <UserCheck className="h-3.5 w-3.5 text-brand-blue shrink-0" />
+                    <span>ผู้ชำระเงิน (ลูกค้า)</span>
+                  </span>
+                  <span className="font-bold text-ink">{paidInfo.customerName}</span>
+                </div>
+
+                <div className="border-t border-hairline pt-2 flex items-center justify-between">
+                  <span className="text-ink-muted">รับจากกระเป๋าลูกค้า (40%)</span>
+                  <span className="font-mono font-bold text-ink">
+                    ฿{paidInfo.citizenPaidAmount.toFixed(2)}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between text-brand-blue">
+                  <span className="flex items-center space-x-1 font-medium">
+                    <Sparkles className="h-3.5 w-3.5 shrink-0" />
+                    <span>รัฐบาลสมทบให้ร้านค้า (60%)</span>
+                  </span>
+                  <span className="font-mono font-bold">
+                    ฿{paidInfo.governmentCopayAmount.toFixed(2)}
+                  </span>
+                </div>
+
+                <div className="border-t border-hairline pt-2 flex items-center justify-between text-[11px] text-ink-muted">
+                  <span>รหัสอ้างอิงบิล (QR Ref.)</span>
+                  <span className="font-mono">{qrResult.qrReference}</span>
+                </div>
+              </div>
+
+              {/* แถบสถานะเสียงแจ้งเตือน */}
+              <div className="flex items-center justify-between px-1 text-[11px] text-ink-muted">
+                <span>
+                  สถานะเสียงแจ้งเตือนร้านค้า:{' '}
+                  <strong className={soundEnabled ? 'text-emerald-700' : 'text-ink-muted'}>
+                    {soundEnabled ? 'เปิดเสียงอยู่' : 'ปิดเสียงอยู่'}
+                  </strong>
+                </span>
+                <button
+                  type="button"
+                  onClick={handleToggleSound}
+                  className="text-brand-blue font-semibold hover:underline"
+                >
+                  {soundEnabled ? 'ปิดเสียง' : 'เปิดเสียง'}
+                </button>
+              </div>
+
+              {/* ปุ่มดำเนินการต่อ */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                <button
+                  type="button"
+                  onClick={() => navigate(APP_ROUTES.MERCHANT_SALES)}
+                  className="rounded-pill border border-hairline bg-white py-3 px-4 text-xs font-semibold text-ink hover:bg-gray-50 transition"
+                >
+                  ดูประวัติยอดขาย
+                </button>
+                <button
+                  id="btn-ack-payment-next-bill"
+                  type="button"
+                  onClick={() => {
+                    setPaidInfo(null);
+                    setQrResult(null);
+                    setAmount(100);
+                  }}
+                  className="rounded-pill bg-brand-blue py-3 px-4 text-xs font-bold text-white shadow-md hover:bg-brand-blue-hover transition active:scale-95"
+                >
+                  ตกลง • รับรายการถัดไป
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <main className="mx-auto w-full max-w-6xl px-3.5 sm:px-6 lg:px-8 space-y-4">
         {/* VIEW 1: หน้าตั้งยอดเงิน — ปรับขนาดอัตโนมัติทั้งมือถือ แท็บเล็ต และเดสก์ท็อป */}
@@ -622,8 +922,8 @@ export const MerchantPosQrPage: React.FC = () => {
               <div className="flex flex-wrap items-center justify-center gap-1.5 sm:gap-2 mb-2">
                 {!isExpired ? (
                   <span className="inline-flex items-center space-x-1.5 rounded-pill bg-emerald-50 px-2.5 sm:px-3 py-1 text-[11px] sm:text-xs font-semibold text-status-success border border-emerald-200">
-                    <CheckCircle2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
-                    <span>Dynamic QR พร้อมสแกน</span>
+                    <span className="h-2 w-2 rounded-full bg-status-success animate-ping" />
+                    <span>รอรับชำระเงิน (ตรวจจับอัตโนมัติ)</span>
                   </span>
                 ) : (
                   <span className="inline-flex items-center space-x-1.5 rounded-pill bg-red-50 px-2.5 sm:px-3 py-1 text-[11px] sm:text-xs font-semibold text-status-error border border-red-200 animate-pulse">
@@ -682,6 +982,7 @@ export const MerchantPosQrPage: React.FC = () => {
                     <p className="text-xs text-ink-muted mt-1 mb-3">กรุณากดสร้างบิลใหม่เพื่อให้ลูกค้าสแกน</p>
                     <button
                       onClick={() => {
+                        setPaidInfo(null);
                         setQrResult(null);
                         setAmount(100);
                       }}
@@ -739,6 +1040,7 @@ export const MerchantPosQrPage: React.FC = () => {
                 <button
                   id="btn-create-new-bill"
                   onClick={() => {
+                    setPaidInfo(null);
                     setQrResult(null);
                     setAmount(100);
                   }}

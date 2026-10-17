@@ -18,8 +18,15 @@ export const resolveFraudAlert = async (req: Request, res: Response): Promise<vo
     const adminId = req.user?.userId;
 
     const result = await fraudService.resolveAlert(id, action, adminId, note);
-    sendSuccess(res, result, `ดำเนินการ ${action === 'APPROVE' ? 'อนุมัติ' : 'ปฏิเสธ'} รายการสำเร็จ`);
+    const actionLabels: Record<string, string> = {
+      APPROVE: 'ยืนยันรายการปกติ (Approve)',
+      REJECT: 'ส่งเรื่องตรวจสอบเบื้องหลัง (ไม่ดึงเงินคืนอัตโนมัติ)',
+      SUSPEND_MERCHANT: 'ระงับสิทธิ์ร้านค้าชั่วคราวเพื่อเข้าตรวจสอบ',
+      SUSPEND_USER: 'ระงับสิทธิ์ Co-pay ของประชาชนที่น่าสงสัย',
+    };
+    sendSuccess(res, result, `ดำเนินการ ${actionLabels[action] || action} สำเร็จ`);
   } catch (error: any) {
     sendError(res, error.message || 'ไม่สามารถดำเนินการตรวจสอบได้', 400);
   }
 };
+

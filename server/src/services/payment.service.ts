@@ -1,6 +1,10 @@
 import prisma from '../utils/prisma';
 import { walletService } from './wallet.service';
-import { fraudService, calculateHaversineDistance } from './fraud.service';
+import {
+  fraudService,
+  calculateHaversineDistance,
+  MAX_ALLOWED_DISTANCE_METERS,
+} from './fraud.service';
 
 export interface DiscountValidationResult {
   code: string;
@@ -44,6 +48,14 @@ export interface DynamicQrData {
   estimatedGovCopay: number;
   estimatedCitizenPay: number;
   status?: 'ACTIVE' | 'USED' | 'SUSPENDED' | 'EXPIRED' | 'REJECTED';
+  paidTransaction?: {
+    transactionId: string;
+    customerName: string;
+    totalAmount: number;
+    governmentCopayAmount: number;
+    citizenPaidAmount: number;
+    completedAt: string;
+  };
 }
 
 // อายุของ Dynamic QR Code ทุกรายการในระบบกำหนดไว้ที่ 3 นาที (180,000 มิลลิวินาที)
@@ -309,7 +321,76 @@ export class PaymentService {
   }
 
   /**
-   * ดึงข้อมูล QR Code เพื่อพรีวิวยอดชำระเงินร่วม Co-pay 60/40 (รองรับส่วนลดคูปอง/โค้ดเพื่อน และตรวจสอบพิกัด GPS)
+   * ตรวจสอบสถานะ QR Code สำหรับฝั่งร้านค้า (POS Real-time Polling)
+   * เพื่อให้หน้าจอร้านค้าเด้งแจ้งเตือนมาตรฐานและเล่นเสียงเมื่อลูกค้าจ่ายเงินสำเร็จ
+   */
+  public async getQrPaymentStatus(qrReference: string) {
+    let qrData = qrStore.get(qrReference);
+
+    // ตรวจสอบในฐานข้อมูลเผื่อมีรายการชำระเงินสำเร็จแล้ว
+    const completedTx = await prisma.transactions.findFirst({
+      where: {
+        qr_reference: qrReference,
+        status: { in: ['SUCCESS', 'FLAGGED'] },
+      },
+      include: {
+        users: { select: { full_name: true } },
+        merchants: { select: { shop_name: true, latitude: true, longitude: true } },
+      },
+      orderBy: { created_at: 'desc' },
+    });
+
+    if (completedTx) {
+      const paidInfo = {
+        transactionId: completedTx.transaction_id,
+        customerName: completedTx.users?.full_name || 'ประชาชนผู้ได้รับสิทธิ',
+        totalAmount: Number(completedTx.total_amount),
+        governmentCopayAmount: Number(completedTx.government_copay_amount),
+        citizenPaidAmount: Number(completedTx.citizen_paid_amount),
+        completedAt: (completedTx.completed_at || completedTx.created_at).toISOString(),
+      };
+
+      if (qrData) {
+        qrData.status = 'USED';
+        qrData.paidTransaction = paidInfo;
+        qrStore.set(qrReference, qrData);
+      }
+
+      return {
+        qrReference,
+        status: 'USED' as const,
+        shopName: qrData?.shopName || completedTx.merchants?.shop_name || 'ร้านค้าโครงการ',
+        totalAmount: qrData?.totalAmount || Number(completedTx.total_amount),
+        paidTransaction: paidInfo,
+      };
+    }
+
+    if (!qrData) {
+      return {
+        qrReference,
+        status: 'EXPIRED' as const,
+        paidTransaction: null,
+      };
+    }
+
+    const isExpired = new Date() > new Date(qrData.expiresAt) || qrData.status === 'EXPIRED';
+    if (isExpired && qrData.status !== 'USED') {
+      qrData.status = 'EXPIRED';
+      qrStore.set(qrReference, qrData);
+    }
+
+    return {
+      qrReference: qrData.qrReference,
+      status: qrData.status || 'ACTIVE',
+      shopName: qrData.shopName,
+      totalAmount: qrData.totalAmount,
+      expiresAt: qrData.expiresAt,
+      paidTransaction: qrData.paidTransaction || null,
+    };
+  }
+
+  /**
+   * ดึงข้อมูล QR Code เพื่อพรีวิวยอดชำระเงินร่วม Co-pay 60/40 (รองรับส่วนลดคูปอง/โค้ดเพื่อน และตรวจสอบพิกัด GPS 2 กม.)
    */
   public async getQrDetails(
     qrReference: string,
@@ -337,7 +418,7 @@ export class PaymentService {
           expiresAt: new Date(tx.created_at.getTime() + QR_EXPIRATION_MS).toISOString(),
           estimatedGovCopay: Number(tx.government_copay_amount),
           estimatedCitizenPay: Number(tx.citizen_paid_amount),
-          status: tx.status as any,
+          status: tx.status === 'SUCCESS' || tx.status === 'FLAGGED' ? 'USED' : (tx.status as any),
         };
       } else {
         throw new Error('ไม่พบข้อมูล QR Code นี้ หรือ QR Code อาจหมดอายุหรือถูกยกเลิกแล้ว');
@@ -361,7 +442,7 @@ export class PaymentService {
       throw new Error('QR Code นี้ถูกใช้งานชำระเงินเรียบร้อยแล้ว ไม่สามารถชำระซ้ำได้');
     }
 
-    // ตรวจสอบพิกัดระยะทางตั้งแต่ขั้นตอนสแกน QR
+    // 3. ตรวจสอบพิกัดระยะทางตั้งแต่ขั้นตอนสแกน QR (อนุญาตให้ทำธุรกรรมในรัศมีไม่เกิน 2 กิโลเมตร = 2,000 เมตร)
     if (userLocation && userLocation.lat && userLocation.lon) {
       const distanceMeters = calculateHaversineDistance(
         userLocation.lat,
@@ -370,13 +451,13 @@ export class PaymentService {
         qrData.merchantLongitude
       );
 
-      // ถ้าระยะห่างเกิน 1,000 เมตร (อยู่นอกพื้นที่หน้าร้าน)
-      if (distanceMeters > 1000) {
+      // ถ้าระยะห่างเกิน 2,000 เมตร (2 กิโลเมตร)
+      if (distanceMeters > MAX_ALLOWED_DISTANCE_METERS) {
         // 1. ระงับ QR Code โดยปรับสถานะเป็น REJECTED (ไม่ลบข้อมูลออกจากระบบหรือ DB เพื่อเก็บประวัติไว้ตรวจสอบ)
         qrData.status = 'REJECTED';
         qrStore.set(qrReference, qrData);
 
-        // 2. จด log เก็บไว้เงียบๆ ในฐานข้อมูล เพื่อให้ Admin ตรวจสอบภายหลัง
+        // 2. จด log เก็บไว้เงียบๆ ในฐานข้อมูล เพื่อให้ Admin ตรวจสอบกรณีมีความน่าสงสัยซ้ำๆ
         try {
           let targetUserId = userId;
           if (!targetUserId) {
@@ -408,7 +489,7 @@ export class PaymentService {
                 distance_meters: distanceMeters,
                 is_distance_valid: false,
                 risk_score: Math.min(1.0, Math.round((distanceMeters / 5000) * 100) / 100),
-                fraud_reason: `ระยะห่างจากร้านค้าเกินพิกัดที่กำหนด (${Math.round(distanceMeters)} เมตร) จากร้านค้า ${qrData.shopName}`,
+                fraud_reason: `พยายามสแกน QR นอกรัศมี 2 กม. ที่กำหนด (ห่าง ${(distanceMeters / 1000).toFixed(2)} กม. จากร้าน ${qrData.shopName})`,
                 decision: 'REJECTED',
               },
             });
@@ -417,9 +498,9 @@ export class PaymentService {
           console.error('[Fraud Log] Failed to save silent rejected log on scan:', logErr);
         }
 
-        // 3. แจ้งเตือนผู้ใช้ด้วยข้อความสุภาพ แจ้งว่าไกลเกินไป (ไม่กล่าวหาว่าทุจริต)
+        // 3. แจ้งเตือนผู้ใช้ด้วยข้อความสุภาพ แจ้งว่าไกลเกินรัศมี 2 กิโลเมตร (ไม่กล่าวหาว่าทุจริต)
         throw new Error(
-          'ไม่สามารถทำรายการได้ เนื่องจากตำแหน่งของคุณอยู่ห่างจากร้านค้าเกินระยะที่กำหนด กรุณาสแกน QR Code ใหม่อีกครั้งที่หน้าร้าน'
+          'ไม่สามารถทำรายการได้ เนื่องจากตำแหน่งของคุณอยู่ห่างจากร้านค้าเกินระยะที่กำหนด (ไม่เกิน 2 กิโลเมตร) กรุณาสแกน QR Code ใหม่อีกครั้งที่หน้าร้าน'
         );
       }
     }
@@ -466,7 +547,8 @@ export class PaymentService {
 
   /**
    * ประชาชนยืนยันชำระเงินร่วม (Co-pay Checkout)
-   * คำนวณ Co-pay 60/40 + ส่วนลดคูปอง/โค้ดเพื่อน + ตรวจพิกัด GPS & Semi-AI
+   * คำนวณ Co-pay 60/40 + ส่วนลดคูปอง/โค้ดเพื่อน + ตรวจพิกัด GPS (ไม่เกิน 2 กม.) & Semi-AI
+   * นโยบาย: AI จะไม่บล็อกผู้ใช้หรือร้านค้าทันที แต่หากพบความน่าสงสัยซ้ำๆ จะส่งแจ้งเตือนให้ Admin ตรวจสอบ
    */
   public async checkout(params: {
     userId: string;
@@ -475,17 +557,35 @@ export class PaymentService {
     userLongitude: number;
     merchantId?: string;
     discountCode?: string;
+    pin?: string;
   }) {
+    if (params.pin !== undefined && !/^\d{6}$/.test(params.pin)) {
+      throw new Error('กรุณาระบุรหัส PIN ยืนยันการชำระเงิน 6 หลักให้ถูกต้อง');
+    }
+
     const { qrData } = await this.getQrDetails(params.qrReference);
 
     const merchantId = params.merchantId || qrData.merchantId;
-    const merchant = await prisma.merchants.findUnique({
-      where: { merchant_id: merchantId },
-    });
+    const [merchant, buyerUser] = await Promise.all([
+      prisma.merchants.findUnique({
+        where: { merchant_id: merchantId },
+      }),
+      prisma.user.findUnique({
+        where: { user_id: params.userId },
+        select: { full_name: true },
+      }),
+    ]);
 
     const merchantLat = merchant ? Number(merchant.latitude) : qrData.merchantLatitude;
     const merchantLon = merchant ? Number(merchant.longitude) : qrData.merchantLongitude;
     const shopName = merchant ? merchant.shop_name : qrData.shopName;
+    const customerName = buyerUser?.full_name || 'ประชาชนผู้ได้รับสิทธิ';
+
+    if (merchant && merchant.is_approved === false) {
+      throw new Error(
+        'ไม่สามารถทำรายการได้ เนื่องจากร้านค้านี้ถูกระงับสิทธิ์ชั่วคราวเพื่อรอการตรวจสอบจากผู้ดูแลระบบ'
+      );
+    }
 
     // 1. ตรวจสอบโค้ดส่วนลด/โค้ดชวนเพื่อน (ถ้ามี)
     let discountInfo: DiscountValidationResult | null = null;
@@ -501,8 +601,14 @@ export class PaymentService {
       discountAmount = discountInfo.discountAmount;
     }
 
-    // 2. ดึงข้อมูลกระเป๋าเงินและคำนวณ Co-pay 60/40 จากยอดสุทธิ
+    // 2. ดึงข้อมูลกระเป๋าเงินและตรวจสอบสถานะการระงับสิทธิ์ของประชาชน
     const wallet = await walletService.getWalletByUserId(params.userId);
+    if (wallet.status === 'SUSPENDED' || wallet.eligibilityStatus === 'SUSPENDED') {
+      throw new Error(
+        'สิทธิ์การใช้จ่ายโครงการของคุณถูกระงับชั่วคราวเนื่องจากพบความผิดปกติ กรุณาติดต่อผู้ดูแลระบบเพื่อยืนยันตัวตน'
+      );
+    }
+
     const copay = this.calculateCopay(
       qrData.totalAmount,
       wallet.dailyQuotaRemaining,
@@ -521,7 +627,7 @@ export class PaymentService {
       );
     }
 
-    // 3. เรียกใช้ระบบตรวจสอบทุจริตพิกัด GPS & Semi-AI Anomaly Engine
+    // 3. เรียกใช้ระบบตรวจสอบพิกัด GPS (รัศมี 2 กม.) & Semi-AI Anomaly Engine
     const fraudAssessment = await fraudService.evaluateTransaction({
       userId: params.userId,
       merchantId,
@@ -532,12 +638,11 @@ export class PaymentService {
       merchantLon,
     });
 
-    if (fraudAssessment.decision === 'REJECTED' || fraudAssessment.distanceMeters > 1000) {
-      // ระงับ QR Code โดยปรับสถานะเป็น REJECTED (ไม่ลบข้อมูลออกจากระบบ เพื่อให้ติดตามและตรวจสอบได้)
+    // บล็อกเฉพาะกรณีอยู่นอกรัศมี 2 กิโลเมตร (2,000 เมตร) เท่านั้น — AI ไม่บล็อกผู้ใช้หรือร้านค้าทันที
+    if (fraudAssessment.distanceMeters > MAX_ALLOWED_DISTANCE_METERS) {
       qrData.status = 'REJECTED';
       qrStore.set(params.qrReference, qrData);
 
-      // บันทึกธุรกรรมสถานะ REJECTED ลงฐานข้อมูล DB (ไม่ลบออกจาก DB) เพื่อให้ติดตามและตรวจสอบได้
       try {
         const rejectedTx = await prisma.transactions.create({
           data: {
@@ -562,7 +667,7 @@ export class PaymentService {
             distance_meters: fraudAssessment.distanceMeters,
             is_distance_valid: false,
             risk_score: fraudAssessment.riskScore,
-            fraud_reason: fraudAssessment.reason,
+            fraud_reason: `ตำแหน่งขณะชำระเงินห่างเกินรัศมี 2 กม. ที่กำหนด (ห่าง ${(fraudAssessment.distanceMeters / 1000).toFixed(2)} กม.)`,
             decision: 'REJECTED',
           },
         });
@@ -570,14 +675,16 @@ export class PaymentService {
         console.error('[Fraud Log] Failed to save rejected log on checkout:', logErr);
       }
 
-      // แจ้งเตือนข้อความสุภาพ ไม่ระบุว่าทุจริต
       throw new Error(
-        'ไม่สามารถทำรายการได้ เนื่องจากตำแหน่งของคุณอยู่ห่างจากร้านค้าเกินระยะที่กำหนด กรุณาสแกน QR Code ใหม่อีกครั้งที่หน้าร้าน'
+        'ไม่สามารถทำรายการได้ เนื่องจากตำแหน่งของคุณอยู่ห่างจากร้านค้าเกินระยะที่กำหนด (ไม่เกิน 2 กิโลเมตร) กรุณาสแกน QR Code ใหม่อีกครั้งที่หน้าร้าน'
       );
     }
 
+    // หากอยู่ในระยะ <= 2 กม. อนุญาตให้ทำธุรกรรมสำเร็จได้เสมอ (ไม่บล็อกผู้ใช้หรือร้านค้า)
+    // แต่หาก AI พบความน่าสงสัยซ้ำๆ จะบันทึกเป็น FLAGGED เพื่อให้ Admin ตรวจสอบย้อนหลังได้
     const txStatus =
       fraudAssessment.decision === 'FLAGGED_FOR_REVIEW' ? 'FLAGGED' : 'SUCCESS';
+    const completedAtDate = new Date();
 
     // 4. บันทึกและตัดยอดเงินใน Atomic Transaction
     const transactionRecord = await prisma.$transaction(async (tx: any) => {
@@ -604,11 +711,11 @@ export class PaymentService {
           qr_reference: params.qrReference,
           user_id: params.userId,
           merchant_id: merchantId,
-          total_amount: copay.netTotalAmount, // บันทึกยอดสุทธิของธุรกรรม
+          total_amount: copay.netTotalAmount,
           government_copay_amount: copay.governmentCopayAmount,
           citizen_paid_amount: copay.citizenPaidAmount,
           status: txStatus,
-          completed_at: txStatus === 'SUCCESS' ? new Date() : null,
+          completed_at: completedAtDate,
         },
       });
 
@@ -619,7 +726,7 @@ export class PaymentService {
           data: {
             status: 'redeemed',
             transaction_id: newTx.transaction_id,
-            converted_at: new Date(),
+            converted_at: completedAtDate,
           },
         });
       } else if (discountInfo?.userRewardId) {
@@ -628,7 +735,7 @@ export class PaymentService {
           data: {
             status: 'used',
             transaction_id: newTx.transaction_id,
-            used_at: new Date(),
+            used_at: completedAtDate,
           },
         });
       }
@@ -646,7 +753,7 @@ export class PaymentService {
         },
       });
 
-      // 4.5 บันทึกการตรวจสอบทุจริต
+      // 4.5 บันทึกการตรวจสอบของ AI (หากเป็น FLAGGED_FOR_REVIEW จะไปปรากฏในหน้า Admin ทันที)
       await tx.fraud_checks.create({
         data: {
           transaction_id: newTx.transaction_id,
@@ -655,7 +762,7 @@ export class PaymentService {
           merchant_latitude: merchantLat,
           merchant_longitude: merchantLon,
           distance_meters: fraudAssessment.distanceMeters,
-          is_distance_valid: fraudAssessment.distanceMeters <= 1000,
+          is_distance_valid: fraudAssessment.distanceMeters <= MAX_ALLOWED_DISTANCE_METERS,
           risk_score: fraudAssessment.riskScore,
           fraud_reason: fraudAssessment.reason,
           decision: fraudAssessment.decision,
@@ -665,8 +772,16 @@ export class PaymentService {
       return newTx;
     });
 
-    // ปรับสถานะ QR Code เป็น USED เมื่อทำรายการสำเร็จ ไม่ลบออกจากระบบ เพื่อเก็บประวัติไว้ตรวจสอบ
+    // ปรับสถานะ QR Code เป็น USED พร้อมแนบข้อมูลการจ่ายเงินเพื่อให้หน้าจอ POS ร้านค้ารับรู้ได้ทันที
     qrData.status = 'USED';
+    qrData.paidTransaction = {
+      transactionId: transactionRecord.transaction_id,
+      customerName,
+      totalAmount: copay.netTotalAmount,
+      governmentCopayAmount: copay.governmentCopayAmount,
+      citizenPaidAmount: copay.citizenPaidAmount,
+      completedAt: completedAtDate.toISOString(),
+    };
     qrStore.set(params.qrReference, qrData);
 
     return {
@@ -683,7 +798,7 @@ export class PaymentService {
       governmentCopayAmount: copay.governmentCopayAmount,
       citizenPaidAmount: copay.citizenPaidAmount,
       totalSavingsAmount: copay.totalSavingsAmount,
-      completedAt: transactionRecord.created_at.toISOString(),
+      completedAt: completedAtDate.toISOString(),
       distanceMeters: fraudAssessment.distanceMeters,
       riskScore: fraudAssessment.riskScore,
       fraudDecision: fraudAssessment.decision,

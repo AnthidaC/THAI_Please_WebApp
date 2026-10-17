@@ -580,16 +580,29 @@ export const CitizenScanCopayPage: React.FC = () => {
                     inputMode="numeric"
                     maxLength={6}
                     value={pin}
-                    onChange={(e) => setPin(e.target.value)}
+                    onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
                     placeholder="******"
                     className="w-full text-center tracking-[0.45em] font-mono text-xl sm:text-2xl rounded-pill border border-hairline py-2.5 focus:border-brand-blue focus:outline-none focus:ring-2 focus:ring-blue-100"
                   />
+                  {pin.length !== 6 && (
+                    <p className="text-[11px] text-amber-600 mt-1 text-center">
+                      กรุณาระบุรหัส PIN ตัวเลข 6 หลักเพื่อยืนยันการชำระเงิน
+                    </p>
+                  )}
                 </div>
 
                 {/* ปุ่มยืนยันชำระเงิน */}
                 <button
                   id="btn-confirm-checkout"
-                  disabled={checkoutMutation.isPending || (wallet ? wallet.balance < (scannedData.copaySplit?.citizenPaidAmount ?? scannedData.qrData.estimatedCitizenPay) : false)}
+                  disabled={
+                    checkoutMutation.isPending ||
+                    pin.length !== 6 ||
+                    (wallet
+                      ? wallet.balance <
+                        (scannedData.copaySplit?.citizenPaidAmount ??
+                          scannedData.qrData.estimatedCitizenPay)
+                      : false)
+                  }
                   onClick={() => checkoutMutation.mutate()}
                   className="w-full flex items-center justify-center space-x-2 rounded-card bg-brand-blue py-3.5 text-white text-sm sm:text-base font-semibold shadow-lg shadow-blue-500/20 transition hover:bg-brand-blue-hover active:scale-98 disabled:opacity-50"
                 >
