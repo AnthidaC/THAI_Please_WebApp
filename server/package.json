@@ -9,7 +9,8 @@
     "start": "node dist/server.js",
     "db:migrate": "npx prisma migrate dev",
     "db:generate": "npx prisma generate",
-    "db:studio": "npx prisma studio"
+    "db:studio": "npx prisma studio",
+    "test:engine": "tsx src/tests/payment-engine.test.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.4.1",
@@ -22,6 +23,7 @@
     "helmet": "^8.0.0",
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.0",
+    "puppeteer-core": "^25.14.0",
     "redis": "^4.7.0",
     "zod": "^3.24.2"
   },

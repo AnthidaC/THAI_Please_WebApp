@@ -1,5 +1,9 @@
 import { Router } from 'express';
 import authRoutes from './auth.routes';
+import walletRoutes from './wallet.routes';
+import paymentRoutes from './payment.routes';
+import transactionRoutes from './transaction.routes';
+import fraudRoutes from './fraud.routes';
 
 const router = Router();
 
@@ -10,5 +14,9 @@ router.get('/health', (req, res) => {
 
 // Mount modules
 router.use('/auth', authRoutes);
+router.use('/wallet', walletRoutes);
+router.use('/payment', paymentRoutes);
+router.use('/transactions', transactionRoutes);
+router.use('/fraud', fraudRoutes);
 
 export default router;
