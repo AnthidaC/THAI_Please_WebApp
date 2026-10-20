@@ -1,5 +1,23 @@
 import prisma from '../utils/prisma';
 
+export interface MerchantBehaviorBaseline {
+  totalTxCount: number;
+  avgAmount: number;
+  amountStdDev: number;
+  inStoreTxCount: number;
+  remoteTxCount: number;
+  inStoreRatio: number; // สัดส่วนธุรกรรมหน้าร้าน เช่น 0.85 = 85%
+  uniqueCustomerCount: number;
+}
+
+export interface CitizenBehaviorBaseline {
+  lifetimeTxCount: number;
+  avgAmount: number;
+  amountStdDev: number;
+  accountAgeDays: number;
+  cleanTxRatio: number; // สัดส่วนประวัติขาวสะอาด 1.0 = 100%
+}
+
 export interface FraudFeatureVector {
   userId: string;
   merchantId: string;
@@ -14,6 +32,9 @@ export interface FraudFeatureVector {
   timeHour: number;
   repeatedSuspiciousCount?: number;
   samePairRepeatCountToday?: number;
+  merchantBaseline?: MerchantBehaviorBaseline;
+  citizenBaseline?: CitizenBehaviorBaseline;
+  amountZScoreVsMerchant?: number;
 }
 
 export interface AiFraudAssessment {
@@ -95,10 +116,27 @@ export class AiFraudEngine {
     const triggers: string[] = [];
     const repeatSuspicious = features.repeatedSuspiciousCount ?? 0;
     const samePairRepeats = features.samePairRepeatCountToday ?? 1;
+    const mb = features.merchantBaseline;
+    const zScore = features.amountZScoreVsMerchant ?? 0;
+
+    // ตรวจจับพฤติกรรมสั่งเดลิเวอรี / LINE OpenChat ปกติ (ระยะ 300 - 1,850 ม. ร้านมีลูกค้าหน้าร้านแน่นหนา >= 65%)
+    const isBenignNeighborhoodDelivery =
+      mb &&
+      mb.inStoreRatio >= 0.65 &&
+      features.distanceMeters > 300 &&
+      features.distanceMeters <= 1850 &&
+      features.estimatedSpeedKmH < 40 &&
+      Math.abs(zScore) < 2.5 &&
+      samePairRepeats <= 2 &&
+      repeatSuspicious === 0;
 
     // กฎที่ 1: พิกัดห่างเกิน 1,500 เมตร (ใกล้กรอบเพดาน 2,000 เมตร)
     if (features.distanceMeters > 1500) {
-      triggers.push(`พิกัดห่าง ${Math.round(features.distanceMeters)} ม. (เกินเกณฑ์เฝ้าระวัง 1,500 ม.)`);
+      if (isBenignNeighborhoodDelivery) {
+        triggers.push(`พิกัดห่าง ${Math.round(features.distanceMeters)} ม. (อยู่ในระยะส่งเดลิเวอรี/ออเดอร์แชตชุมชน)`);
+      } else {
+        triggers.push(`พิกัดห่าง ${Math.round(features.distanceMeters)} ม. (เกินเกณฑ์เฝ้าระวัง 1,500 ม.)`);
+      }
     }
 
     // กฎที่ 2: ความเร็วการเปลี่ยนพิกัดเกิน 70 กม./ชม.
@@ -124,6 +162,16 @@ export class AiFraudEngine {
     // กฎที่ 6: ยอดเงินสูงกว่า 1,500 บาท ร่วมกับระยะห่างเกิน 1,000 เมตร
     if (features.amount > 1500 && features.distanceMeters > 1000) {
       triggers.push(`ยอดเงินสูง (${features.amount} บาท) ร่วมกับระยะห่างมากกว่า 1 กม.`);
+    }
+
+    // กฎที่ 7: ความผันผวนของยอดเงินสูงผิดปกติเทียบกับสถิติร้านค้า (Outlier / Z-Score > 3.0)
+    if (zScore > 3.0 && mb && mb.totalTxCount >= 5) {
+      triggers.push(`ยอดเงิน ฿${features.amount} ผันผวนสูงผิดปกติ (Z-Score ${zScore.toFixed(1)}x ของส่วนเบี่ยงเบนมาตรฐานร้าน)`);
+    }
+
+    // กฎที่ 8: ร้านค้ามีสัดส่วนลูกค้าหน้าร้านต่ำผิดปกติ (< 30% จากประวัติ 10 รายการขึ้นไป)
+    if (mb && mb.totalTxCount >= 10 && mb.inStoreRatio < 0.30) {
+      triggers.push(`ร้านค้ามีสัดส่วนลูกค้าหน้าร้านต่ำผิดปกติ (${Math.round(mb.inStoreRatio * 100)}%) เสี่ยงเป็นร้านตัวแทน/ฮั้ว`);
     }
 
     return {
@@ -183,7 +231,12 @@ export class AiFraudEngine {
     const timeout = setTimeout(() => controller.abort(), 2500); // ไม่ให้หน้าร้านค้างเกิน 2.5 วินาที
 
     try {
-      const compactPrompt = `TxFeatures: dist=${Math.round(features.distanceMeters)}m, speed=${Math.round(features.estimatedSpeedKmH)}km/h, tx10m=${features.recentTxCountIn10Min}, sameShopToday=${features.samePairRepeatCountToday ?? 1}, prevFlags=${features.repeatedSuspiciousCount ?? 0}, amt=${features.amount}THB, triggers=[${triggers.join('; ')}]`;
+      const mb = features.merchantBaseline;
+      const cb = features.citizenBaseline;
+      const compactPrompt = `TxData: amt=${features.amount}THB, dist=${Math.round(features.distanceMeters)}m, spd=${Math.round(features.estimatedSpeedKmH)}km/h, 10mTx=${features.recentTxCountIn10Min}, sameShopToday=${features.samePairRepeatCountToday ?? 1}, flags=${features.repeatedSuspiciousCount ?? 0}
+MerchantBase: avgAmt=${mb ? mb.avgAmount : 150}THB (std=${mb ? mb.amountStdDev : 30}), inStoreRatio=${mb ? Math.round(mb.inStoreRatio * 100) : 100}%, uniqCust=${mb ? mb.uniqueCustomerCount : 1}, zScore=${features.amountZScoreVsMerchant ?? 0}
+CitizenBase: totalTx=${cb ? cb.lifetimeTxCount : 1}, avgAmt=${cb ? cb.avgAmount : 150}THB (std=${cb ? cb.amountStdDev : 30}), cleanRatio=${cb ? Math.round(cb.cleanTxRatio * 100) : 100}%, acctDays=${cb ? cb.accountAgeDays : 30}
+Observations: [${triggers.join('; ')}]`;
 
       let riskScore = 0.75;
       let decision: 'AUTO_APPROVED' | 'FLAGGED_FOR_REVIEW' = 'FLAGGED_FOR_REVIEW';
@@ -202,7 +255,7 @@ export class AiFraudEngine {
             contents: [{ parts: [{ text: compactPrompt }] }],
             systemInstruction: {
               parts: [{
-                text: 'You are an anti-fraud risk engine for Thailand Co-pay. Evaluate risk. Output ONLY valid JSON: {"riskScore": number(0-1), "decision": "AUTO_APPROVED"|"FLAGGED_FOR_REVIEW", "reason": "สรุปสั้นๆภาษาไทย 1 ประโยค"}. Never return REJECTED directly; always FLAGGED_FOR_REVIEW if suspicious.',
+                text: 'You are an objective fraud evaluator for Thailand Co-pay. Commercial context: neighborhood delivery, LINE OpenChat, and takeaway within 2km are normal if merchant has healthy in-store ratio (>=60%) and realistic ticket sizes. Evaluate amount volatility against merchant/citizen average and std dev. Output ONLY valid JSON: {"riskScore": number(0-1), "decision": "AUTO_APPROVED"|"FLAGGED_FOR_REVIEW", "reason": "สรุปสั้นๆภาษาไทย 1 ประโยค อธิบายความสมเหตุสมผลเชิงสถิติ"}. Never return REJECTED.',
               }],
             },
             generationConfig: {
@@ -303,26 +356,64 @@ export class AiFraudEngine {
   public evaluateLocally(features: FraudFeatureVector, triggers: string[] = []): AiFraudAssessment {
     const repeatSuspicious = features.repeatedSuspiciousCount ?? 0;
     const samePairRepeats = features.samePairRepeatCountToday ?? 1;
+    const mb = features.merchantBaseline;
+    const cb = features.citizenBaseline;
+    const zScore = features.amountZScoreVsMerchant ?? 0;
+
+    // ตรวจสอบว่าพฤติกรรมนี้สอดคล้องกับออเดอร์เดลิเวอรี / สั่งผ่าน LINE แชตชุมชนปกติหรือไม่
+    const isBenignNeighborhoodDelivery =
+      mb &&
+      mb.inStoreRatio >= 0.60 &&
+      features.distanceMeters > 300 &&
+      features.distanceMeters <= 1850 &&
+      features.estimatedSpeedKmH < 40 &&
+      Math.abs(zScore) < 2.5 &&
+      samePairRepeats <= 2 &&
+      repeatSuspicious === 0;
 
     // คำนวณน้ำหนักความเสี่ยงแต่ละมิติ
-    const distanceRiskWeight = Math.min(1.0, features.distanceMeters / MAX_ALLOWED_DISTANCE_METERS);
+    let distanceRiskWeight = Math.min(1.0, features.distanceMeters / MAX_ALLOWED_DISTANCE_METERS);
+    if (isBenignNeighborhoodDelivery) {
+      distanceRiskWeight *= 0.40;
+    }
+
     const speedRiskWeight = Math.min(1.0, features.estimatedSpeedKmH / 120);
     const frequencyRiskWeight = Math.min(1.0, Math.max(0, features.recentTxCountIn10Min - 1) / 3);
     const repeatOffenseWeight = Math.min(1.0, (repeatSuspicious * 0.35) + Math.max(0, samePairRepeats - 2) * 0.25);
-    const amountRiskWeight = features.amount > 1500 ? 0.25 : 0.05;
+
+    // ความผันผวนของยอดเงินเทียบกับสถิติร้านค้า
+    const volatilityWeight = Math.min(1.0, Math.max(0, zScore - 1.5) / 3.0);
+    const amountRiskWeight = features.amount > 1500 ? 0.25 : (volatilityWeight * 0.15 + 0.05);
+
+    // ส่วนลดความน่าเชื่อถือหากประชาชนมีประวัติการใช้จ่ายขาวสะอาดและใช้งานต่อเนื่อง
+    const citizenTrustDiscount = (cb && cb.cleanTxRatio === 1.0 && cb.lifetimeTxCount >= 5) ? 0.08 : 0;
 
     // คำนวณความเสี่ยงรวมแบบ Multi-factor Weighted Anomaly Score
-    const combinedAnomalyScore =
-      distanceRiskWeight * 0.30 +
-      repeatOffenseWeight * 0.30 +
+    const combinedAnomalyScore = Math.max(
+      0.01,
+      distanceRiskWeight * 0.25 +
+      repeatOffenseWeight * 0.25 +
       frequencyRiskWeight * 0.20 +
       speedRiskWeight * 0.15 +
-      amountRiskWeight * 0.05;
+      amountRiskWeight * 0.15 -
+      citizenTrustDiscount
+    );
 
     const roundedScore = Math.min(0.99, Math.max(0.01, Math.round(combinedAnomalyScore * 100) / 100));
 
     let decision: 'AUTO_APPROVED' | 'FLAGGED_FOR_REVIEW' = 'AUTO_APPROVED';
     const reasons: string[] = triggers.length > 0 ? [...triggers] : [];
+
+    // หากเข้าข่ายเดลิเวอรีชุมชนปกติ และไม่มีตัวบ่งชี้การโกงอื่น
+    if (isBenignNeighborhoodDelivery && roundedScore < 0.45) {
+      return {
+        riskScore: roundedScore,
+        decision: 'AUTO_APPROVED',
+        reason: `พิกัด ${Math.round(features.distanceMeters)} ม. สอดคล้องกับออเดอร์เดลิเวอรี/แชตชุมชน (ร้านมีสัดส่วนหน้าร้าน ${Math.round((mb?.inStoreRatio ?? 0.8) * 100)}% ยอดเงินอยู่ในกรอบปกติ)`,
+        confidence: 0.96,
+        model: 'semi-ai-baseline-calibrated-v2',
+      };
+    }
 
     if (repeatSuspicious >= 2 && !reasons.some(r => r.includes('ประวัติ'))) {
       reasons.push(`ตรวจพบประวัติความน่าสงสัยซ้ำสะสม (${repeatSuspicious} ครั้ง)`);
@@ -444,6 +535,127 @@ export class FraudService {
       }
     }
 
+    // 4. ดึงสถิติภาพรวมย้อนหลังของร้านค้าและประชาชน (Merchant & Citizen Baseline Profiling)
+    const [merchantPastTxs, userPastTxs] = await Promise.all([
+      prisma.transactions.findMany({
+        where: {
+          merchant_id: params.merchantId,
+          status: { in: ['COMPLETED', 'SETTLED', 'USED', 'AUTO_APPROVED'] },
+        },
+        select: {
+          total_amount: true,
+          user_id: true,
+          fraud_checks: {
+            select: { distance_meters: true },
+          },
+        },
+        take: 50,
+        orderBy: { created_at: 'desc' },
+      }),
+      prisma.transactions.findMany({
+        where: {
+          user_id: params.userId,
+          status: { in: ['COMPLETED', 'SETTLED', 'USED', 'AUTO_APPROVED'] },
+        },
+        select: {
+          total_amount: true,
+          created_at: true,
+          fraud_checks: {
+            select: { decision: true },
+          },
+        },
+        take: 30,
+        orderBy: { created_at: 'desc' },
+      }),
+    ]);
+
+    // คำนวณ Merchant Baseline (ยอดเฉลี่ย, ความผันผวน, สัดส่วนหน้าร้าน vs ส่งรอบร้าน)
+    let merchantBaseline: MerchantBehaviorBaseline = {
+      totalTxCount: 0,
+      avgAmount: 150,
+      amountStdDev: 30,
+      inStoreTxCount: 0,
+      remoteTxCount: 0,
+      inStoreRatio: 1.0,
+      uniqueCustomerCount: 0,
+    };
+
+    if (merchantPastTxs.length > 0) {
+      const amounts = merchantPastTxs.map((t) => Number(t.total_amount));
+      const sumAmount = amounts.reduce((a, b) => a + b, 0);
+      const avgAmount = Math.round((sumAmount / amounts.length) * 100) / 100;
+
+      const variance = amounts.reduce((sum, amt) => sum + Math.pow(amt - avgAmount, 2), 0) / amounts.length;
+      const amountStdDev = Math.round(Math.sqrt(variance) * 100) / 100;
+
+      let inStoreCount = 0;
+      let remoteCount = 0;
+      const uniqueUsers = new Set<string>();
+
+      for (const tx of merchantPastTxs) {
+        if (tx.user_id) uniqueUsers.add(tx.user_id);
+        const dist = tx.fraud_checks ? Number(tx.fraud_checks.distance_meters) : 0;
+        if (dist <= 200) {
+          inStoreCount++;
+        } else {
+          remoteCount++;
+        }
+      }
+
+      const inStoreRatio = Math.round((inStoreCount / merchantPastTxs.length) * 100) / 100;
+
+      merchantBaseline = {
+        totalTxCount: merchantPastTxs.length,
+        avgAmount,
+        amountStdDev: amountStdDev || 20,
+        inStoreTxCount: inStoreCount,
+        remoteTxCount: remoteCount,
+        inStoreRatio,
+        uniqueCustomerCount: uniqueUsers.size,
+      };
+    }
+
+    // คำนวณ Citizen Baseline
+    let citizenBaseline: CitizenBehaviorBaseline = {
+      lifetimeTxCount: 0,
+      avgAmount: 150,
+      amountStdDev: 30,
+      accountAgeDays: 30,
+      cleanTxRatio: 1.0,
+    };
+
+    if (userPastTxs.length > 0) {
+      const userAmounts = userPastTxs.map((t) => Number(t.total_amount));
+      const userSum = userAmounts.reduce((a, b) => a + b, 0);
+      const userAvg = Math.round((userSum / userAmounts.length) * 100) / 100;
+      const userVar = userAmounts.reduce((sum, amt) => sum + Math.pow(amt - userAvg, 2), 0) / userAmounts.length;
+      const userStd = Math.round(Math.sqrt(userVar) * 100) / 100;
+
+      let cleanCount = 0;
+      for (const tx of userPastTxs) {
+        const dec = tx.fraud_checks?.decision;
+        if (!dec || dec === 'AUTO_APPROVED') {
+          cleanCount++;
+        }
+      }
+
+      const oldestTxDate = new Date(userPastTxs[userPastTxs.length - 1].created_at).getTime();
+      const accountAgeDays = Math.max(1, Math.round((Date.now() - oldestTxDate) / (1000 * 3600 * 24)));
+
+      citizenBaseline = {
+        lifetimeTxCount: userPastTxs.length,
+        avgAmount: userAvg,
+        amountStdDev: userStd || 20,
+        accountAgeDays,
+        cleanTxRatio: Math.round((cleanCount / userPastTxs.length) * 100) / 100,
+      };
+    }
+
+    // Z-Score ของยอดเงินบิลนี้เทียบกับความผันผวนของร้านค้า
+    const amountZScoreVsMerchant = merchantBaseline.amountStdDev > 0
+      ? Math.round(((params.amount - merchantBaseline.avgAmount) / merchantBaseline.amountStdDev) * 100) / 100
+      : 0;
+
     const featureVector: FraudFeatureVector = {
       userId: params.userId,
       merchantId: params.merchantId,
@@ -458,6 +670,9 @@ export class FraudService {
       timeHour: new Date().getHours(),
       repeatedSuspiciousCount: Math.max(userPrevFlags, merchantPrevFlags),
       samePairRepeatCountToday: samePairTodayCount + 1,
+      merchantBaseline,
+      citizenBaseline,
+      amountZScoreVsMerchant,
     };
 
     const assessment = await this.aiEngine.evaluate(featureVector);
