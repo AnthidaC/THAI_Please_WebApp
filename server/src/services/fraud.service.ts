@@ -574,6 +574,328 @@ export class FraudService {
   }
 
   /**
+   * ดึงรายการแฟ้มสรุปคดีความเสี่ยงระดับบุคคล (User Dossiers) และร้านค้า (Merchant Dossiers)
+   * พร้อมระบบตัดสัญญาณรบกวน (Micro-transaction Noise Filter):
+   * กรองธุรกรรมย่อยเดี่ยวๆ (Isolated Single Micro-tx) ออก ไม่ส่งเข้าคิว Admin
+   * จะแสดงเฉพาะเคสที่:
+   * 1. ทำซ้ำสะสม >= 2 ครั้ง
+   * 2. หรือยอดเงินรัฐสมทบที่เสี่ยงเสียหายสะสม >= 300 บาท
+   * 3. หรือมีความเสี่ยงระดับวิกฤต (Risk Score >= 0.80)
+   */
+  public async getFraudDossiers(includeMinorNoise: boolean = false) {
+    const rawAlerts = await this.getFlaggedAlerts();
+
+    // 1. จัดกลุ่มตามผู้ใช้ (User Grouping)
+    const userMap: Record<string, any> = {};
+    // 2. จัดกลุ่มตามร้านค้า (Merchant Grouping)
+    const merchantMap: Record<string, any> = {};
+
+    let totalGovernmentAtRisk = 0;
+    let suppressedNoiseCount = 0;
+
+    for (const alert of rawAlerts) {
+      const uid = alert.userId || 'anonymous-user';
+      const mid = alert.merchantId || 'anonymous-merchant';
+
+      totalGovernmentAtRisk += alert.copayAmount;
+
+      // จัดกลุ่ม User
+      if (!userMap[uid]) {
+        userMap[uid] = {
+          userId: uid,
+          customerName: alert.customerName,
+          provinceCode: 'BKK',
+          walletStatus: alert.userWalletStatus,
+          flaggedCount: 0,
+          totalAmount: 0,
+          governmentCopayAtRisk: 0,
+          citizenPaidTotal: 0,
+          riskScores: [],
+          maxRiskScore: 0,
+          merchantsMap: {},
+          transactions: [],
+          latestActivityAt: alert.createdAt,
+        };
+      }
+      userMap[uid].flaggedCount += 1;
+      userMap[uid].totalAmount += alert.totalAmount;
+      userMap[uid].governmentCopayAtRisk += alert.copayAmount;
+      userMap[uid].citizenPaidTotal += alert.citizenPaidAmount;
+      userMap[uid].riskScores.push(alert.riskScore);
+      if (alert.riskScore > userMap[uid].maxRiskScore) {
+        userMap[uid].maxRiskScore = alert.riskScore;
+      }
+      if (!userMap[uid].merchantsMap[mid]) {
+        userMap[uid].merchantsMap[mid] = {
+          merchantId: mid,
+          shopName: alert.shopName,
+          transactionCount: 0,
+        };
+      }
+      userMap[uid].merchantsMap[mid].transactionCount += 1;
+      userMap[uid].transactions.push(alert);
+
+      // จัดกลุ่ม Merchant
+      if (!merchantMap[mid]) {
+        merchantMap[mid] = {
+          merchantId: mid,
+          shopName: alert.shopName,
+          merchantTaxId: alert.merchantTaxId,
+          isMerchantApproved: alert.isMerchantApproved,
+          flaggedCount: 0,
+          totalAmount: 0,
+          governmentCopayAtRisk: 0,
+          riskScores: [],
+          maxRiskScore: 0,
+          customersMap: {},
+          transactions: [],
+          latestActivityAt: alert.createdAt,
+        };
+      }
+      merchantMap[mid].flaggedCount += 1;
+      merchantMap[mid].totalAmount += alert.totalAmount;
+      merchantMap[mid].governmentCopayAtRisk += alert.copayAmount;
+      merchantMap[mid].riskScores.push(alert.riskScore);
+      if (alert.riskScore > merchantMap[mid].maxRiskScore) {
+        merchantMap[mid].maxRiskScore = alert.riskScore;
+      }
+      merchantMap[mid].customersMap[uid] = (merchantMap[mid].customersMap[uid] || 0) + 1;
+      merchantMap[mid].transactions.push(alert);
+    }
+
+    // 3. แปลงเป็น User Dossier List พร้อมวิเคราะห์ความเสี่ยงเชิงพฤติกรรม (AI Pattern Synthesis)
+    const userDossiers = Object.values(userMap).map((u: any) => {
+      const avgScore =
+        u.riskScores.length > 0
+          ? Math.round(
+              (u.riskScores.reduce((acc: number, cur: number) => acc + cur, 0) /
+                u.riskScores.length) *
+                100
+            ) / 100
+          : 0;
+
+      const merchantsInvolved = Object.values(u.merchantsMap);
+      const isRepeatedAtSameShop = merchantsInvolved.some((m: any) => m.transactionCount >= 2);
+      const hasHighVelocity = u.transactions.some((t: any) =>
+        t.fraudReason?.includes('เคลื่อนที่') || t.fraudReason?.includes('กม./ชม.')
+      );
+      const hasNearBorder = u.transactions.some((t: any) => t.distanceMeters > 1500);
+
+      let primaryRiskPattern = 'พฤติกรรมธุรกรรมน่าสงสัยสะสม';
+      let aiCaseSummary = `ตรวจพบรูปแบบธุรกรรมผิดปกติสะสม ${u.flaggedCount} รายการ ยอดรัฐสมทบสะสม ฿${u.governmentCopayAtRisk.toLocaleString()}`;
+
+      if (isRepeatedAtSameShop && u.flaggedCount >= 3) {
+        primaryRiskPattern = 'ส่อเจตนาซอยบิลแลกเงินสด (Split-Billing Cash-out)';
+        aiCaseSummary = `ตรวจพบการสแกนจ่ายซ้ำร้านเดิมถี่ (${u.flaggedCount} ครั้ง) ส่อเจตนาซอยบิลแลกเปลี่ยนเป็นเงินสดแทนการซื้อสินค้าจริง แนะนำระงับสิทธิ์ Co-pay ชั่วคราวเพื่อตรวจสอบ`;
+      } else if (hasHighVelocity) {
+        primaryRiskPattern = 'เคลื่อนที่เร็วผิดปกติ / เสี่ยงแชร์บัญชี (Velocity Anomaly)';
+        aiCaseSummary = `ตรวจพบการเปลี่ยนพิกัดการทำรายการรวดเร็วผิดวิสัย ส่อเจตนาใช้แอปจำลองพิกัด (GPS Spoofing) หรือมีผู้ใช้งานหลายคนใช้บัญชีร่วมกัน`;
+      } else if (hasNearBorder) {
+        primaryRiskPattern = 'ทำรายการปริ่มขอบรัศมี 2 กม. (Edge Geofence)';
+        aiCaseSummary = `ตรวจพบพิกัดสแกนชำระเงินห่างเกิน 1.5 กม. ต่อเนื่อง ควรตรวจสอบการส่งมอบสินค้าจริงหน้าร้าน`;
+      }
+
+      // เกณฑ์ความเสียหายสะสม (Cumulative Threshold): ตัดธุรกรรมย่อยโดดๆ 1 ครั้งออก
+      const isActionable =
+        u.flaggedCount >= 2 ||
+        u.governmentCopayAtRisk >= 300 ||
+        u.maxRiskScore >= 0.80;
+
+      if (!isActionable) {
+        suppressedNoiseCount += u.flaggedCount;
+      }
+
+      return {
+        userId: u.userId,
+        customerName: u.customerName,
+        provinceCode: u.provinceCode,
+        walletStatus: u.walletStatus,
+        flaggedCount: u.flaggedCount,
+        totalAmount: Math.round(u.totalAmount * 100) / 100,
+        governmentCopayAtRisk: Math.round(u.governmentCopayAtRisk * 100) / 100,
+        citizenPaidTotal: Math.round(u.citizenPaidTotal * 100) / 100,
+        averageRiskScore: avgScore,
+        maxRiskScore: u.maxRiskScore,
+        primaryRiskPattern,
+        aiCaseSummary,
+        isActionable,
+        latestActivityAt: u.latestActivityAt,
+        merchantsInvolved,
+        transactions: u.transactions,
+      };
+    });
+
+    // 4. แปลงเป็น Merchant Dossier List
+    const merchantDossiers = Object.values(merchantMap).map((m: any) => {
+      const avgScore =
+        m.riskScores.length > 0
+          ? Math.round(
+              (m.riskScores.reduce((acc: number, cur: number) => acc + cur, 0) /
+                m.riskScores.length) *
+                100
+            ) / 100
+          : 0;
+
+      const uniqueCustomersCount = Object.keys(m.customersMap).length;
+      const isSuspiciousCollusion = m.flaggedCount >= 3 && uniqueCustomersCount <= 2;
+
+      let primaryRiskPattern = 'ร้านค้ามีธุรกรรมต้องสงสัยสะสม';
+      let aiCaseSummary = `ร้านค้านี้มีรายการธุรกรรมติดสถานะน่าสงสัย ${m.flaggedCount} รายการ ยอดเงินรัฐสมทบสะสม ฿${m.governmentCopayAtRisk.toLocaleString()}`;
+
+      if (isSuspiciousCollusion) {
+        primaryRiskPattern = 'ส่อเจตนาสมรู้ร่วมคิดแลกเงินสด (Collusion Cash-out)';
+        aiCaseSummary = `ตรวจพบการรับเงินจากลูกค้ากลุ่มเดิมซ้ำซ้อนผิดวิสัย (${m.flaggedCount} บิลจากลูกค้าเพียง ${uniqueCustomersCount} ราย) เสี่ยงทุจริตสมรู้ร่วมคิดแลกเงินสด`;
+      } else if (m.flaggedCount >= 4) {
+        primaryRiskPattern = 'ความถี่ธุรกรรมผิดปกติหน้าร้าน (High Flag Frequency)';
+        aiCaseSummary = `ร้านค้ามีสัดส่วนรายการผิดปกติสูงต่อเนื่อง แนะนำส่งเจ้าหน้าที่เข้าสุ่มตรวจจุดพิกัดจริง`;
+      }
+
+      const isActionable =
+        m.flaggedCount >= 2 ||
+        m.governmentCopayAtRisk >= 300 ||
+        m.maxRiskScore >= 0.80;
+
+      return {
+        merchantId: m.merchantId,
+        shopName: m.shopName,
+        merchantTaxId: m.merchantTaxId,
+        isMerchantApproved: m.isMerchantApproved,
+        flaggedCount: m.flaggedCount,
+        totalAmount: Math.round(m.totalAmount * 100) / 100,
+        governmentCopayAtRisk: Math.round(m.governmentCopayAtRisk * 100) / 100,
+        averageRiskScore: avgScore,
+        maxRiskScore: m.maxRiskScore,
+        primaryRiskPattern,
+        aiCaseSummary,
+        isActionable,
+        latestActivityAt: m.latestActivityAt,
+        uniqueCustomersCount,
+        transactions: m.transactions,
+      };
+    });
+
+    const sortedUserDossiers = userDossiers
+      .filter((u) => includeMinorNoise || u.isActionable)
+      .sort((a, b) => b.maxRiskScore - a.maxRiskScore || b.governmentCopayAtRisk - a.governmentCopayAtRisk);
+
+    const sortedMerchantDossiers = merchantDossiers
+      .filter((m) => includeMinorNoise || m.isActionable)
+      .sort((a, b) => b.maxRiskScore - a.maxRiskScore || b.governmentCopayAtRisk - a.governmentCopayAtRisk);
+
+    return {
+      summary: {
+        totalPendingChecks: rawAlerts.length,
+        actionableUserDossiersCount: sortedUserDossiers.length,
+        actionableMerchantDossiersCount: sortedMerchantDossiers.length,
+        suppressedNoiseCount,
+        totalGovernmentAtRisk: Math.round(totalGovernmentAtRisk * 100) / 100,
+      },
+      userDossiers: sortedUserDossiers,
+      merchantDossiers: sortedMerchantDossiers,
+    };
+  }
+
+  /**
+   * ผู้ดูแลระบบจัดการแฟ้มคดีระดับบุคคล/ร้านค้าแบบ Batch 1-Click
+   * (จัดการทุกธุรกรรมของ User หรือ Merchant ในคลิกเดียว)
+   */
+  public async resolveDossier(params: {
+    targetType: 'USER' | 'MERCHANT';
+    targetId: string;
+    action: 'APPROVE_ALL' | 'REJECT_ALL' | 'SUSPEND_USER' | 'SUSPEND_MERCHANT';
+    adminId?: string;
+    note?: string;
+  }) {
+    const { targetType, targetId, action, adminId, note } = params;
+
+    const whereCondition =
+      targetType === 'USER'
+        ? {
+            transactions: { user_id: targetId },
+            decision: { in: ['FLAGGED_FOR_REVIEW', 'REJECTED'] },
+          }
+        : {
+            transactions: { merchant_id: targetId },
+            decision: { in: ['FLAGGED_FOR_REVIEW', 'REJECTED'] },
+          };
+
+    const pendingChecks = await prisma.fraud_checks.findMany({
+      where: whereCondition,
+      include: { transactions: true },
+    });
+
+    if (pendingChecks.length === 0) {
+      throw new Error(`ไม่พบรายการต้องสงสัยที่ค้างการตรวจสอบสำหรับ ${targetType} รหัส ${targetId}`);
+    }
+
+    const decisionMap: Record<string, string> = {
+      APPROVE_ALL: 'MANUALLY_APPROVED',
+      REJECT_ALL: 'REJECTED_BY_ADMIN',
+      SUSPEND_USER: 'USER_SUSPENDED',
+      SUSPEND_MERCHANT: 'MERCHANT_SUSPENDED',
+    };
+    const newDecision = decisionMap[action] || 'MANUALLY_APPROVED';
+
+    const checkIds = pendingChecks.map((c) => c.fraud_check_id);
+    const txIds = pendingChecks.map((c) => c.transaction_id);
+
+    await prisma.$transaction(async (tx: any) => {
+      // 1. อัปเดต fraud_checks ทุกรายการ
+      await tx.fraud_checks.updateMany({
+        where: { fraud_check_id: { in: checkIds } },
+        data: {
+          decision: newDecision,
+          fraud_reason: note
+            ? `[มติแฟ้มคดี Admin (${action}): ${note}]`.slice(0, 255)
+            : undefined,
+          reviewed_by_admin_id: adminId || null,
+        },
+      });
+
+      // 2. อัปเดต transactions สถานะ (หาก Approve ให้ยืนยันสำเร็จ)
+      if (action === 'APPROVE_ALL') {
+        await tx.transactions.updateMany({
+          where: { transaction_id: { in: txIds } },
+          data: { status: 'SUCCESS' },
+        });
+      }
+
+      // 3. ปฏิบัติการระงับสิทธิ์
+      if (action === 'SUSPEND_USER') {
+        const userId = targetType === 'USER' ? targetId : pendingChecks[0]?.transactions?.user_id;
+        if (userId) {
+          await tx.wallets.updateMany({
+            where: { user_id: userId },
+            data: {
+              status: 'SUSPENDED',
+              eligibility_status: 'SUSPENDED',
+            },
+          });
+        }
+      }
+
+      if (action === 'SUSPEND_MERCHANT') {
+        const merchantId = targetType === 'MERCHANT' ? targetId : pendingChecks[0]?.transactions?.merchant_id;
+        if (merchantId) {
+          await tx.merchants.update({
+            where: { merchant_id: merchantId },
+            data: { is_approved: false },
+          });
+        }
+      }
+    });
+
+    return {
+      success: true,
+      action,
+      targetType,
+      targetId,
+      resolvedCount: pendingChecks.length,
+      newDecision,
+    };
+  }
+
+  /**
    * ผู้ดูแลระบบจัดการรายการที่ถูก Flag (โดยไม่ดึงเงินคืนอัตโนมัติ เพื่อป้องกันร้านค้าเสียหายฟรีหลังส่งมอบสินค้าแล้ว)
    * รองรับ 4 มาตรการ:
    * - APPROVE: ยืนยันธุรกรรมปกติ

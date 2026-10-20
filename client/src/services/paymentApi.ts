@@ -157,6 +157,61 @@ export interface MerchantSalesSummary {
 
 export type FraudResolveAction = 'APPROVE' | 'REJECT' | 'SUSPEND_MERCHANT' | 'SUSPEND_USER';
 
+export type DossierResolveAction = 'APPROVE_ALL' | 'REJECT_ALL' | 'SUSPEND_USER' | 'SUSPEND_MERCHANT';
+
+export interface UserFraudDossier {
+  userId: string;
+  customerName: string;
+  provinceCode: string;
+  walletStatus: string;
+  flaggedCount: number;
+  totalAmount: number;
+  governmentCopayAtRisk: number;
+  citizenPaidTotal: number;
+  averageRiskScore: number;
+  maxRiskScore: number;
+  primaryRiskPattern: string;
+  aiCaseSummary: string;
+  isActionable: boolean;
+  latestActivityAt: string;
+  merchantsInvolved: Array<{
+    merchantId: string;
+    shopName: string;
+    transactionCount: number;
+  }>;
+  transactions: FraudAlertItem[];
+}
+
+export interface MerchantFraudDossier {
+  merchantId: string;
+  shopName: string;
+  merchantTaxId: string;
+  isMerchantApproved: boolean;
+  flaggedCount: number;
+  totalAmount: number;
+  governmentCopayAtRisk: number;
+  averageRiskScore: number;
+  maxRiskScore: number;
+  primaryRiskPattern: string;
+  aiCaseSummary: string;
+  isActionable: boolean;
+  latestActivityAt: string;
+  uniqueCustomersCount: number;
+  transactions: FraudAlertItem[];
+}
+
+export interface FraudDossierResponse {
+  summary: {
+    totalPendingChecks: number;
+    actionableUserDossiersCount: number;
+    actionableMerchantDossiersCount: number;
+    suppressedNoiseCount: number;
+    totalGovernmentAtRisk: number;
+  };
+  userDossiers: UserFraudDossier[];
+  merchantDossiers: MerchantFraudDossier[];
+}
+
 export interface FraudAlertItem {
   fraudCheckId: string;
   transactionId: string;
@@ -300,7 +355,24 @@ export const getTransactionSlip = async (id: string): Promise<SlipData> => {
   return res.data.data;
 };
 
-// 4. ระบบตรวจจับทุจริตสำหรับ Admin (Fraud Alerts)
+// 4. ระบบตรวจจับทุจริตสำหรับ Admin (Fraud Alerts & User Dossiers)
+export const getFraudDossiers = async (includeNoise: boolean = false): Promise<FraudDossierResponse> => {
+  const res = await axios.get('/fraud/dossiers', {
+    params: { includeNoise },
+  });
+  return res.data.data;
+};
+
+export const resolveFraudDossier = async (params: {
+  targetType: 'USER' | 'MERCHANT';
+  targetId: string;
+  action: DossierResolveAction;
+  note?: string;
+}) => {
+  const res = await axios.post('/fraud/dossier/resolve', params);
+  return res.data.data;
+};
+
 export const getFraudAlerts = async (): Promise<FraudAlertItem[]> => {
   const res = await axios.get('/fraud/alerts');
   return res.data.data;

@@ -59,3 +59,13 @@ export const resolveFraudAlertSchema = z.object({
   note: z.string().optional(),
 });
 
+export const resolveDossierSchema = z.object({
+  targetType: z.enum(['USER', 'MERCHANT'], {
+    required_error: 'กรุณาระบุประเภทเป้าหมาย (USER หรือ MERCHANT)',
+  }),
+  targetId: z.string({ required_error: 'กรุณาระบุ targetId' }).min(1),
+  action: z.enum(['APPROVE_ALL', 'REJECT_ALL', 'SUSPEND_USER', 'SUSPEND_MERCHANT'], {
+    required_error: 'กรุณาระบุผลการจัดการเคส',
+  }),
+  note: z.string().optional(),
+});

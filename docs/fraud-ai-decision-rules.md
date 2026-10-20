@@ -110,12 +110,38 @@ TxFeatures: dist=1650m, speed=95km/h, tx10m=4, sameShopToday=3, prevFlags=2, amt
 
 ---
 
-## 🛠️ 6. ไฟล์ที่เกี่ยวข้องในระบบ (Code Mapping)
+---
+
+## 👥 7. การรวมกลุ่มแฟ้มคดีและการตัดสัญญาณรบกวน (User & Merchant Dossier Rollup)
+
+เพื่อแก้ไขปัญหา **Alert Fatigue** ของผู้ดูแลระบบ (ป้องกันไม่ให้ Admin ต้องตรวจบิลย่อยเป็นล้านรายการ):
+
+### 7.1 กฎตัดสัญญาณรบกวนธุรกรรมย่อย (Micro-transaction Noise Suppression)
+* **Isolated Single Tx (< 150 บาท):** บิลย่อยเดี่ยวๆ ที่ไม่มีประวัติทำซ้ำ จะถูกบันทึกเงียบๆ (Silent Audit Log) โดย**ไม่นำขึ้นแสดงในคิวหลักของ Admin**
+* **เกณฑ์ส่งต่อเข้าคิว Admin (Actionable Criteria):**
+  1. `flaggedCount >= 2` (ทำซ้ำตั้งแต่ 2 รายการขึ้นไป)
+  2. `governmentCopayAtRisk >= 300` (ยอดเงินรัฐสมทบ 60% ที่เสี่ยงสูญเสียสะสม $\ge$ 300 บาท)
+  3. `maxRiskScore >= 0.80` (มีความผิดปกติรุนแรง เช่น วาร์ปข้ามเขต หรือความเร็วผิดมนุษย์)
+
+### 7.2 แฟ้มคดีระดับบุคคล/ร้านค้า (AI Case Dossiers)
+* รวบรวมธุรกรรมที่น่าสงสัยตาม `userId` และ `merchantId`
+* AI สังเคราะห์พฤติกรรมภาพรวมเป็น **Executive Summary 1-2 ประโยค** (เช่น ส่อเจตนาซอยบิลแลกเงินสด, แชร์บัญชี)
+* รองรับปุ่มจัดการแบบ **Batch 1-Click Action:**
+  * `APPROVE_ALL`: อนุมัติทุกบิลในแฟ้มคดีในคลิกเดียว
+  * `SUSPEND_USER`: ระงับสิทธิ์ Co-pay ประชาชนรายนี้
+  * `SUSPEND_MERCHANT`: ระงับสิทธิ์ร้านค้าเพื่อส่งเจ้าหน้าที่ลงพื้นที่
+
+---
+
+## 🛠️ 8. ไฟล์ที่เกี่ยวข้องในระบบ (Code Mapping)
 
 * **คลาสและตรรกะการตัดสินใจ:** [`server/src/services/fraud.service.ts`](file:///d:/Y4/THAI_Please_WebApp/server/src/services/fraud.service.ts)
   * ฟังก์ชันตัดสินใจส่ง Prompt: `shouldInvokeAi(features)`
-  * ฟังก์ชันยิง AI: `invokeExternalAi(features, triggers)`
-  * ฟังก์ชันประเมินสำรอง: `evaluateLocally(features, triggers)`
-* **จุดตัดยอดเงินและธุรกรรม:** [`server/src/services/payment.service.ts`](file:///d:/Y4/THAI_Please_WebApp/server/src/services/payment.service.ts#L636-L692)
+  * ฟังก์ชันรวบรวมแฟ้มคดีและตัด Noise: `getFraudDossiers(includeMinorNoise)`
+  * ฟังก์ชันจัดการเคสแบบ Batch: `resolveDossier(params)`
+* **API Endpoints:** [`server/src/routes/fraud.routes.ts`](file:///d:/Y4/THAI_Please_WebApp/server/src/routes/fraud.routes.ts)
+  * `GET /api/fraud/dossiers`
+  * `POST /api/fraud/dossier/resolve`
+* **หน้า UI ผู้ดูแลระบบ:** [`client/src/pages/admin/fraud-alerts/AdminFraudAlertsPage.tsx`](file:///d:/Y4/THAI_Please_WebApp/client/src/pages/admin/fraud-alerts/AdminFraudAlertsPage.tsx)
 * **การตั้งค่า Environment:** [`server/src/config/env.ts`](file:///d:/Y4/THAI_Please_WebApp/server/src/config/env.ts) และ [`server/.env`](file:///d:/Y4/THAI_Please_WebApp/server/.env)
 * **ชุดทดสอบความถูกต้อง:** [`server/src/tests/payment-engine.test.ts`](file:///d:/Y4/THAI_Please_WebApp/server/src/tests/payment-engine.test.ts#L112-L162)
