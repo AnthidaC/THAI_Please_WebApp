@@ -303,7 +303,15 @@ export class PaymentService {
     const now = new Date();
     const expiresAt = new Date(now.getTime() + QR_EXPIRATION_MS);
 
-    const tentativeGov = Math.min(Math.round(params.amount * 0.6 * 100) / 100, 150.0);
+    // ดึงเพดานรายวันจากโครงการที่เปิดใช้งานล่าสุดในระบบ (ค่าเริ่มต้น 200 บาท / รัฐช่วย 60%)
+    const activeCampaign = await prisma.campaigns.findFirst({
+      where: { status: 'ACTIVE' },
+      orderBy: { created_at: 'desc' },
+    });
+    const campaignDailyLimit = activeCampaign ? Number(activeCampaign.daily_quota_limit) : 200.0;
+    const govRate = activeCampaign ? Number(activeCampaign.government_copay_rate_percent) / 100 : 0.6;
+
+    const tentativeGov = Math.min(Math.round(params.amount * govRate * 100) / 100, campaignDailyLimit);
     const tentativeCit = Math.round((params.amount - tentativeGov) * 100) / 100;
 
     const qrData: DynamicQrData = {
@@ -611,6 +619,18 @@ export class PaymentService {
     if (wallet.status === 'SUSPENDED' || wallet.eligibilityStatus === 'SUSPENDED') {
       throw new Error(
         'สิทธิ์การใช้จ่ายโครงการของคุณถูกระงับชั่วคราวเนื่องจากพบความผิดปกติ กรุณาติดต่อผู้ดูแลระบบเพื่อยืนยันตัวตน'
+      );
+    }
+
+    if (wallet.eligibilityStatus === 'CAMPAIGN_EXPIRED') {
+      throw new Error(
+        'ไม่สามารถใช้สิทธิ์ร่วมจ่ายได้ เนื่องจากโครงการ Co-pay สิ้นสุดระยะเวลาตามที่กำหนดในระบบแล้ว'
+      );
+    }
+
+    if (wallet.eligibilityStatus !== 'ELIGIBLE') {
+      throw new Error(
+        'คุณไม่มีสิทธิเข้าร่วมโครงการ Co-pay ในขณะนี้ กรุณากดลงทะเบียนรับสิทธิที่หน้ากระเป๋าเงินก่อนทำรายการ'
       );
     }
 

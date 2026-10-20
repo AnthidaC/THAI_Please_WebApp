@@ -298,7 +298,11 @@ export const CitizenScanCopayPage: React.FC = () => {
                 <Sparkles className="h-3.5 w-3.5 shrink-0" />
                 <span>โควตารัฐช่วยจ่ายคงเหลือวันนี้</span>
               </span>
-              <span className="font-mono font-bold">฿{(wallet?.dailyQuotaRemaining ?? 150).toFixed(2)}</span>
+              <span className="font-mono font-bold">
+                {wallet?.eligibilityStatus === 'ELIGIBLE'
+                  ? `฿${(wallet.dailyQuotaRemaining ?? 200).toFixed(2)}`
+                  : 'ไม่มีสิทธิรับ'}
+              </span>
             </div>
           </div>
         ) : (

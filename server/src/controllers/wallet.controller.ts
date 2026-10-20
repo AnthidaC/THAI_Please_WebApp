@@ -32,3 +32,19 @@ export const topUpWallet = async (req: Request, res: Response): Promise<void> =>
     sendError(res, error.message || 'เกิดข้อผิดพลาดในการเติมเงิน', 400);
   }
 };
+
+export const enrollInCampaign = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      sendError(res, 'กรุณาเข้าสู่ระบบก่อนทำรายการ', 401);
+      return;
+    }
+
+    const { campaignId } = req.body;
+    const result = await walletService.enrollInCampaign(userId, campaignId);
+    sendSuccess(res, result, 'ลงทะเบียนรับสิทธิ์โครงการสำเร็จ');
+  } catch (error: any) {
+    sendError(res, error.message || 'ไม่สามารถลงทะเบียนรับสิทธิ์ได้', 400);
+  }
+};

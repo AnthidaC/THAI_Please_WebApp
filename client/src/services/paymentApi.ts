@@ -8,6 +8,19 @@ export interface MonthlyCycleInfo {
   monthlyAllocationAmount?: number;
 }
 
+export interface AvailableCampaignInfo {
+  campaignId: string;
+  campaignName: string;
+  governmentCopayRatePercent: number;
+  citizenPaymentRatePercent: number;
+  dailyQuotaLimit: number;
+  totalQuotaLimit: number;
+  startDate: string;
+  endDate: string;
+  status: string;
+  isRegistrationOpen: boolean;
+}
+
 export interface WalletData {
   walletId: string;
   userId: string;
@@ -20,6 +33,18 @@ export interface WalletData {
   status: string;
   lastQuotaResetDate: string;
   monthlyCycle?: MonthlyCycleInfo;
+  campaignInfo?: {
+    campaignId: string;
+    campaignName: string;
+    startDate: string;
+    endDate: string;
+    dailyLimit: number;
+    totalLimit: number;
+    isStarted: boolean;
+    isExpired: boolean;
+    isActive: boolean;
+  } | null;
+  availableCampaignForRegistration?: AvailableCampaignInfo | null;
 }
 
 export interface DynamicQrResponse {
@@ -278,6 +303,11 @@ export const getWalletBalance = async (): Promise<WalletData> => {
 
 export const topUpWallet = async (amount: number, paymentChannel = 'PROMPTPAY') => {
   const res = await axios.post('/wallet/top-up', { amount, paymentChannel });
+  return res.data.data;
+};
+
+export const enrollInCampaign = async (campaignId?: string) => {
+  const res = await axios.post('/wallet/enroll', { campaignId });
   return res.data.data;
 };
 

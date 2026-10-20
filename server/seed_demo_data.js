@@ -4,18 +4,27 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('Seeding demo data...');
 
-  // 1. Campaign
+  // 1. Campaign (กำหนดวันเริ่มต้น-สิ้นสุด เพดาน 200 บ./วัน ยอดรวม 3,000 บ. เดือนละ 1,000 บ. ใน DB)
   const campaign = await prisma.campaigns.upsert({
     where: { campaign_id: '11111111-1111-1111-1111-111111111111' },
-    update: {},
+    update: {
+      campaign_name: 'โครงการไทยช่วยไทยพลีส (THAI Please Co-pay 60/40)',
+      start_date: new Date('2026-01-01T00:00:00.000Z'),
+      end_date: new Date('2026-12-31T23:59:59.000Z'),
+      government_copay_rate_percent: 60.0,
+      citizen_payment_rate_percent: 40.0,
+      daily_quota_limit: 200.0,
+      total_quota_limit: 3000.0,
+      status: 'ACTIVE',
+    },
     create: {
       campaign_id: '11111111-1111-1111-1111-111111111111',
-      campaign_name: 'โครงการคนละครึ่ง เฟสพิเศษ (THAI Please Co-pay)',
-      start_date: new Date('2026-01-01'),
-      end_date: new Date('2026-12-31'),
-      government_copay_rate_percent: 50.0,
-      citizen_payment_rate_percent: 50.0,
-      daily_quota_limit: 150.0,
+      campaign_name: 'โครงการไทยช่วยไทยพลีส (THAI Please Co-pay 60/40)',
+      start_date: new Date('2026-01-01T00:00:00.000Z'),
+      end_date: new Date('2026-12-31T23:59:59.000Z'),
+      government_copay_rate_percent: 60.0,
+      citizen_payment_rate_percent: 40.0,
+      daily_quota_limit: 200.0,
       total_quota_limit: 3000.0,
       status: 'ACTIVE',
     },
@@ -29,7 +38,10 @@ async function main() {
       where: { user_id: user.user_id },
       data: {
         campaign_id: campaign.campaign_id,
-        balance: 1450.0,
+        balance: 2000.0,
+        daily_quota_limit: 200.0,
+        total_quota_remaining: 3000.0,
+        eligibility_status: 'ELIGIBLE',
       },
     });
   }

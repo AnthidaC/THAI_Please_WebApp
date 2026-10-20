@@ -14,6 +14,16 @@ console.log('🧪 เริ่มการทดสอบระบบคำน�
   console.log('  ✅ ผ่าน: คำนวณ Co-pay 60/40 กรณีปกติ ยอด 200 บาท (รัฐ 120 / ประชาชน 80)');
 }
 
+// 1.1 ทดสอบการคำนวณ Co-pay ตามเพดานใหม่ใน DB 200 บาท/วัน (ยอด 300 บาท, โควตา 200 บาท)
+{
+  const result = paymentService.calculateCopay(300, 200, 3000);
+  assert.strictEqual(result.totalAmount, 300);
+  assert.strictEqual(result.governmentCopayAmount, 180);
+  assert.strictEqual(result.citizenPaidAmount, 120);
+  assert.strictEqual(result.dailyQuotaRemainingAfter, 20);
+  console.log('  ✅ ผ่าน: คำนวณ Co-pay ตามเพดานใหม่จาก DB 200 บาท/วัน (ยอด 300 -> รัฐ 180 / ประชาชน 120 / เหลือ 20)');
+}
+
 // 2. ทดสอบกรณีค่าสินค้าสูงเกินเพดาน 150 บาทต่อวัน (ยอด 500 บาท, โควตาวันละ 150 บาท)
 {
   const result = paymentService.calculateCopay(500, 150, 3000);

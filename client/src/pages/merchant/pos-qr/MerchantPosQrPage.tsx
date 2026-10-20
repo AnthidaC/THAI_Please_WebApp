@@ -614,7 +614,7 @@ export const MerchantPosQrPage: React.FC = () => {
   const currentShopName =
     merchantData?.merchant?.shopName || (isMerchantLoading ? 'กำลังโหลดข้อมูลร้าน...' : 'ร้านข้าวมันไก่ป้าณี (วิสาหกิจชุมชน)');
 
-  const govPreviewAmount = Math.min((amount || 0) * 0.6, 150);
+  const govPreviewAmount = Math.min((amount || 0) * 0.6, 200);
   const citizenPreviewAmount = Math.max(0, (amount || 0) - govPreviewAmount);
   const govPercent = amount > 0 ? Math.round((govPreviewAmount / amount) * 100) : 60;
 
@@ -932,7 +932,7 @@ export const MerchantPosQrPage: React.FC = () => {
                       <span className="font-mono font-bold text-ink">฿{citizenPreviewAmount.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between items-center text-brand-blue">
-                      <span>รัฐบาลสมทบ (สูงสุด ฿150/วัน)</span>
+                      <span>รัฐบาลสมทบ (สูงสุด ฿200/วัน)</span>
                       <span className="font-mono font-bold">฿{govPreviewAmount.toFixed(2)}</span>
                     </div>
                     <div className="border-t border-hairline pt-2.5 flex justify-between items-center font-semibold">
