@@ -194,7 +194,7 @@ export const MerchantSalesHistoryPage: React.FC = () => {
               {isLoading ? '---' : data?.summary.totalTransactions ?? 0} รายการ
             </div>
             <span className="text-[10px] sm:text-[11px] text-ink-muted block mt-1">
-              สแกนผ่าน Dynamic QR
+              ทำรายการผ่าน QR ร้านค้า
             </span>
           </div>
         </div>
@@ -203,9 +203,9 @@ export const MerchantSalesHistoryPage: React.FC = () => {
         <div className="rounded-card border border-hairline bg-white p-4 sm:p-5 md:p-6 shadow-sm space-y-4">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
             <div>
-              <h3 className="text-sm sm:text-base font-bold text-ink">ประวัติการทำธุรกรรมร้านค้า (Audit Trail)</h3>
+              <h3 className="text-sm sm:text-base font-bold text-ink">ประวัติการทำธุรกรรมร้านค้า</h3>
               <p className="text-[11px] sm:text-xs text-ink-muted mt-0.5">
-                เก็บบันทึกประวัติทุกสถานะในระบบเพื่อความโปร่งใสและตรวจสอบย้อนหลัง
+                บันทึกประวัติการรับชำระเงินทั้งหมดในระบบ
               </p>
             </div>
 

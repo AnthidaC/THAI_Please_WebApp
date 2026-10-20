@@ -112,6 +112,22 @@ async function testDiscountValidation() {
 async function testAiEngine() {
   const aiEngine = AiFraudEngine.getInstance();
 
+  const normalGate = aiEngine.shouldInvokeAi({
+    userId: 'u-1',
+    merchantId: 'm-1',
+    amount: 120,
+    userLat: 13.7525,
+    userLon: 100.5014,
+    merchantLat: 13.7528,
+    merchantLon: 100.5016,
+    distanceMeters: 400,
+    recentTxCountIn10Min: 1,
+    estimatedSpeedKmH: 0,
+    timeHour: 12,
+  });
+  assert.strictEqual(normalGate.shouldInvoke, false, 'ธุรกรรมปกติ 100% ต้องไม่ส่ง prompt เข้า AI (Zero-Token Saved)');
+  console.log('  ✅ ผ่าน: ระบบ Zero-Token Gating สกัดธุรกรรมปกติโดยไม่ส่ง Prompt เข้า AI');
+
   const normalAssessment = await aiEngine.evaluate({
     userId: 'u-1',
     merchantId: 'm-1',
@@ -130,6 +146,24 @@ async function testAiEngine() {
   assert.strictEqual(normalAssessment.decision, 'AUTO_APPROVED');
   assert.ok(normalAssessment.riskScore < 0.3, `คะแนนความเสี่ยงกรณีปกติควรต่ำ ได้ ${normalAssessment.riskScore}`);
   console.log(`  ✅ ผ่าน: Semi-AI ประเมินธุรกรรมปกติ -> AUTO_APPROVED (Risk: ${normalAssessment.riskScore})`);
+
+  const suspiciousGate = aiEngine.shouldInvokeAi({
+    userId: 'u-2',
+    merchantId: 'm-1',
+    amount: 1500,
+    userLat: 13.7525,
+    userLon: 100.5014,
+    merchantLat: 13.7680,
+    merchantLon: 100.5014,
+    distanceMeters: 1750,
+    recentTxCountIn10Min: 4,
+    estimatedSpeedKmH: 45,
+    timeHour: 2,
+    repeatedSuspiciousCount: 3,
+    samePairRepeatCountToday: 3,
+  });
+  assert.strictEqual(suspiciousGate.shouldInvoke, true, 'ธุรกรรมน่าสงสัยต้องตัดสินใจส่ง Prompt เข้า AI');
+  console.log(`  ✅ ผ่าน: ระบบตรวจจับเงื่อนไขกระตุ้น AI ได้ถูกต้อง (${suspiciousGate.triggers.length} เงื่อนไข)`);
 
   const repeatedSuspiciousAssessment = await aiEngine.evaluate({
     userId: 'u-2',

@@ -35,10 +35,10 @@ export const AdminFraudAlertsPage: React.FC = () => {
   });
 
   const actionSuccessTextMap: Record<FraudResolveAction, string> = {
-    APPROVE: 'ยืนยันรายการปกติ (Approve) เรียบร้อยแล้ว',
-    REJECT: 'บันทึกส่งเรื่องตรวจสอบบัญชีเบื้องหลังเรียบร้อยแล้ว (ไม่ดึงเงินคืนอัตโนมัติ)',
-    SUSPEND_MERCHANT: 'ระงับสิทธิ์ร้านค้าชั่วคราวเพื่อส่งเจ้าหน้าที่เข้าตรวจสอบร้านค้าเรียบร้อยแล้ว',
-    SUSPEND_USER: 'ระงับสิทธิ์การใช้จ่ายโครงการของประชาชนรายนี้ชั่วคราวเรียบร้อยแล้ว',
+    APPROVE: 'ยืนยันรายการปกติเรียบร้อยแล้ว',
+    REJECT: 'บันทึกส่งเรื่องตรวจสอบเพิ่มเติมเรียบร้อยแล้ว',
+    SUSPEND_MERCHANT: 'ระงับสิทธิร้านค้าชั่วคราวเพื่อตรวจสอบเรียบร้อยแล้ว',
+    SUSPEND_USER: 'ระงับสิทธิการใช้จ่ายของประชาชนรายนี้ชั่วคราวเรียบร้อยแล้ว',
   };
 
   const resolveMutation = useMutation({
@@ -76,10 +76,10 @@ export const AdminFraudAlertsPage: React.FC = () => {
             </div>
             <div className="min-w-0">
               <h1 className="text-sm sm:text-base md:text-lg font-bold text-ink truncate">
-                ระบบตรวจจับและแจ้งเตือนทุจริตพิกัด GPS &amp; Semi-AI
+                ระบบตรวจสอบความผิดปกติและพิกัดร้านค้า
               </h1>
               <p className="text-[11px] sm:text-xs text-ink-muted truncate">
-                คัดกรองความน่าสงสัยซ้ำๆ ส่งให้ Admin ตรวจสอบร้านค้าหรือระงับสิทธิ์ผู้ต้องสงสัย (ไม่ดึงเงินคืนอัตโนมัติ)
+                ตรวจสอบรายการธุรกรรมและพิกัดตำแหน่งเพื่อความโปร่งใสในโครงการ
               </p>
             </div>
           </div>
@@ -124,53 +124,53 @@ export const AdminFraudAlertsPage: React.FC = () => {
         {/* แดชบอร์ดสรุป 4 การ์ดสถิติความปลอดภัย (2x2 บนมือถือ, 4 คอลัมน์บนจอใหญ่) */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           <div className="rounded-card border border-hairline bg-white p-3.5 sm:p-5 shadow-sm flex flex-col justify-between">
-            <span className="text-[11px] sm:text-xs text-ink-muted font-medium">รายการที่ตรวจจับทั้งหมด</span>
+            <span className="text-[11px] sm:text-xs text-ink-muted font-medium">รายการที่ตรวจสอบทั้งหมด</span>
             <div className="mt-1.5 sm:mt-2 font-mono text-lg sm:text-2xl font-bold text-ink">
               {(alerts?.[0]?.systemStats?.totalChecksCount ?? 1420).toLocaleString('th-TH')} รายการ
             </div>
             <span className="text-[10px] sm:text-[11px] text-brand-blue font-medium block mt-1">
-              ครอบคลุมทุกธุรกรรม Co-pay (รัศมี 2 กม.)
+              ครอบคลุมทุกธุรกรรม Co-pay
             </span>
           </div>
 
           <div className="rounded-card border border-hairline bg-white p-3.5 sm:p-5 shadow-sm flex flex-col justify-between">
             <span className="text-[11px] sm:text-xs text-emerald-700 font-medium flex items-center space-x-1">
               <CheckCircle2 className="h-3.5 w-3.5 text-status-success shrink-0" />
-              <span className="truncate">อนุมัติอัตโนมัติ (ปกติ)</span>
+              <span className="truncate">อัตราผ่านเกณฑ์ปกติ</span>
             </span>
             <div className="mt-1.5 sm:mt-2 font-mono text-lg sm:text-2xl font-bold text-status-success">
               {alerts?.[0]?.systemStats?.approvalRate ?? 98.2}%
             </div>
             <span className="text-[10px] sm:text-[11px] text-ink-muted block mt-1">
-              พิกัดในรัศมี &le; 2 กม. และไม่พบพฤติกรรมซ้ำผิดปกติ
+              พิกัดตรงตามเงื่อนไขโครงการ
             </span>
           </div>
 
           <div className="rounded-card border border-amber-200 bg-amber-50/50 p-3.5 sm:p-5 shadow-sm flex flex-col justify-between">
             <span className="text-[11px] sm:text-xs text-amber-800 font-medium flex items-center space-x-1">
               <AlertTriangle className="h-3.5 w-3.5 text-status-warning shrink-0" />
-              <span className="truncate">รอ Admin ตรวจสอบ (Flagged)</span>
+              <span className="truncate">รอตรวจสอบ (Flagged)</span>
             </span>
             <div className="mt-1.5 sm:mt-2 font-mono text-lg sm:text-2xl font-bold text-status-warning">
-              {isLoading ? '...' : alerts?.length ?? 0} เคส
+              {isLoading ? '...' : alerts?.length ?? 0} รายการ
             </div>
             <span className="text-[10px] sm:text-[11px] text-amber-700 block mt-1">
-              AI ตรวจพบความน่าสงสัยซ้ำๆ (ไม่บล็อกอัตโนมัติ)
+              ตรวจพบความผิดปกติของพิกัดหรือพฤติกรรม
             </span>
           </div>
 
           <div className="rounded-card border border-hairline bg-white p-3.5 sm:p-5 shadow-sm flex flex-col justify-between">
             <span className="text-[11px] sm:text-xs text-ink-muted font-medium flex items-center space-x-1">
               <Cpu className="h-3.5 w-3.5 text-brand-blue shrink-0" />
-              <span className="truncate">มาตรการคุ้มครองผู้ค้า &amp; รัฐ</span>
+              <span className="truncate">การจัดการเชิงรุก</span>
             </span>
             <div className="mt-1.5 sm:mt-2">
               <span className="text-[11px] sm:text-xs font-semibold text-emerald-600 bg-emerald-50 px-2.5 py-0.5 rounded-pill inline-block border border-emerald-200">
-                ● ไม่ดึงเงินคืนอัตโนมัติ
+                ตรวจสอบรายบุคคล
               </span>
             </div>
             <span className="text-[10px] text-ink-muted block mt-1">
-              เน้นตรวจสอบร้านค้า/ระงับสิทธิ์ผู้ต้องสงสัยรายบุคคล
+              ตรวจสอบร้านค้าและระงับสิทธิผู้ต้องสงสัย
             </span>
           </div>
         </div>
@@ -179,10 +179,10 @@ export const AdminFraudAlertsPage: React.FC = () => {
         <div className="rounded-card border border-hairline bg-white p-4 sm:p-5 md:p-6 shadow-sm">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-4">
             <h3 className="text-sm sm:text-base font-bold text-ink">
-              รายการที่ AI ตรวจพบความน่าสงสัยซ้ำๆ ส่งให้ Admin ตรวจสอบ
+              รายการธุรกรรมรอตรวจสอบ
             </h3>
             <span className="text-[11px] sm:text-xs text-ink-muted">
-              เลือกตรวจสอบเชิงลึกเพื่อระงับสิทธิ์ร้านค้าหรือประชาชนที่น่าสงสัย โดยไม่กระทบยอดขายที่ส่งมอบสินค้าไปแล้ว
+              ตรวจสอบพิกัดและรายละเอียดเพื่อดำเนินการตามระเบียบโครงการ
             </span>
           </div>
 
@@ -550,22 +550,14 @@ export const AdminFraudAlertsPage: React.FC = () => {
                 <p className="mt-1 text-ink leading-relaxed">{selectedAlert.fraudReason}</p>
               </div>
 
-              {/* คำชี้แจงเรื่องการไม่ดึงเงินคืนอัตโนมัติ */}
-              <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-2.5 text-[11px] text-amber-900">
-                <span className="font-semibold">หมายเหตุกระบวนการตรวจสอบ: </span>
-                ระบบจะไม่ดึงเงินคืนอัตโนมัติเพื่อป้องกันร้านค้าสูญเสียเงินฟรีหลังส่งมอบสินค้าแล้ว โดยผู้ดูแลระบบสามารถเลือก
-                <strong> ระงับสิทธิ์ร้านค้าชั่วคราว</strong> เพื่อลงพื้นที่ตรวจสอบ หรือ
-                <strong> ระงับสิทธิ์การใช้จ่ายของประชาชน</strong> ที่มีพฤติกรรมน่าสงสัยซ้ำๆ ได้ทันที
-              </div>
-
               {/* ช่องบันทึกเหตุผลของผู้ดูแลระบบ */}
               <div>
                 <label className="block text-[11px] font-medium text-ink-muted mb-1">
-                  บันทึกความเห็นของผู้ดูแลระบบ (Audit Note)
+                  บันทึกผลการตรวจสอบ
                 </label>
                 <input
                   type="text"
-                  placeholder="เช่น ส่งทีมตรวจสอบหน้าร้าน / ระงับสิทธิ์ชั่วคราวเพื่อรอยืนยันตัวตน"
+                  placeholder="ระบุข้อสังเกตหรือผลการตรวจสอบ เช่น รอเอกสารเพิ่มเติม / ตรวจสอบแล้วถูกต้อง"
                   value={resolveNote}
                   onChange={(e) => setResolveNote(e.target.value)}
                   className="w-full rounded-pill border border-hairline px-4 py-2.5 text-xs focus:border-brand-blue focus:outline-none"
@@ -583,10 +575,10 @@ export const AdminFraudAlertsPage: React.FC = () => {
                     note: resolveNote || 'ผู้ดูแลระบบตรวจสอบแล้วยืนยันว่าเป็นรายการปกติ',
                   })
                 }
-                className=" inline-flex items-center justify-center space-x-1.5 rounded-pill bg-brand-blue text-white hover:bg-brand-blue-hover px-4 py-2.5 text-xs font-semibold shadow-sm transition disabled:opacity-50"
+                className="inline-flex items-center justify-center space-x-1.5 rounded-pill bg-brand-blue text-white hover:bg-brand-blue-hover px-4 py-2.5 text-xs font-semibold shadow-sm transition disabled:opacity-50"
               >
                 <CheckCircle2 className="h-4 w-4 shrink-0" />
-                <span>ยืนยันรายการปกติ (Approve)</span>
+                <span>ยืนยันรายการปกติ</span>
               </button>
 
               <button
@@ -595,13 +587,13 @@ export const AdminFraudAlertsPage: React.FC = () => {
                   resolveMutation.mutate({
                     id: selectedAlert.fraudCheckId,
                     action: 'REJECT',
-                    note: resolveNote || 'บันทึกส่งตรวจสอบบัญชีเบื้องหลัง (ไม่ดึงเงินคืนอัตโนมัติ)',
+                    note: resolveNote || 'ส่งเรื่องตรวจสอบเพิ่มเติม',
                   })
                 }
                 className="inline-flex items-center justify-center space-x-1.5 rounded-pill bg-slate-100 text-ink hover:bg-slate-200 px-4 py-2.5 text-xs font-semibold border border-hairline transition disabled:opacity-50"
               >
                 <FileSearch className="h-4 w-4 shrink-0" />
-                <span>ส่งตรวจสอบเบื้องหลัง (ไม่คืนเงิน Auto)</span>
+                <span>ส่งตรวจสอบเพิ่มเติม</span>
               </button>
 
               <button
@@ -610,13 +602,13 @@ export const AdminFraudAlertsPage: React.FC = () => {
                   resolveMutation.mutate({
                     id: selectedAlert.fraudCheckId,
                     action: 'SUSPEND_MERCHANT',
-                    note: resolveNote || 'ระงับสิทธิ์ร้านค้าชั่วคราวเพื่อส่งเจ้าหน้าที่เข้าตรวจสอบร้านค้า',
+                    note: resolveNote || 'ระงับสิทธิร้านค้าชั่วคราวเพื่อตรวจสอบ',
                   })
                 }
                 className="inline-flex items-center justify-center space-x-1.5 rounded-pill bg-amber-50 text-amber-800 hover:bg-amber-100 px-4 py-2.5 text-xs font-semibold border border-amber-200 transition disabled:opacity-50"
               >
                 <Store className="h-4 w-4 shrink-0" />
-                <span>ระงับ/ตรวจสอบร้านค้านี้</span>
+                <span>ระงับสิทธิร้านค้า</span>
               </button>
 
               <button
@@ -625,13 +617,13 @@ export const AdminFraudAlertsPage: React.FC = () => {
                   resolveMutation.mutate({
                     id: selectedAlert.fraudCheckId,
                     action: 'SUSPEND_USER',
-                    note: resolveNote || 'ระงับสิทธิ์ Co-pay ของประชาชนเนื่องจากมีพฤติกรรมน่าสงสัยซ้ำๆ',
+                    note: resolveNote || 'ระงับสิทธิการใช้จ่ายของประชาชนชั่วคราว',
                   })
                 }
                 className="inline-flex items-center justify-center space-x-1.5 rounded-pill bg-red-50 text-status-error hover:bg-red-100 px-4 py-2.5 text-xs font-semibold border border-red-200 transition disabled:opacity-50"
               >
                 <UserX className="h-4 w-4 shrink-0" />
-                <span>ระงับสิทธิ์ประชาชนรายนี้</span>
+                <span>ระงับสิทธิประชาชน</span>
               </button>
             </div>
           </div>

@@ -78,10 +78,10 @@ export const CitizenTransactionsPage: React.FC = () => {
             </button>
             <div className="border-l border-hairline pl-2.5 sm:pl-3 min-w-0">
               <h1 className="text-sm sm:text-base font-bold text-ink truncate">
-                ประวัติการทำธุรกรรม (Transaction Ledger)
+                ประวัติการทำธุรกรรม
               </h1>
               <p className="text-[11px] sm:text-xs text-brand-blue font-medium truncate">
-                ประวัติการใช้จ่ายร่วม Co-pay 60/40 และสลิปอิเล็กทรอนิกส์ย้อนหลัง
+                ประวัติการใช้จ่ายร่วม Co-pay 60/40 และสลิปย้อนหลัง
               </p>
             </div>
           </div>
@@ -113,7 +113,7 @@ export const CitizenTransactionsPage: React.FC = () => {
 
           <div className="rounded-2xl border border-hairline bg-white p-3 sm:p-4 shadow-2xs flex items-center justify-between">
             <div className="min-w-0">
-              <p className="text-[11px] text-ink-muted font-medium truncate">จ่ายจริงสะสม (40%)</p>
+              <p className="text-[11px] text-ink-muted font-medium truncate">ยอดจ่ายเองสะสม</p>
               <p className="font-mono text-base sm:text-xl font-bold text-status-error mt-0.5 truncate">
                 ฿{summary.citizenPaid.toLocaleString('th-TH', { minimumFractionDigits: 2 })}
               </p>
@@ -125,7 +125,7 @@ export const CitizenTransactionsPage: React.FC = () => {
 
           <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-3 sm:p-4 shadow-2xs flex items-center justify-between">
             <div className="min-w-0">
-              <p className="text-[11px] text-emerald-800 font-medium truncate">รัฐช่วยจ่ายสะสม (60%)</p>
+              <p className="text-[11px] text-emerald-800 font-medium truncate">ยอดรัฐช่วยจ่ายสะสม</p>
               <p className="font-mono text-base sm:text-xl font-bold text-emerald-700 mt-0.5 truncate">
                 ฿{summary.govCopay.toLocaleString('th-TH', { minimumFractionDigits: 2 })}
               </p>

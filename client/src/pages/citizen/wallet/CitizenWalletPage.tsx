@@ -140,9 +140,6 @@ export const CitizenWalletPage: React.FC = () => {
                   <div className="font-mono text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight text-ink break-all">
                     ฿ {isWalletLoading ? '---.--' : (wallet?.balance ?? 0).toLocaleString('th-TH', { minimumFractionDigits: 2 })}
                   </div>
-                  <p className="mt-1 text-[11px] sm:text-xs text-ink-muted">
-                    ใช้สำหรับชำระส่วนของประชาชน (40% หรือส่วนเกินโควตา)
-                  </p>
                 </div>
                 <div className="flex items-center gap-2 w-full sm:w-auto">
                   <button
@@ -244,7 +241,7 @@ export const CitizenWalletPage: React.FC = () => {
                       สแกนชำระ Co-pay 60/40
                     </div>
                     <div className="text-[11px] sm:text-xs text-blue-100 mt-1 truncate">
-                      สแกน Dynamic QR หน้าร้านค้าทันที
+                      สแกน QR ร้านค้าเพื่อชำระเงิน
                     </div>
                   </div>
                 </div>
@@ -358,7 +355,7 @@ export const CitizenWalletPage: React.FC = () => {
             <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-gray-200 sm:hidden" />
             <h3 className="text-base sm:text-lg font-bold text-ink">เติมเงินเข้ากระเป๋า</h3>
             <p className="text-xs text-ink-muted mt-1">
-              เลือกหรือระบุยอดเงินที่ต้องการเติมเพื่อใช้ชำระเงินร่วม Co-pay 40%
+              เลือกหรือระบุจำนวนเงินที่ต้องการเติม
             </p>
 
             {topUpSuccessMsg ? (

@@ -41,7 +41,7 @@ export const CitizenScanCopayPage: React.FC = () => {
   // ข้อมูล QR และการเลือกสแกน
   const [qrReference, setQrReference] = useState<string>('');
   const [scannedData, setScannedData] = useState<CopayPreviewData | null>(null);
-  const [pin, setPin] = useState<string>('123456');
+  const [pin, setPin] = useState<string>('');
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [showManualInput, setShowManualInput] = useState<boolean>(false);
   const [showCoupon, setShowCoupon] = useState<boolean>(false);
@@ -213,7 +213,7 @@ export const CitizenScanCopayPage: React.FC = () => {
             <div className="border-l border-hairline pl-2.5 sm:pl-3 min-w-0">
               <h1 className="text-sm sm:text-base md:text-lg font-bold text-ink truncate">สแกนชำระเงินร่วม</h1>
               <p className="hidden sm:block text-xs text-brand-blue font-medium truncate">
-                สแกน Dynamic QR ร้านค้าเพื่อรับสิทธิรัฐช่วยจ่าย
+                สแกน QR ร้านค้าเพื่อรับสิทธิร่วมจ่าย
               </p>
             </div>
           </div>
@@ -292,16 +292,13 @@ export const CitizenScanCopayPage: React.FC = () => {
               )}
             </section>
 
-            {/* ข้อแนะนำโครงการ Co-pay */}
-            <div className="rounded-card border border-blue-100 bg-blue-50/50 p-4 space-y-1.5 text-xs">
-              <span className="font-semibold text-brand-blue flex items-center gap-1.5">
+            {/* โควตาสิทธิรัฐช่วยจ่ายคงเหลือวันนี้ */}
+            <div className="rounded-2xl border border-blue-100 bg-blue-50/50 px-4 py-2.5 flex items-center justify-between text-xs text-brand-blue">
+              <span className="flex items-center gap-1.5 font-medium">
                 <Sparkles className="h-3.5 w-3.5 shrink-0" />
-                <span>การสแกนชำระเงินร่วม Co-pay 60/40</span>
+                <span>โควตารัฐช่วยจ่ายคงเหลือวันนี้</span>
               </span>
-              <ul className="space-y-1 text-ink-muted list-disc list-inside text-[11px] sm:text-xs">
-                <li>รัฐบาลช่วยจ่าย 60% (สูงสุด ฿{(wallet?.dailyQuotaLimit ?? 150).toFixed(0)} ต่อวัน • คงเหลือวันนี้ ฿{(wallet?.dailyQuotaRemaining ?? 150).toFixed(2)})</li>
-                <li>ประชาชนจ่าย 40% หักจากยอดเงินในกระเป๋าส่วนตัว</li>
-              </ul>
+              <span className="font-mono font-bold">฿{(wallet?.dailyQuotaRemaining ?? 150).toFixed(2)}</span>
             </div>
           </div>
         ) : (
@@ -405,10 +402,10 @@ export const CitizenScanCopayPage: React.FC = () => {
                             </p>
                           )}
 
-                          {/* Quick pills สำหรับแนะนำโค้ดคำชวนเพื่อนและคูปองทดสอบ */}
+                          {/* แนะนำโค้ดสิทธิพิเศษและเพื่อนชวนเพื่อน */}
                           <div className="pt-1">
                             <span className="text-[10px] text-ink-muted block mb-1">
-                              ⚡ โค้ดทดสอบด่วน:
+                              สิทธิพิเศษและโค้ดแนะนำ:
                             </span>
                             <div className="flex flex-wrap gap-1.5">
                               <button
@@ -420,7 +417,7 @@ export const CitizenScanCopayPage: React.FC = () => {
                                 className="rounded-pill border border-emerald-200 bg-emerald-50/80 px-2.5 py-1 text-[10px] font-medium text-emerald-800 transition hover:bg-emerald-100 flex items-center space-x-1"
                               >
                                 <Users className="h-3 w-3 text-emerald-600 shrink-0" />
-                                <span>FRIEND30 (ลด ฿30 เพื่อนสมชาย)</span>
+                                <span>FRIEND30 (ลด ฿30 เพื่อนชวนเพื่อน)</span>
                               </button>
                               <button
                                 type="button"
@@ -431,7 +428,7 @@ export const CitizenScanCopayPage: React.FC = () => {
                                 className="rounded-pill border border-blue-200 bg-blue-50/80 px-2.5 py-1 text-[10px] font-medium text-brand-blue transition hover:bg-blue-100 flex items-center space-x-1"
                               >
                                 <Tag className="h-3 w-3 text-brand-blue shrink-0" />
-                                <span>DUO50 (ลด ฿50 Duo Special)</span>
+                                <span>DUO50 (ลด ฿50 สิทธิพิเศษคู่หู)</span>
                               </button>
                               <button
                                 type="button"
@@ -442,7 +439,7 @@ export const CitizenScanCopayPage: React.FC = () => {
                                 className="rounded-pill border border-hairline bg-surface-soft px-2.5 py-1 text-[10px] font-medium text-ink transition hover:bg-gray-100 flex items-center space-x-1"
                               >
                                 <Gift className="h-3 w-3 text-ink-muted shrink-0" />
-                                <span>WELCOME20 (ลด ฿20)</span>
+                                <span>WELCOME20 (ลด ฿20 สิทธิพิเศษต้อนรับ)</span>
                               </button>
                             </div>
                           </div>

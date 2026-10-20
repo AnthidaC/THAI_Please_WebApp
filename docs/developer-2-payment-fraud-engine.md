@@ -85,8 +85,9 @@ flowchart TD
     I -- "Risk Score > 0.85 (ทุจริตรุนแรง เช่น GPS ปลอม)" --> L["ปฏิเสธรายการทันที (REJECTED_FRAUD)"]
 ```
 
-### การเชื่อมต่อกับ AI API (Semi-AI Design Pattern)
-- **AI Fraud Client Interface (`AiFraudClient`):** รองรับการส่ง Features ไปยัง AI Endpoint ภายนอก (เช่น Google Gemini API, Custom ML Anomaly Microservice)
+### การเชื่อมต่อกับ AI API (Semi-AI Design Pattern & Zero-Token Gating)
+- **Zero-Token Gating & AI Decision Rules:** ดูข้อกำหนดฉบับเต็มและ Flowchart ได้ที่ [docs/fraud-ai-decision-rules.md](fraud-ai-decision-rules.md)
+- **AI Fraud Client Interface (`AiFraudClient` / `AiFraudEngine`):** กรองธุรกรรมปกติ 95% ด้วย Local Heuristic (0 Token) และส่ง Prompt วิเคราะห์เฉพาะธุรกรรมน่าสงสัยไปยัง Google Gemini Flash / OpenAI API (จำกัดคำตอบ max 80 tokens ในรูปแบบ JSON)
 - **Fallback / Local Smart Heuristic Scoring:** ในระหว่างที่ยังไม่ผูก API Key ปลายทาง ระบบมี Intelligent AI Simulation Model ที่ประเมิน Anomaly Score ตามข้อมูลพฤติกรรมจริง ไม่ตัดสิทธิ์ด้วยเงื่อนไขแข็งทื่อ
 - **Admin Review Queue:** ผู้ดูแลระบบสามารถดูแผนที่เปรียบเทียบพิกัด วิเคราะห์ความน่าจะเป็น และกด Overwrite/Approve ได้จากหน้า Dashboard
 

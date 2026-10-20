@@ -58,14 +58,26 @@ export const calculateHaversineDistance = (
  * - แต่ AI ทำหน้าที่ตรวจจับพฤติกรรมน่าสงสัย โดยเฉพาะ "ความน่าสงสัยซ้ำๆ" (Repeated Anomalies)
  *   เพื่อส่งเรื่องให้ Admin ตรวจสอบในคิว FLAGGED_FOR_REVIEW
  */
+/**
+ * AI Fraud Detection Client (Semi-AI Model Interface with Zero-Token Gating)
+ * นโยบายสำคัญ:
+ * - Stage 1 (0-Token Filter): กรองธุรกรรมปกติ 90-95% ด้วย Rule-based & Heuristics ทันที ไม่ส่ง AI เพื่อประหยัด Token
+ * - Stage 2 (Targeted AI Prompt): ส่ง Prompt เข้า AI เฉพาะเคสที่ตกเกณฑ์น่าสงสัย (Gray Zone)
+ * - AI จะไม่บล็อกผู้ใช้หรือร้านค้าทันที (ไม่ส่งค่า REJECTED เพื่อขัดจังหวะการค้าขายปกติ)
+ * - บันทึกสถานะ FLAGGED_FOR_REVIEW เพื่อส่งเรื่องให้ Admin ตรวจสอบย้อนหลัง
+ */
 export class AiFraudEngine {
   private static instance: AiFraudEngine;
+  private provider: 'gemini' | 'openai' | 'custom' = 'gemini';
   private externalAiEndpoint: string | null = null;
   private aiApiKey: string | null = null;
+  private aiModel: string = 'gemini-1.5-flash';
 
   private constructor() {
+    this.provider = ((process.env.AI_PROVIDER as any) || 'gemini').toLowerCase();
     this.externalAiEndpoint = process.env.AI_FRAUD_ENDPOINT || null;
     this.aiApiKey = process.env.AI_FRAUD_API_KEY || null;
+    this.aiModel = process.env.AI_FRAUD_MODEL || 'gemini-1.5-flash';
   }
 
   public static getInstance(): AiFraudEngine {
@@ -76,44 +88,219 @@ export class AiFraudEngine {
   }
 
   /**
-   * ส่ง Feature Vector ไปวิเคราะห์ผ่าน AI Engine
+   * กฎการตัดสินใจส่ง Prompt (Heuristic Pre-Filtering / Zero-Token Gating)
+   * หากเข้าเกณฑ์ข้อใดข้อหนึ่ง จะส่ง Prompt เข้า AI เพื่อวิเคราะห์เชิงลึก
+   */
+  public shouldInvokeAi(features: FraudFeatureVector): { shouldInvoke: boolean; triggers: string[] } {
+    const triggers: string[] = [];
+    const repeatSuspicious = features.repeatedSuspiciousCount ?? 0;
+    const samePairRepeats = features.samePairRepeatCountToday ?? 1;
+
+    // กฎที่ 1: พิกัดห่างเกิน 1,500 เมตร (ใกล้กรอบเพดาน 2,000 เมตร)
+    if (features.distanceMeters > 1500) {
+      triggers.push(`พิกัดห่าง ${Math.round(features.distanceMeters)} ม. (เกินเกณฑ์เฝ้าระวัง 1,500 ม.)`);
+    }
+
+    // กฎที่ 2: ความเร็วการเปลี่ยนพิกัดเกิน 70 กม./ชม.
+    if (features.estimatedSpeedKmH > 70) {
+      triggers.push(`ความเร็วการเคลื่อนที่ผิดปกติ (${Math.round(features.estimatedSpeedKmH)} กม./ชม.)`);
+    }
+
+    // กฎที่ 3: สแกนถี่เกิน 2 ครั้งใน 10 นาที (>= 3 ครั้ง)
+    if (features.recentTxCountIn10Min >= 3) {
+      triggers.push(`ความถี่ทำธุรกรรมสูงผิดปกติ (${features.recentTxCountIn10Min} ครั้งใน 10 นาที)`);
+    }
+
+    // กฎที่ 4: สแกนร้านเดิมซ้ำเกิน 2 ครั้งในวันเดียว (>= 3 ครั้ง เสี่ยงซอยบิล)
+    if (samePairRepeats >= 3) {
+      triggers.push(`สแกนซ้ำร้านเดิม ${samePairRepeats} ครั้งในวันเดียว`);
+    }
+
+    // กฎที่ 5: มีประวัติความน่าสงสัยสะสม
+    if (repeatSuspicious >= 1) {
+      triggers.push(`พบบัญชีมีประวัติถูกตั้งข้อสงสัย ${repeatSuspicious} ครั้ง`);
+    }
+
+    // กฎที่ 6: ยอดเงินสูงกว่า 1,500 บาท ร่วมกับระยะห่างเกิน 1,000 เมตร
+    if (features.amount > 1500 && features.distanceMeters > 1000) {
+      triggers.push(`ยอดเงินสูง (${features.amount} บาท) ร่วมกับระยะห่างมากกว่า 1 กม.`);
+    }
+
+    return {
+      shouldInvoke: triggers.length > 0,
+      triggers,
+    };
+  }
+
+  /**
+   * ส่ง Feature Vector ไปวิเคราะห์ผ่าน AI Engine พร้อมระบบประหยัด Token
    */
   public async evaluate(features: FraudFeatureVector): Promise<AiFraudAssessment> {
-    // 1. หากมีการกำหนด External AI Endpoint และ Key ในอนาคต ให้ต่อ API AI ทันที
-    if (this.externalAiEndpoint && this.aiApiKey) {
-      try {
-        const response = await fetch(this.externalAiEndpoint, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${this.aiApiKey}`,
-          },
-          body: JSON.stringify({
-            features,
-            prompt: `วิเคราะห์ความเสี่ยงการทุจริตธุรกรรม Co-pay โดยไม่บล็อกผู้ใช้ทันที แต่ให้ส่งเรื่องให้ Admin เมื่อพบความน่าสงสัยซ้ำๆ (ระยะทาง ${features.distanceMeters} เมตร, ความเร็ว ${features.estimatedSpeedKmH} กม./ชม., ยอดเงิน ${features.amount} บาท, ความถี่ ${features.recentTxCountIn10Min} ครั้งใน 10 นาที, ประวัติความน่าสงสัยซ้ำ ${features.repeatedSuspiciousCount || 0} ครั้ง)`,
-          }),
-        });
+    const { shouldInvoke, triggers } = this.shouldInvokeAi(features);
 
-        if (response.ok) {
-          const aiResult = (await response.json()) as any;
-          const rawDecision = aiResult.decision || 'AUTO_APPROVED';
-          // นโยบาย: AI ไม่บล็อกทันที หาก AI ภายนอกส่ง REJECTED ให้เปลี่ยนเป็น FLAGGED_FOR_REVIEW เพื่อให้ Admin ตัดสินใจ
-          const safeDecision =
-            rawDecision === 'REJECTED' ? 'FLAGGED_FOR_REVIEW' : rawDecision;
-          return {
-            riskScore: Number(aiResult.riskScore || 0),
-            decision: safeDecision,
-            reason: aiResult.reason || 'AI Model ประเมินผลสำเร็จ',
-            confidence: Number(aiResult.confidence || 0.95),
-            model: 'external-ai-api',
-          };
+    // =========================================================================
+    // 🌟 STAGE 1: 0-TOKEN FILTER (ธุรกรรมปกติ 90-95% จบตรงนี้ทันที)
+    // =========================================================================
+    if (!shouldInvoke) {
+      return {
+        riskScore: 0.06,
+        decision: 'AUTO_APPROVED',
+        reason: 'พิกัดและพฤติกรรมอยู่ในเกณฑ์ปลอดภัยสมบูรณ์ (Zero-Token Gated)',
+        confidence: 0.99,
+        model: 'heuristic-zero-token-v2',
+      };
+    }
+
+    // =========================================================================
+    // 🤖 STAGE 2: TARGETED AI PROMPT (เรียก AI เฉพาะธุรกรรมน่าสงสัย)
+    // =========================================================================
+    if (this.aiApiKey || this.externalAiEndpoint) {
+      try {
+        const aiAssessment = await this.invokeExternalAi(features, triggers);
+        if (aiAssessment) {
+          return aiAssessment;
         }
       } catch (err) {
         console.warn('[AI Fraud Engine] External API call failed, falling back to Local Anomaly Evaluator:', err);
       }
     }
 
-    // 2. Intelligent Semi-AI Anomaly Scoring Engine (Local Multi-factor Model)
+    // =========================================================================
+    // 🛡️ STAGE 3: FALLBACK TO LOCAL MULTI-FACTOR ENGINE
+    // =========================================================================
+    return this.evaluateLocally(features, triggers);
+  }
+
+  /**
+   * เรียกใช้งานโมเดล AI ภายนอก (Google Gemini Flash / OpenAI / Custom Endpoint)
+   * โดยคุม Token ให้สั้นที่สุด (max_tokens: 80) และบังคับ Output JSON
+   */
+  private async invokeExternalAi(
+    features: FraudFeatureVector,
+    triggers: string[]
+  ): Promise<AiFraudAssessment | null> {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 2500); // ไม่ให้หน้าร้านค้างเกิน 2.5 วินาที
+
+    try {
+      const compactPrompt = `TxFeatures: dist=${Math.round(features.distanceMeters)}m, speed=${Math.round(features.estimatedSpeedKmH)}km/h, tx10m=${features.recentTxCountIn10Min}, sameShopToday=${features.samePairRepeatCountToday ?? 1}, prevFlags=${features.repeatedSuspiciousCount ?? 0}, amt=${features.amount}THB, triggers=[${triggers.join('; ')}]`;
+
+      let riskScore = 0.75;
+      let decision: 'AUTO_APPROVED' | 'FLAGGED_FOR_REVIEW' = 'FLAGGED_FOR_REVIEW';
+      let reason = triggers.join(' • ');
+      let confidence = 0.95;
+      let usedModel = this.aiModel;
+
+      // 1. Google Gemini Flash API (ประหยัด Token และเร็วสูงสุด)
+      if (this.provider === 'gemini' && this.aiApiKey) {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${this.aiModel}:generateContent?key=${this.aiApiKey}`;
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          signal: controller.signal,
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: compactPrompt }] }],
+            systemInstruction: {
+              parts: [{
+                text: 'You are an anti-fraud risk engine for Thailand Co-pay. Evaluate risk. Output ONLY valid JSON: {"riskScore": number(0-1), "decision": "AUTO_APPROVED"|"FLAGGED_FOR_REVIEW", "reason": "สรุปสั้นๆภาษาไทย 1 ประโยค"}. Never return REJECTED directly; always FLAGGED_FOR_REVIEW if suspicious.',
+              }],
+            },
+            generationConfig: {
+              responseMimeType: 'application/json',
+              maxOutputTokens: 80, // ป้องกันการเปลือง token
+              temperature: 0.1,
+            },
+          }),
+        });
+
+        if (res.ok) {
+          const json: any = await res.json();
+          const rawText = json?.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (rawText) {
+            const parsed = JSON.parse(rawText);
+            riskScore = Number(parsed.riskScore ?? 0.75);
+            decision = parsed.decision === 'REJECTED' ? 'FLAGGED_FOR_REVIEW' : (parsed.decision || 'FLAGGED_FOR_REVIEW');
+            reason = parsed.reason || reason;
+            confidence = 0.96;
+            usedModel = this.aiModel;
+          }
+        }
+      }
+      // 2. OpenAI API (เช่น gpt-4o-mini)
+      else if (this.provider === 'openai' && this.aiApiKey) {
+        const url = 'https://api.openai.com/v1/chat/completions';
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${this.aiApiKey}`,
+          },
+          signal: controller.signal,
+          body: JSON.stringify({
+            model: this.aiModel || 'gpt-4o-mini',
+            messages: [
+              {
+                role: 'system',
+                content: 'You are an anti-fraud risk engine. Output ONLY JSON: {"riskScore": number(0-1), "decision": "AUTO_APPROVED"|"FLAGGED_FOR_REVIEW", "reason": "สรุปสั้นๆภาษาไทย 1 ประโยค"}.',
+              },
+              { role: 'user', content: compactPrompt },
+            ],
+            response_format: { type: 'json_object' },
+            max_tokens: 80,
+            temperature: 0.1,
+          }),
+        });
+
+        if (res.ok) {
+          const json: any = await res.json();
+          const content = json.choices?.[0]?.message?.content;
+          if (content) {
+            const parsed = JSON.parse(content);
+            riskScore = Number(parsed.riskScore ?? 0.75);
+            decision = parsed.decision === 'REJECTED' ? 'FLAGGED_FOR_REVIEW' : (parsed.decision || 'FLAGGED_FOR_REVIEW');
+            reason = parsed.reason || reason;
+            confidence = 0.95;
+            usedModel = this.aiModel || 'gpt-4o-mini';
+          }
+        }
+      }
+      // 3. Custom AI Endpoint
+      else if (this.externalAiEndpoint) {
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (this.aiApiKey) headers['Authorization'] = `Bearer ${this.aiApiKey}`;
+        const res = await fetch(this.externalAiEndpoint, {
+          method: 'POST',
+          headers,
+          signal: controller.signal,
+          body: JSON.stringify({ features, triggers, prompt: compactPrompt }),
+        });
+
+        if (res.ok) {
+          const json: any = await res.json();
+          riskScore = Number(json.riskScore ?? 0.75);
+          decision = json.decision === 'REJECTED' ? 'FLAGGED_FOR_REVIEW' : (json.decision || 'FLAGGED_FOR_REVIEW');
+          reason = json.reason || reason;
+          confidence = Number(json.confidence ?? 0.92);
+          usedModel = 'custom-ai-service';
+        }
+      }
+
+      return {
+        riskScore: Math.min(0.99, Math.max(0.01, Math.round(riskScore * 100) / 100)),
+        decision,
+        reason,
+        confidence,
+        model: usedModel,
+      };
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  /**
+   * Intelligent Semi-AI Anomaly Scoring Engine (Local Multi-factor Model Fallback)
+   */
+  public evaluateLocally(features: FraudFeatureVector, triggers: string[] = []): AiFraudAssessment {
     const repeatSuspicious = features.repeatedSuspiciousCount ?? 0;
     const samePairRepeats = features.samePairRepeatCountToday ?? 1;
 
@@ -135,41 +322,30 @@ export class AiFraudEngine {
     const roundedScore = Math.min(0.99, Math.max(0.01, Math.round(combinedAnomalyScore * 100) / 100));
 
     let decision: 'AUTO_APPROVED' | 'FLAGGED_FOR_REVIEW' = 'AUTO_APPROVED';
-    const reasons: string[] = [];
+    const reasons: string[] = triggers.length > 0 ? [...triggers] : [];
 
-    if (repeatSuspicious >= 2) {
-      reasons.push(`ตรวจพบประวัติความน่าสงสัยซ้ำสะสม (${repeatSuspicious} ครั้ง) จากบัญชีผู้ใช้หรือร้านค้านี้`);
+    if (repeatSuspicious >= 2 && !reasons.some(r => r.includes('ประวัติ'))) {
+      reasons.push(`ตรวจพบประวัติความน่าสงสัยซ้ำสะสม (${repeatSuspicious} ครั้ง)`);
+    }
+    if (samePairRepeats >= 3 && !reasons.some(r => r.includes('สแกนซ้ำ'))) {
+      reasons.push(`ผู้ใช้สแกนชำระเงินซ้ำกับร้านค้าเดิม ${samePairRepeats} ครั้งในวันเดียวกัน`);
+    }
+    if (features.recentTxCountIn10Min >= 3 && !reasons.some(r => r.includes('10 นาที'))) {
+      reasons.push(`ความถี่ทำธุรกรรมซ้ำสูงผิดปกติ (${features.recentTxCountIn10Min} ครั้งใน 10 นาที)`);
     }
 
-    if (samePairRepeats >= 3) {
-      reasons.push(`ผู้ใช้สแกนชำระเงินซ้ำกับร้านค้าเดิม ${samePairRepeats} ครั้งภายในวันเดียวกัน (สงสัยการซอยบิล)`);
-    }
-
-    if (features.recentTxCountIn10Min >= 3) {
-      reasons.push(`ความถี่ในการทำธุรกรรมซ้ำสูงผิดปกติ (${features.recentTxCountIn10Min} ครั้งภายใน 10 นาที)`);
-    }
-
-    if (features.distanceMeters > 1500) {
-      reasons.push(`พิกัดผู้ซื้อห่างจากร้านค้า ${Math.round(features.distanceMeters)} เมตร (ใกล้ขอบรัศมี 2 กม. ที่กำหนด)`);
-    }
-
-    if (features.estimatedSpeedKmH > 90) {
-      reasons.push(`ตรวจพบการเคลื่อนที่ข้ามพิกัดรวดเร็วผิดปกติ (${Math.round(features.estimatedSpeedKmH)} กม./ชม.)`);
-    }
-
-    // AI ไม่บล็อกผู้ใช้หรือร้านค้าทันที แต่ส่งเรื่องให้ Admin ตรวจสอบเมื่อมีพฤติกรรมน่าสงสัยซ้ำๆ หรือคะแนนความเสี่ยงถึงเกณฑ์
     const isSuspiciousForAdmin =
       roundedScore >= 0.45 ||
       repeatSuspicious >= 2 ||
       samePairRepeats >= 3 ||
       features.recentTxCountIn10Min >= 3 ||
       features.distanceMeters > 1500 ||
-      features.estimatedSpeedKmH > 90;
+      features.estimatedSpeedKmH > 70;
 
     if (isSuspiciousForAdmin) {
       decision = 'FLAGGED_FOR_REVIEW';
       if (reasons.length === 0) {
-        reasons.push('AI ตรวจพบรูปแบบพฤติกรรมน่าสงสัยซ้ำซ้อน จึงส่งเรื่องให้ผู้ดูแลระบบตรวจสอบ');
+        reasons.push('ระบบตรวจพบรูปแบบพฤติกรรมน่าสงสัยซ้ำซ้อน จึงส่งเรื่องให้ผู้ดูแลระบบตรวจสอบ');
       }
     } else {
       decision = 'AUTO_APPROVED';

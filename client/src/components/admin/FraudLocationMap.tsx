@@ -45,7 +45,12 @@ export const FraudLocationMap: React.FC<FraudLocationMapProps> = ({
     }
 
     // สร้าง Leaflet Map เชื่อมโยงกับ OpenStreetMap (OSM) ฟรี 100% ไม่มีค่าใช้จ่าย
+    const centerLat = (userLat + merchantLat) / 2 || 13.7563;
+    const centerLon = (userLon + merchantLon) / 2 || 100.5018;
+
     const map = L.map(mapContainerRef.current, {
+      center: [centerLat, centerLon],
+      zoom: 13,
       zoomControl: true,
       scrollWheelZoom: true,
     });
@@ -153,12 +158,24 @@ export const FraudLocationMap: React.FC<FraudLocationMapProps> = ({
       className: 'bg-slate-900 text-white font-mono text-[10px] px-2 py-0.5 rounded shadow',
     });
 
-    // 5. ปรับมุมมองอัตโนมัติให้ครอบคลุมทั้ง 2 จุดและรัศมี 2 กม.
-    const group = L.featureGroup([merchantMarker, citizenMarker, geofenceCircle]);
-    map.fitBounds(group.getBounds().pad(0.15));
+    // 5. ปรับมุมมองอัตโนมัติให้ครอบคลุมทั้ง 2 จุดและรัศมี 2 กม. เมื่อ Modal เรนเดอร์เสร็จ
+    const fitTimer = setTimeout(() => {
+      if (!mapInstanceRef.current) return;
+      try {
+        mapInstanceRef.current.invalidateSize();
+        const group = L.featureGroup([merchantMarker, citizenMarker, geofenceCircle]);
+        const bounds = group.getBounds();
+        if (bounds.isValid()) {
+          mapInstanceRef.current.fitBounds(bounds.pad(0.15));
+        }
+      } catch (err) {
+        console.warn('Leaflet fitBounds error:', err);
+      }
+    }, 250);
 
     // Cleanup เมื่อ Component ถูก Unmount
     return () => {
+      clearTimeout(fitTimer);
       map.remove();
       mapInstanceRef.current = null;
     };

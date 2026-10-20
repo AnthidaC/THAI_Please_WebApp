@@ -547,7 +547,7 @@ export const MerchantPosQrPage: React.FC = () => {
 
     ctx.fillStyle = '#dc2626';
     ctx.font = 'bold 13px "Prompt", "Sarabun", -apple-system, sans-serif';
-    ctx.fillText(`⏳ QR Code มีอายุ 3 นาที (หมดอายุเวลา ${expiryTimeStr} น.)`, w / 2, pillY + pillH / 2);
+    ctx.fillText(`⏳ QR Code หมดอายุเวลา ${expiryTimeStr} น.`, w / 2, pillY + pillH / 2);
 
     // 8. ส่วนท้ายการ์ด (Footer Banner)
     const footerW = 600;
@@ -645,7 +645,7 @@ export const MerchantPosQrPage: React.FC = () => {
                 <CheckCircle2 className="h-4 w-4 text-status-success shrink-0" aria-label="ร้านค้าลงทะเบียนถูกต้อง" />
               </h1>
               <p className="hidden sm:block text-xs text-brand-blue font-medium truncate">
-                ระบบสร้าง QR รับเงินร้านค้า (Co-pay 60/40)
+                สร้าง QR รับชำระเงิน Co-pay 60/40
               </p>
             </div>
           </div>
@@ -705,7 +705,7 @@ export const MerchantPosQrPage: React.FC = () => {
               </div>
               <span className="inline-flex items-center space-x-1 rounded-pill bg-white/20 px-3 py-0.5 text-[11px] font-semibold text-white">
                 <ShieldCheck className="h-3.5 w-3.5" />
-                <span>ธุรกรรมเสร็จสมบูรณ์ (Payment Completed)</span>
+                <span>ธุรกรรมเสร็จสมบูรณ์</span>
               </span>
               <h2 className="mt-2 text-lg sm:text-xl font-bold">ได้รับเงินชำระเรียบร้อยแล้ว</h2>
               <p className="mt-0.5 font-mono text-xs text-emerald-100">
@@ -737,7 +737,7 @@ export const MerchantPosQrPage: React.FC = () => {
                 <div className="flex items-center justify-between">
                   <span className="text-ink-muted flex items-center space-x-1.5">
                     <UserCheck className="h-3.5 w-3.5 text-brand-blue shrink-0" />
-                    <span>ผู้ชำระเงิน (ลูกค้า)</span>
+                    <span>ผู้ชำระเงิน</span>
                   </span>
                   <span className="font-bold text-ink">{paidInfo.customerName}</span>
                 </div>
@@ -760,7 +760,7 @@ export const MerchantPosQrPage: React.FC = () => {
                 </div>
 
                 <div className="border-t border-hairline pt-2 flex items-center justify-between text-[11px] text-ink-muted">
-                  <span>รหัสอ้างอิงบิล (QR Ref.)</span>
+                  <span>รหัสอ้างอิง</span>
                   <span className="font-mono">{qrResult.qrReference}</span>
                 </div>
               </div>
@@ -963,7 +963,7 @@ export const MerchantPosQrPage: React.FC = () => {
                 {!isExpired ? (
                   <span className="inline-flex items-center space-x-1.5 rounded-pill bg-emerald-50 px-2.5 sm:px-3 py-1 text-[11px] sm:text-xs font-semibold text-status-success border border-emerald-200">
                     <span className="h-2 w-2 rounded-full bg-status-success animate-ping" />
-                    <span>รอรับชำระเงิน (ตรวจจับอัตโนมัติ)</span>
+                    <span>รอรับชำระเงิน</span>
                   </span>
                 ) : (
                   <span className="inline-flex items-center space-x-1.5 rounded-pill bg-red-50 px-2.5 sm:px-3 py-1 text-[11px] sm:text-xs font-semibold text-status-error border border-red-200 animate-pulse">
@@ -982,7 +982,7 @@ export const MerchantPosQrPage: React.FC = () => {
                   }`}
                 >
                   <Clock className="h-3.5 w-3.5 shrink-0" />
-                  <span>{isExpired ? 'หมดอายุแล้ว (00:00)' : `อายุ QR: ${formattedTimer} น.`}</span>
+                  <span>{isExpired ? 'หมดอายุแล้ว' : `เวลาคงเหลือ ${formattedTimer}`}</span>
                 </span>
               </div>
 
@@ -1018,8 +1018,8 @@ export const MerchantPosQrPage: React.FC = () => {
                     <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-100 text-status-error mb-2">
                       <AlertTriangle className="h-6 w-6" />
                     </div>
-                    <p className="text-sm font-bold text-status-error">QR หมดอายุแล้ว (3 นาที)</p>
-                    <p className="text-xs text-ink-muted mt-1 mb-3">กรุณากดสร้างบิลใหม่เพื่อให้ลูกค้าสแกน</p>
+                    <p className="text-sm font-bold text-status-error">QR Code หมดอายุแล้ว</p>
+                    <p className="text-xs text-ink-muted mt-1 mb-3">กรุณาสร้าง QR ใหม่เพื่อรับชำระเงิน</p>
                     <button
                       onClick={() => {
                         setPaidInfo(null);
@@ -1072,7 +1072,7 @@ export const MerchantPosQrPage: React.FC = () => {
                   ) : (
                     <>
                       <Download className="h-4 w-4 text-brand-blue shrink-0" />
-                      <span>บันทึกรูป QR พร้อมเพย์</span>
+                      <span>บันทึกรูปภาพ QR</span>
                     </>
                   )}
                 </button>
