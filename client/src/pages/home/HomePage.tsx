@@ -51,6 +51,33 @@ export const HomePage: React.FC = () => {
           </div>
         </div>
 
+        <section className="rounded-card border border-amber-200 bg-amber-50/70 p-5 shadow-sm">
+          <h2 className="text-sm font-bold text-ink">ทางเข้าสำหรับทดสอบตามบทบาท</h2>
+          <p className="mt-1 text-xs text-ink-muted">
+            เลือกหน้าล็อกอินให้ตรงกับประเภทบัญชี
+          </p>
+          <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
+            <button
+              onClick={() => navigate(APP_ROUTES.LOGIN)}
+              className="rounded-xl border border-blue-200 bg-white px-4 py-3 text-xs font-semibold text-brand-blue transition hover:bg-blue-50"
+            >
+              เข้าสู่ระบบประชาชน
+            </button>
+            <button
+              onClick={() => navigate(APP_ROUTES.MERCHANT_LOGIN)}
+              className="rounded-xl border border-emerald-200 bg-white px-4 py-3 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-50"
+            >
+              เข้าสู่ระบบร้านค้า
+            </button>
+            <button
+              onClick={() => navigate(APP_ROUTES.STAFF_LOGIN)}
+              className="rounded-xl border border-red-200 bg-white px-4 py-3 text-xs font-semibold text-status-error transition hover:bg-red-50"
+            >
+              เข้าสู่ระบบเจ้าหน้าที่
+            </button>
+          </div>
+        </section>
+
         {/* เมนูทางลัดตามบทบาท 3 กลุ่ม (Citizen, Merchant, Admin) */}
         <div>
           <h2 className="text-base font-bold text-ink mb-4">โมดูลงาน Developer 2: Payment & Fraud Engine</h2>

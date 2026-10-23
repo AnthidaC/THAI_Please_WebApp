@@ -9,6 +9,7 @@ import { PublicRoute } from './PublicRoute';
 import { HomePage } from '../pages/home/HomePage';
 import { LoginPage } from '../pages/auth/LoginPage';
 import { RegisterPage } from '../pages/auth/RegisterPage';
+import { MerchantRegisterPage } from '../pages/auth/MerchantRegisterPage';
 import { DashboardPage } from '../pages/dashboard/DashboardPage';
 import { NotFoundPage } from '../pages/notFound/NotFoundPage';
 
@@ -88,6 +89,18 @@ export const router = createBrowserRouter([
           {
             path: APP_ROUTES.LOGIN,
             element: <LoginPage />,
+          },
+          {
+            path: APP_ROUTES.MERCHANT_LOGIN,
+            element: <LoginPage audience="MERCHANT" />,
+          },
+          {
+            path: APP_ROUTES.MERCHANT_REGISTER,
+            element: <MerchantRegisterPage />,
+          },
+          {
+            path: APP_ROUTES.STAFF_LOGIN,
+            element: <LoginPage audience="ADMIN" />,
           },
           {
             path: APP_ROUTES.REGISTER,

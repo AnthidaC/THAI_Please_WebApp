@@ -3,8 +3,36 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { LogIn, User, Store, ShieldAlert, Lock, Mail, AlertCircle, ArrowRight } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import { APP_ROUTES } from '../../constants/routes';
+import type { User as AuthUser } from '../../types';
 
-export const LoginPage: React.FC = () => {
+type LoginAudience = 'CITIZEN' | 'MERCHANT' | 'ADMIN';
+
+interface LoginPageProps {
+  audience?: LoginAudience;
+}
+
+const DEFAULT_ROUTE_BY_AUDIENCE: Record<LoginAudience, string> = {
+  CITIZEN: APP_ROUTES.DASHBOARD,
+  MERCHANT: APP_ROUTES.MERCHANT_POS_QR,
+  ADMIN: APP_ROUTES.ADMIN_FRAUD_ALERTS,
+};
+
+const LOGIN_COPY: Record<LoginAudience, { title: string; description: string }> = {
+  CITIZEN: {
+    title: 'เข้าสู่ระบบประชาชน',
+    description: 'ระบบกระเป๋าเงินดิจิทัล & ชำระเงินร่วม Co-pay 60/40',
+  },
+  MERCHANT: {
+    title: 'เข้าสู่ระบบร้านค้า',
+    description: 'ระบบรับชำระเงินและจัดการยอดขายหน้าร้าน',
+  },
+  ADMIN: {
+    title: 'เข้าสู่ระบบเจ้าหน้าที่',
+    description: 'สำหรับเจ้าหน้าที่รัฐและผู้ดูแลระบบ',
+  },
+};
+
+export const LoginPage: React.FC<LoginPageProps> = ({ audience = 'CITIZEN' }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const setAuth = useAuthStore((state) => state.setAuth);
@@ -14,10 +42,10 @@ export const LoginPage: React.FC = () => {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // ดึงหน้าปลายทางที่ต้องการไปหลังล็อกอิน (ถ้ามี redirect มา)
-  const from = (location.state as { from?: { pathname: string } } | null)?.from?.pathname || APP_ROUTES.DASHBOARD;
+  const from = (location.state as { from?: { pathname: string } } | null)?.from?.pathname || DEFAULT_ROUTE_BY_AUDIENCE[audience];
 
-  const handleDemoLogin = (roleType: 'CITIZEN' | 'MERCHANT' | 'ADMIN') => {
-    let mockUser: any;
+  const handleDemoLogin = (roleType: LoginAudience) => {
+    let mockUser: AuthUser;
     if (roleType === 'CITIZEN') {
       mockUser = {
         id: '62a51dec-39a0-4193-9ddc-20fe354f0d27',
@@ -45,7 +73,7 @@ export const LoginPage: React.FC = () => {
     }
 
     setAuth(mockUser, 'demo-token-' + roleType.toLowerCase());
-    navigate(from, { replace: true });
+    navigate(roleType === audience ? from : DEFAULT_ROUTE_BY_AUDIENCE[roleType], { replace: true });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -55,7 +83,7 @@ export const LoginPage: React.FC = () => {
       return;
     }
     // เข้าสู่ระบบแบบจำลอง
-    handleDemoLogin('CITIZEN');
+    handleDemoLogin(audience);
   };
 
   return (
@@ -65,10 +93,10 @@ export const LoginPage: React.FC = () => {
           <LogIn className="h-6 w-6" />
         </div>
         <h2 className="text-xl sm:text-2xl font-bold text-ink tracking-tight">
-          เข้าสู่ระบบ THAI Please
+          {LOGIN_COPY[audience].title}
         </h2>
         <p className="text-xs text-ink-muted mt-1">
-          ระบบกระเป๋าเงินดิจิทัล &amp; ชำระเงินร่วม Co-pay 60/40
+          {LOGIN_COPY[audience].description}
         </p>
       </div>
 
@@ -189,12 +217,21 @@ export const LoginPage: React.FC = () => {
         </div>
       </div>
 
-      <div className="text-xs text-center text-ink-muted pt-2 border-t border-hairline">
-        ยังไม่มีบัญชีผู้ใช้งาน?{' '}
-        <Link to={APP_ROUTES.REGISTER} className="text-brand-blue font-semibold hover:underline">
-          ลงทะเบียนรับสิทธิ์
-        </Link>
-      </div>
+      {audience === 'MERCHANT' ? (
+        <div className="text-xs text-center text-ink-muted pt-2 border-t border-hairline">
+          ยังไม่ได้ลงทะเบียนร้านค้า?{' '}
+          <Link to={APP_ROUTES.MERCHANT_REGISTER} className="text-brand-blue font-semibold hover:underline">
+            สมัครเป็นร้านค้า
+          </Link>
+        </div>
+      ) : audience === 'CITIZEN' ? (
+        <div className="text-xs text-center text-ink-muted pt-2 border-t border-hairline">
+          ยังไม่มีบัญชีผู้ใช้งาน?{' '}
+          <Link to={APP_ROUTES.REGISTER} className="text-brand-blue font-semibold hover:underline">
+            ลงทะเบียนรับสิทธิ์
+          </Link>
+        </div>
+      ) : null}
     </div>
   );
 };
