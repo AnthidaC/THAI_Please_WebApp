@@ -7,33 +7,73 @@ export const authenticate = async (
   res: Response,
   next: NextFunction
 ): Promise<void> => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith('Bearer ')) {
+    res.status(401).json({ status: 'error', message: 'กรุณาเข้าสู่ระบบก่อนดำเนินการ' });
+    return;
+  }
+
   try {
-    const authHeader = req.headers.authorization;
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      const token = authHeader.split(' ')[1];
-      if (token !== 'demo-token') {
-        const payload = verifyToken(token);
-        req.user = payload;
-        return next();
-      }
+    const token = authHeader.slice('Bearer '.length);
+    const payload = verifyToken(token);
+    if (!payload.userId || !payload.role) {
+      res.status(401).json({ status: 'error', message: 'โทเคนไม่ถูกต้องหรือหมดอายุ' });
+      return;
     }
-
-    // Fallback: หากยังไม่ได้ล็อกอิน ให้ใช้ User คนแรกในฐานข้อมูลอัตโนมัติ เพื่อให้ทดสอบหน้าจอได้โดยไม่ต้องรอระบบ Login
-    const defaultUser = await prisma.user.findFirst();
-    if (defaultUser) {
-      req.user = { userId: defaultUser.user_id, role: 'citizen' };
-      return next();
-    }
-
-    res.status(401).json({ status: 'error', message: 'Unauthorized: No token provided' });
-  } catch (error) {
-    // หาก Token หมดอายุหรือไม่ถูกต้อง ให้ fallback เข้า defaultUser เพื่อความต่อเนื่องในการทดสอบ
-    const defaultUser = await prisma.user.findFirst();
-    if (defaultUser) {
-      req.user = { userId: defaultUser.user_id, role: 'citizen' };
-      return next();
-    }
-    res.status(401).json({ status: 'error', message: 'Unauthorized: Invalid or expired token' });
+    req.user = payload;
+    next();
+  } catch {
+    res.status(401).json({ status: 'error', message: 'โทเคนไม่ถูกต้องหรือหมดอายุ' });
   }
 };
 
+export const requireStaff = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  const staffId = req.user?.userId;
+  const role = req.user?.role.toUpperCase();
+  if (!staffId || (role !== 'ADMIN' && role !== 'STAFF')) {
+    res.status(403).json({ status: 'error', message: 'คุณไม่มีสิทธิ์ดำเนินการนี้' });
+    return;
+  }
+  try {
+    const staff = await prisma.staff_accounts.findUnique({
+      where: { staff_id: staffId },
+      select: { role: true, is_active: true },
+    });
+    if (!staff || !staff.is_active || staff.role !== role) {
+      res.status(403).json({ status: 'error', message: 'บัญชีเจ้าหน้าที่ถูกระงับหรือไม่มีสิทธิ์' });
+      return;
+    }
+    next();
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const requireApprovedMerchant = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  const merchantId = req.user?.userId;
+  if (!merchantId || req.user?.role.toUpperCase() !== 'MERCHANT') {
+    res.status(403).json({ status: 'error', message: 'คุณไม่มีสิทธิ์ดำเนินการนี้' });
+    return;
+  }
+  try {
+    const merchant = await prisma.merchants.findUnique({
+      where: { merchant_id: merchantId },
+      select: { is_approved: true },
+    });
+    if (!merchant?.is_approved) {
+      res.status(403).json({ status: 'error', message: 'บัญชีร้านค้ายังไม่ได้รับอนุมัติหรือถูกระงับ' });
+      return;
+    }
+    next();
+  } catch (error) {
+    next(error);
+  }
+};

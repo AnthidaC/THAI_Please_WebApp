@@ -99,6 +99,7 @@ This starts:
    cd server
    cp .env.example .env
    ```
+   Set `JWT_SECRET` to a unique random value of at least 32 characters before starting the server.
 2. Install dependencies:
    ```bash
    npm install
@@ -113,6 +114,45 @@ This starts:
    npm run dev
    ```
    Server will be running at `http://localhost:5000`
+
+### Merchant onboarding and staff review (staging)
+
+Merchant applications are stored in PostgreSQL, and verification files are uploaded to a **private**
+Supabase Storage bucket. Create a private bucket (public access disabled) named
+`merchant-applications`, then configure `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and
+`MERCHANT_DOCUMENTS_BUCKET` in the server environment. The API verifies that the bucket is private
+before uploading or creating document links. Review links expire after 60 seconds.
+
+Apply the onboarding migration before starting the API:
+
+```bash
+cd server
+npx prisma migrate deploy
+npx prisma generate
+```
+
+Create the first authorized account using `npm run staff:bootstrap` with
+`BOOTSTRAP_STAFF_EMAIL`, `BOOTSTRAP_STAFF_PASSWORD` (at least 12 characters),
+`BOOTSTRAP_STAFF_NAME`, and `BOOTSTRAP_STAFF_ROLE` (`ADMIN` or `STAFF`) set only in the
+operator's environment. The bootstrap command refuses to overwrite an existing account; there is
+no public staff registration.
+
+In PowerShell, provide those variables only for the bootstrap process/session:
+
+```powershell
+$env:BOOTSTRAP_STAFF_EMAIL = "admin@example.org"
+$env:BOOTSTRAP_STAFF_PASSWORD = "use-a-unique-secret-of-at-least-12-characters"
+$env:BOOTSTRAP_STAFF_NAME = "System Administrator"
+$env:BOOTSTRAP_STAFF_ROLE = "ADMIN"
+npm run staff:bootstrap
+Remove-Item Env:BOOTSTRAP_STAFF_EMAIL, Env:BOOTSTRAP_STAFF_PASSWORD, Env:BOOTSTRAP_STAFF_NAME, Env:BOOTSTRAP_STAFF_ROLE
+```
+
+The review API activates a merchant only after an authorized staff member approves its pending
+application. Rejections require a recorded reason. Do not use real identity or bank documents in
+staging, and do not enable production collection until access, retention/deletion, privacy notice,
+and incident-response policies have been approved. Demo fast-login buttons are UI-only and cannot
+authenticate API requests.
 
 ---
 

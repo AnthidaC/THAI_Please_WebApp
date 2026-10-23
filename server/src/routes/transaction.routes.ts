@@ -4,7 +4,7 @@ import {
   getMerchantHistory,
   getTransactionSlip,
 } from '../controllers/transaction.controller';
-import { authenticate } from '../middlewares/auth.middleware';
+import { authenticate, requireApprovedMerchant } from '../middlewares/auth.middleware';
 
 const router = Router();
 
@@ -12,7 +12,7 @@ const router = Router();
 router.get('/buyer/history', authenticate, getBuyerHistory);
 
 // GET /api/transactions/merchant/history
-router.get('/merchant/history', getMerchantHistory);
+router.get('/merchant/history', authenticate, requireApprovedMerchant, getMerchantHistory);
 
 // GET /api/transactions/:id/slip
 router.get('/:id/slip', getTransactionSlip);

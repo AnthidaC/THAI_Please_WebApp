@@ -276,28 +276,15 @@ export class PaymentService {
     longitude: number;
     shopName?: string;
   }): Promise<DynamicQrData> {
-    let merchantId = params.merchantId;
-    let shopName = params.shopName || 'ร้านค้าประชารัฐร่วมใจ';
-
-    if (!merchantId) {
-      const existingMerchant = await prisma.merchants.findFirst();
-      if (existingMerchant) {
-        merchantId = existingMerchant.merchant_id;
-        shopName = existingMerchant.shop_name;
-      } else {
-        const newMerchant = await prisma.merchants.create({
-          data: {
-            tax_id: `TAX-${Date.now().toString().slice(-10)}`,
-            shop_name: shopName,
-            latitude: params.latitude,
-            longitude: params.longitude,
-            average_rating_stars: 4.8,
-            is_approved: true,
-          },
-        });
-        merchantId = newMerchant.merchant_id;
-      }
+    if (!params.merchantId) throw new Error('กรุณาเข้าสู่ระบบร้านค้าที่ได้รับอนุมัติแล้ว');
+    const merchant = await prisma.merchants.findUnique({
+      where: { merchant_id: params.merchantId },
+    });
+    if (!merchant || !merchant.is_approved) {
+      throw new Error('บัญชีร้านค้ายังไม่ได้รับอนุมัติหรือไม่พร้อมใช้งาน');
     }
+    const merchantId = merchant.merchant_id;
+    const shopName = merchant.shop_name;
 
     const qrReference = `TP-QR-${Date.now()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
     const now = new Date();
@@ -319,8 +306,8 @@ export class PaymentService {
       merchantId: merchantId || 'sample-merchant-id',
       shopName,
       totalAmount: params.amount,
-      merchantLatitude: params.latitude,
-      merchantLongitude: params.longitude,
+      merchantLatitude: Number(merchant.latitude),
+      merchantLongitude: Number(merchant.longitude),
       createdAt: now.toISOString(),
       expiresAt: expiresAt.toISOString(),
       estimatedGovCopay: tentativeGov,
@@ -337,8 +324,11 @@ export class PaymentService {
    * ตรวจสอบสถานะ QR Code สำหรับฝั่งร้านค้า (POS Real-time Polling)
    * เพื่อให้หน้าจอร้านค้าเด้งแจ้งเตือนมาตรฐานและเล่นเสียงเมื่อลูกค้าจ่ายเงินสำเร็จ
    */
-  public async getQrPaymentStatus(qrReference: string) {
+  public async getQrPaymentStatus(qrReference: string, expectedMerchantId?: string) {
     let qrData = qrStore.get(qrReference);
+    if (qrData && expectedMerchantId && qrData.merchantId !== expectedMerchantId) {
+      throw new Error('ไม่มีสิทธิ์ดูสถานะ QR นี้');
+    }
 
     // ตรวจสอบในฐานข้อมูลเผื่อมีรายการชำระเงินสำเร็จแล้ว
     const completedTx = await prisma.transactions.findFirst({
@@ -354,6 +344,9 @@ export class PaymentService {
     });
 
     if (completedTx) {
+      if (expectedMerchantId && completedTx.merchant_id !== expectedMerchantId) {
+        throw new Error('ไม่มีสิทธิ์ดูสถานะ QR นี้');
+      }
       const paidInfo = {
         transactionId: completedTx.transaction_id,
         customerName: completedTx.users?.full_name || 'ประชาชนผู้ได้รับสิทธิ',

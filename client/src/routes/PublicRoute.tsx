@@ -8,10 +8,15 @@ import { APP_ROUTES } from '../constants/routes';
  * Redirects to DASHBOARD if already authenticated.
  */
 export const PublicRoute: React.FC = () => {
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, user } = useAuthStore();
 
   if (isAuthenticated) {
-    return <Navigate to={APP_ROUTES.DASHBOARD} replace />;
+    const destination = user?.role === 'MERCHANT'
+      ? APP_ROUTES.MERCHANT_POS_QR
+      : user?.role === 'ADMIN' || user?.role === 'STAFF'
+        ? APP_ROUTES.ADMIN_MERCHANT_APPLICATIONS
+        : APP_ROUTES.DASHBOARD;
+    return <Navigate to={destination} replace />;
   }
 
   return <Outlet />;

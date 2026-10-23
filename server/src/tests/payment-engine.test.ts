@@ -1,6 +1,7 @@
 import assert from 'node:assert';
 import { paymentService } from '../services/payment.service';
 import { calculateHaversineDistance, AiFraudEngine } from '../services/fraud.service';
+import { prisma } from '../utils/prisma';
 
 console.log('🧪 เริ่มการทดสอบระบบคำนวณและประมวลผล (Unit Tests: Payment & Fraud Engine)');
 
@@ -205,9 +206,10 @@ async function testAiEngine() {
 }
 
 // 9. ทดสอบอนุญาตธุรกรรมไม่เกิน 2 กม. (<= 2,000 ม.) และปฏิเสธเมื่อเกิน 2 กม. พร้อมระงับ QR ทันทีและแจ้งข้อความสุภาพ
-async function testDistanceCheckAndQrSuspension() {
+async function testDistanceCheckAndQrSuspension(merchantId: string) {
   // 9.1 ทดสอบระยะทางประมาณ 1.5 กม. (ไม่เกิน 2 กม.) ต้องอนุญาตให้ทำรายการได้
   const qrWithin2Km = await paymentService.generateDynamicQr({
+    merchantId,
     amount: 150,
     latitude: 13.7500,
     longitude: 100.5000,
@@ -226,6 +228,7 @@ async function testDistanceCheckAndQrSuspension() {
 
   // 9.2 ทดสอบระยะทางเกิน 2 กม. (เช่น ~5 กม.) ต้องระงับ QR และแจ้งเตือนอย่างสุภาพ
   const qrBeyond2Km = await paymentService.generateDynamicQr({
+    merchantId,
     amount: 150,
     latitude: 13.7500,
     longitude: 100.5000,
@@ -261,8 +264,9 @@ async function testDistanceCheckAndQrSuspension() {
 }
 
 // 10. ทดสอบอายุ QR Code 3 นาที (180,000 มิลลิวินาที) และการแจ้งเตือน "QR หมดอายุ กรุณาทำรายการใหม่"
-async function testQrExpirationIn3Minutes() {
+async function testQrExpirationIn3Minutes(merchantId: string) {
   const qr = await paymentService.generateDynamicQr({
+    merchantId,
     amount: 100,
     latitude: 13.7563,
     longitude: 100.5018,
@@ -299,11 +303,26 @@ async function testQrExpirationIn3Minutes() {
 }
 
 async function runAllTests() {
-  await testDiscountValidation();
-  await testAiEngine();
-  await testDistanceCheckAndQrSuspension();
-  await testQrExpirationIn3Minutes();
-  console.log('\n🎉 ผลการทดสอบ Unit Tests ทั้งหมด 10/10 ผ่านอย่างสมบูรณ์แบบ!');
+  const merchant = await prisma.merchants.create({
+    data: {
+      tax_id: `9${Date.now().toString().slice(-12)}`,
+      shop_name: 'ร้านค้าสำหรับทดสอบระบบ',
+      latitude: 13.75,
+      longitude: 100.5,
+      is_approved: true,
+    },
+    select: { merchant_id: true },
+  });
+  try {
+    await testDiscountValidation();
+    await testAiEngine();
+    await testDistanceCheckAndQrSuspension(merchant.merchant_id);
+    await testQrExpirationIn3Minutes(merchant.merchant_id);
+    console.log('\n🎉 ผลการทดสอบ Unit Tests ทั้งหมด 10/10 ผ่านอย่างสมบูรณ์แบบ!');
+  } finally {
+    await prisma.merchants.delete({ where: { merchant_id: merchant.merchant_id } });
+    await prisma.$disconnect();
+  }
 }
 
 runAllTests().catch((err) => {

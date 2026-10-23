@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { isAxiosError } from 'axios';
 import { LogIn, User, Store, ShieldAlert, Lock, Mail, AlertCircle, ArrowRight } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import { APP_ROUTES } from '../../constants/routes';
 import type { User as AuthUser } from '../../types';
+import { authApi } from '../../services/authApi';
 
 type LoginAudience = 'CITIZEN' | 'MERCHANT' | 'ADMIN';
 
@@ -14,7 +16,7 @@ interface LoginPageProps {
 const DEFAULT_ROUTE_BY_AUDIENCE: Record<LoginAudience, string> = {
   CITIZEN: APP_ROUTES.DASHBOARD,
   MERCHANT: APP_ROUTES.MERCHANT_POS_QR,
-  ADMIN: APP_ROUTES.ADMIN_FRAUD_ALERTS,
+  ADMIN: APP_ROUTES.ADMIN_MERCHANT_APPLICATIONS,
 };
 
 const LOGIN_COPY: Record<LoginAudience, { title: string; description: string }> = {
@@ -40,6 +42,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ audience = 'CITIZEN' }) =>
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // ดึงหน้าปลายทางที่ต้องการไปหลังล็อกอิน (ถ้ามี redirect มา)
   const from = (location.state as { from?: { pathname: string } } | null)?.from?.pathname || DEFAULT_ROUTE_BY_AUDIENCE[audience];
@@ -59,7 +62,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ audience = 'CITIZEN' }) =>
         id: '6d293778-8264-475d-a40e-448e78d7a861',
         email: 'noodle.shop@thaiplease.go.th',
         name: 'ร้านข้าวมันไก่ป้าณี (วิสาหกิจชุมชน)',
-        role: 'USER',
+        role: 'MERCHANT',
         createdAt: new Date().toISOString(),
       };
     } else {
@@ -76,14 +79,33 @@ export const LoginPage: React.FC<LoginPageProps> = ({ audience = 'CITIZEN' }) =>
     navigate(roleType === audience ? from : DEFAULT_ROUTE_BY_AUDIENCE[roleType], { replace: true });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) {
       setErrorMsg('กรุณากรอกอีเมล/เลขบัตรประชาชน และรหัสผ่าน');
       return;
     }
-    // เข้าสู่ระบบแบบจำลอง
-    handleDemoLogin(audience);
+    if (audience === 'CITIZEN') {
+      handleDemoLogin(audience);
+      return;
+    }
+
+    setErrorMsg(null);
+    setIsSubmitting(true);
+    try {
+      const response = audience === 'MERCHANT'
+        ? await authApi.loginMerchant({ email, password })
+        : await authApi.loginStaff({ email, password });
+      setAuth(response.data.user, response.data.token);
+      navigate(from, { replace: true });
+    } catch (error) {
+      const message = isAxiosError<{ message?: string }>(error)
+        ? error.response?.data?.message
+        : undefined;
+      setErrorMsg(message || 'ไม่สามารถเข้าสู่ระบบได้ กรุณาตรวจสอบข้อมูลแล้วลองอีกครั้ง');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -111,7 +133,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ audience = 'CITIZEN' }) =>
       <form onSubmit={handleSubmit} className="space-y-3.5">
         <div>
           <label className="block text-xs font-semibold text-ink mb-1">
-            อีเมล หรือ เลขบัตรประชาชน 13 หลัก
+            {audience === 'CITIZEN' ? 'อีเมล หรือ เลขบัตรประชาชน 13 หลัก' : 'อีเมล'}
           </label>
           <div className="relative">
             <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-ink-muted" />
@@ -120,7 +142,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ audience = 'CITIZEN' }) =>
               id="input-login-email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="example@thaiplease.go.th"
+              placeholder={audience === 'CITIZEN' ? 'example@thaiplease.go.th' : 'อีเมลที่ลงทะเบียน'}
               className="w-full rounded-pill border border-hairline bg-surface-soft/40 pl-10 pr-4 py-2.5 text-xs text-ink focus:bg-white focus:border-brand-blue focus:outline-none focus:ring-2 focus:ring-blue-100 transition"
             />
           </div>
@@ -149,9 +171,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({ audience = 'CITIZEN' }) =>
         <button
           type="submit"
           id="btn-login-submit"
+          disabled={isSubmitting}
           className="w-full rounded-pill bg-brand-blue py-3 text-xs sm:text-sm font-semibold text-white shadow-md shadow-blue-500/20 hover:bg-brand-blue-hover transition active:scale-98"
         >
-          เข้าสู่ระบบ
+          {isSubmitting ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบ'}
         </button>
       </form>
 
@@ -160,6 +183,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ audience = 'CITIZEN' }) =>
         <span className="block text-[11px] font-semibold text-ink-muted text-center mb-2.5">
           เข้าสู่ระบบด่วนเพื่อตรวจสอบสถานะตามบทบาท (Demo Test Accounts):
         </span>
+        <p className="mb-2 text-center text-[10px] text-amber-700">
+          บัญชี Demo ใช้ทดสอบหน้าจอเท่านั้น ไม่สามารถเรียก API ของระบบได้
+        </p>
         <div className="space-y-1.5">
           <button
             type="button"

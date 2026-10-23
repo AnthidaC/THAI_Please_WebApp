@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import { Wallet, QrCode, Store, ShieldAlert, TrendingUp, History, ScanLine } from 'lucide-react';
+import { Wallet, QrCode, Store, ShieldAlert, TrendingUp, History, ScanLine, ClipboardCheck } from 'lucide-react';
 import { APP_ROUTES } from '../../constants/routes';
 
 /**
@@ -34,6 +34,7 @@ export const NAV_BY_ROLE: Record<NavRole, NavItem[]> = {
     { to: APP_ROUTES.MERCHANT_SALES, label: 'ยอดขาย', fullLabel: 'สถิติยอดขาย', icon: TrendingUp },
   ],
   ADMIN: [
+    { to: APP_ROUTES.ADMIN_MERCHANT_APPLICATIONS, label: 'คำขอร้านค้า', fullLabel: 'ตรวจสอบคำขอร้านค้า', icon: ClipboardCheck },
     { to: APP_ROUTES.ADMIN_FRAUD_ALERTS, label: 'ตรวจทุจริต', fullLabel: 'ตรวจจับทุจริต', icon: ShieldAlert },
   ],
 };
@@ -49,7 +50,7 @@ export const ROLE_LABEL: Record<NavRole, { label: string; icon: LucideIcon }> = 
  * ปัจจุบัน User type มีแค่ 'USER' | 'ADMIN' จึงอนุมานบทบาทร้านค้า/ประชาชนจากโซนของหน้า (path)
  */
 export const resolveNavRole = (userRole: string | undefined, pathname: string): NavRole => {
-  if (userRole === 'ADMIN' || pathname.startsWith('/admin')) return 'ADMIN';
+  if (userRole === 'ADMIN' || userRole === 'STAFF' || pathname.startsWith('/admin')) return 'ADMIN';
   if (userRole === 'MERCHANT' || pathname.startsWith('/merchant')) return 'MERCHANT';
   return 'CITIZEN';
 };

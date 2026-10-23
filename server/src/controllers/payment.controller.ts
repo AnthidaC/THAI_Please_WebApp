@@ -4,14 +4,18 @@ import { sendSuccess, sendError } from '../utils/response';
 
 export const generateDynamicQr = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { amount, latitude, longitude, shopName, merchantId } = req.body;
+    const { amount } = req.body;
+    const merchantId = req.user?.userId;
+    if (!merchantId) {
+      sendError(res, 'กรุณาเข้าสู่ระบบร้านค้าที่ได้รับอนุมัติแล้ว', 401);
+      return;
+    }
 
     const qrData = await paymentService.generateDynamicQr({
       merchantId,
       amount: Number(amount),
-      latitude: Number(latitude),
-      longitude: Number(longitude),
-      shopName,
+      latitude: 0,
+      longitude: 0,
     });
 
     sendSuccess(res, qrData, 'สร้าง Dynamic QR Code รับชำระเงินสำเร็จ', 201);
@@ -45,10 +49,15 @@ export const getQrDetails = async (req: Request, res: Response): Promise<void> =
 
 export const getQrPaymentStatus = async (req: Request, res: Response): Promise<void> => {
   try {
+    const merchantId = req.user?.userId;
+    if (!merchantId) {
+      sendError(res, 'กรุณาเข้าสู่ระบบร้านค้า', 401);
+      return;
+    }
     const reference = Array.isArray(req.params.reference)
       ? req.params.reference[0]
       : req.params.reference;
-    const statusData = await paymentService.getQrPaymentStatus(reference);
+    const statusData = await paymentService.getQrPaymentStatus(reference, merchantId);
     sendSuccess(res, statusData, 'ตรวจสอบสถานะ QR Code สำเร็จ');
   } catch (error: any) {
     sendError(res, error.message || 'ไม่สามารถตรวจสอบสถานะ QR Code ได้', 400);
@@ -61,6 +70,11 @@ export const getQrPaymentStatus = async (req: Request, res: Response): Promise<v
  */
 export const streamQrPaymentStatus = async (req: Request, res: Response): Promise<void> => {
   try {
+    const merchantId = req.user?.userId;
+    if (!merchantId) {
+      sendError(res, 'กรุณาเข้าสู่ระบบร้านค้า', 401);
+      return;
+    }
     const reference = Array.isArray(req.params.reference)
       ? req.params.reference[0]
       : req.params.reference;
@@ -76,7 +90,7 @@ export const streamQrPaymentStatus = async (req: Request, res: Response): Promis
     res.write('retry: 3000\n\n');
 
     // ส่งสถานะปัจจุบันเริ่มต้นทันที
-    const currentStatus = await paymentService.getQrPaymentStatus(reference);
+    const currentStatus = await paymentService.getQrPaymentStatus(reference, merchantId);
     res.write(`data: ${JSON.stringify(currentStatus)}\n\n`);
 
     // หากชำระเงินเรียบร้อยแล้ว ให้ปิดการเชื่อมต่อ

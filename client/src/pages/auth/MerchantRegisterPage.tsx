@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { isAxiosError } from 'axios';
 import { ArrowLeft, CheckCircle2, FileText, MapPin, Store, Upload, UserRound } from 'lucide-react';
 import { APP_ROUTES } from '../../constants/routes';
+import { submitMerchantApplication } from '../../services/merchantApplicationApi';
 
 type BusinessType = 'INDIVIDUAL' | 'JURISTIC';
 type DocumentKey = 'storePhoto' | 'bankProof' | 'businessRegistration' | 'companyCertificate' | 'authorization';
@@ -12,14 +14,19 @@ const ACCEPTED_FILE_TYPES = ['image/jpeg', 'image/png', 'application/pdf'];
 export const MerchantRegisterPage: React.FC = () => {
   const [businessType, setBusinessType] = useState<BusinessType>('INDIVIDUAL');
   const [businessName, setBusinessName] = useState('');
+  const [taxId, setTaxId] = useState('');
   const [contactName, setContactName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [address, setAddress] = useState('');
+  const [latitude, setLatitude] = useState('');
+  const [longitude, setLongitude] = useState('');
   const [documents, setDocuments] = useState<Partial<Record<DocumentKey, File>>>({});
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [applicationId, setApplicationId] = useState<string | null>(null);
 
   const selectDocument = (key: DocumentKey, file?: File) => {
     setErrorMessage(null);
@@ -52,19 +59,50 @@ export const MerchantRegisterPage: React.FC = () => {
     setDocuments((current) => ({ ...current, [key]: file }));
   };
 
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const missingCommonDocuments = !documents.storePhoto || !documents.bankProof;
     const missingCompanyCertificate = businessType === 'JURISTIC' && !documents.companyCertificate;
 
-    if (missingCommonDocuments || missingCompanyCertificate) {
-      setErrorMessage('กรุณาแนบรูปหน้าร้านและหลักฐานบัญชีธนาคาร' +
-        (missingCompanyCertificate ? ' รวมถึงหนังสือรับรองนิติบุคคล' : ''));
+    if (missingCommonDocuments || missingCompanyCertificate || !taxId.match(/^\d{13}$/)) {
+      setErrorMessage(!taxId.match(/^\d{13}$/)
+        ? 'กรุณากรอกเลขประจำตัวผู้เสียภาษี 13 หลัก'
+        : 'กรุณาแนบรูปหน้าร้านและหลักฐานบัญชีธนาคาร' +
+          (missingCompanyCertificate ? ' รวมถึงหนังสือรับรองนิติบุคคล' : ''));
       return;
     }
 
     setErrorMessage(null);
-    setIsSubmitted(true);
+    setIsSubmitting(true);
+    const formData = new FormData();
+    formData.append('businessType', businessType);
+    formData.append('taxId', taxId);
+    formData.append('businessName', businessName);
+    formData.append('contactName', contactName);
+    formData.append('email', email);
+    formData.append('phone', phone);
+    formData.append('password', password);
+    formData.append('address', address);
+    formData.append('latitude', latitude);
+    formData.append('longitude', longitude);
+    Object.entries(documents).forEach(([key, file]) => {
+      if (file) formData.append(key, file);
+    });
+
+    try {
+      const result = await submitMerchantApplication(formData);
+      setApplicationId(result.applicationId);
+      setPassword('');
+      setDocuments({});
+      setIsSubmitted(true);
+    } catch (error) {
+      const message = isAxiosError<{ message?: string }>(error)
+        ? error.response?.data?.message
+        : undefined;
+      setErrorMessage(message || 'ส่งคำขอไม่สำเร็จ กรุณาลองอีกครั้ง');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const mapsSearchUrl = address.trim()
@@ -97,10 +135,11 @@ export const MerchantRegisterPage: React.FC = () => {
     return (
       <div className="space-y-4 text-center font-sans">
         <CheckCircle2 className="mx-auto h-12 w-12 text-status-success" />
-        <h2 className="text-xl font-bold text-ink">ตรวจสอบแบบฟอร์มทดลองเรียบร้อย</h2>
+        <h2 className="text-xl font-bold text-ink">ส่งคำขอสมัครร้านค้าเรียบร้อย</h2>
+        {applicationId && <p className="text-xs text-ink-muted">เลขที่คำขอ: {applicationId}</p>}
         <p className="text-sm leading-relaxed text-ink-muted">
-          นี่เป็นเพียงหน้าทดลอง ข้อมูลและไฟล์ยังไม่ได้ส่งหรือจัดเก็บไว้ที่ระบบ
-          เมื่อเชื่อมต่อระบบจริง คำขอจะต้องผ่านการตรวจสอบก่อนเปิดใช้งานร้านค้า
+          คำขออยู่ระหว่างตรวจสอบ เจ้าหน้าที่จะตรวจข้อมูลและเอกสารก่อนอนุมัติ
+          คุณจะเข้าสู่ Merchant Web App ได้เมื่อได้รับอนุมัติแล้ว
         </p>
         <Link to={APP_ROUTES.MERCHANT_LOGIN} className="inline-flex items-center gap-2 text-sm font-semibold text-brand-blue hover:underline">
           <ArrowLeft className="h-4 w-4" />
@@ -121,8 +160,8 @@ export const MerchantRegisterPage: React.FC = () => {
       </div>
 
       <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-relaxed text-amber-900">
-        แบบฟอร์มนี้เป็นต้นแบบเพื่อทดสอบหน้าจอเท่านั้น ไฟล์จะไม่ถูกอัปโหลดหรือบันทึก
-        เอกสารที่ต้องใช้จริงและระยะเวลาการเก็บรักษาต้องกำหนดโดยผู้ดูแลระบบก่อนเปิดใช้งาน
+        ระบบอยู่ในสภาพแวดล้อม staging เอกสารที่แนบจะถูกส่งไปยัง private storage เพื่อทดสอบ
+        โปรดอย่าแนบเอกสารจริงหรือข้อมูลบัญชีจริงจนกว่าจะยืนยันนโยบายและเปิดระบบ production
       </div>
 
       {errorMessage && (
@@ -153,6 +192,12 @@ export const MerchantRegisterPage: React.FC = () => {
           </div>
 
           <div>
+            <label htmlFor="merchant-tax-id" className="mb-1 block text-xs font-semibold text-ink">เลขประจำตัวผู้เสียภาษี 13 หลัก</label>
+            <input id="merchant-tax-id" inputMode="numeric" pattern="[0-9]{13}" maxLength={13} required value={taxId} onChange={(event) => setTaxId(event.target.value.replace(/\D/g, '').slice(0, 13))} className="w-full rounded-xl border border-hairline bg-white px-3 py-2.5 text-xs focus:border-brand-blue focus:outline-none focus:ring-2 focus:ring-blue-100" />
+            <p className="mt-1 text-[11px] text-ink-muted">ใช้ตรวจสอบกิจการและป้องกันการสมัครซ้ำ</p>
+          </div>
+
+          <div>
             <label htmlFor="merchant-contact-name" className="mb-1 flex items-center gap-1 text-xs font-semibold text-ink">
               <UserRound className="h-3.5 w-3.5" /> ชื่อผู้ติดต่อ
             </label>
@@ -172,8 +217,8 @@ export const MerchantRegisterPage: React.FC = () => {
 
           <div>
             <label htmlFor="merchant-password" className="mb-1 block text-xs font-semibold text-ink">ตั้งรหัสผ่าน</label>
-            <input id="merchant-password" type="password" autoComplete="new-password" minLength={8} required value={password} onChange={(event) => setPassword(event.target.value)} className="w-full rounded-xl border border-hairline bg-white px-3 py-2.5 text-xs focus:border-brand-blue focus:outline-none focus:ring-2 focus:ring-blue-100" />
-            <p className="mt-1 text-[11px] text-ink-muted">อย่างน้อย 8 ตัวอักษร (ต้นแบบนี้ยังไม่ส่งรหัสผ่านไปบันทึก)</p>
+            <input id="merchant-password" type="password" autoComplete="new-password" minLength={12} required value={password} onChange={(event) => setPassword(event.target.value)} className="w-full rounded-xl border border-hairline bg-white px-3 py-2.5 text-xs focus:border-brand-blue focus:outline-none focus:ring-2 focus:ring-blue-100" />
+            <p className="mt-1 text-[11px] text-ink-muted">อย่างน้อย 12 ตัวอักษร บันทึกเป็นรหัสผ่านแบบเข้ารหัส</p>
           </div>
         </section>
 
@@ -198,6 +243,17 @@ export const MerchantRegisterPage: React.FC = () => {
                 ตรวจสอบตำแหน่งบน Google Maps
               </a>
             )}
+            <p className="mt-2 text-[11px] text-ink-muted">ระบุพิกัดจาก Google Maps (คลิกขวาที่ตำแหน่งร้านเพื่อคัดลอกพิกัด)</p>
+            <div className="mt-2 grid grid-cols-2 gap-3">
+              <div>
+                <label htmlFor="merchant-latitude" className="mb-1 block text-xs font-semibold text-ink">Latitude</label>
+                <input id="merchant-latitude" type="number" step="any" min="-90" max="90" required value={latitude} onChange={(event) => setLatitude(event.target.value)} className="w-full rounded-xl border border-hairline bg-white px-3 py-2.5 text-xs focus:border-brand-blue focus:outline-none focus:ring-2 focus:ring-blue-100" />
+              </div>
+              <div>
+                <label htmlFor="merchant-longitude" className="mb-1 block text-xs font-semibold text-ink">Longitude</label>
+                <input id="merchant-longitude" type="number" step="any" min="-180" max="180" required value={longitude} onChange={(event) => setLongitude(event.target.value)} className="w-full rounded-xl border border-hairline bg-white px-3 py-2.5 text-xs focus:border-brand-blue focus:outline-none focus:ring-2 focus:ring-blue-100" />
+              </div>
+            </div>
           </div>
         </section>
 
@@ -220,8 +276,8 @@ export const MerchantRegisterPage: React.FC = () => {
             )}
         </section>
 
-        <button type="submit" className="w-full rounded-pill bg-brand-blue py-3 text-sm font-semibold text-white shadow-md transition hover:bg-brand-blue-hover">
-          ส่งคำขอสมัครร้านค้า (ทดลอง)
+        <button type="submit" disabled={isSubmitting} className="w-full rounded-pill bg-brand-blue py-3 text-sm font-semibold text-white shadow-md transition hover:bg-brand-blue-hover disabled:opacity-60">
+          {isSubmitting ? 'กำลังส่งข้อมูลและเอกสาร...' : 'ส่งคำขอสมัครร้านค้า'}
         </button>
       </form>
 

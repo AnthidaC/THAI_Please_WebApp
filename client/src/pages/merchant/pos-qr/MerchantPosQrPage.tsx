@@ -163,7 +163,7 @@ export const MerchantPosQrPage: React.FC = () => {
   const timerSeconds = secondsRemaining % 60;
   const formattedTimer = `${String(timerMinutes).padStart(2, '0')}:${String(timerSeconds).padStart(2, '0')}`;
 
-  // ตรวจสอบสถานะการจ่ายเงินของ QR Code แบบ Real-time ทันทีผ่าน Server-Sent Events (SSE) พร้อม Polling Fallback
+  // Poll สถานะ QR พร้อมใช้ Bearer token เพื่อจำกัดข้อมูลลูกค้าให้เฉพาะร้านค้าที่เป็นเจ้าของ QR
   useEffect(() => {
     if (!qrResult || paidInfo || isExpired) return;
 
@@ -183,36 +183,7 @@ export const MerchantPosQrPage: React.FC = () => {
       }
     };
 
-    // 1. เชื่อมต่อ Server-Sent Events (SSE) เพื่อรับแจ้งเตือนแบบ Real-Time ทันที (0 ms Latency)
-    let eventSource: EventSource | null = null;
-    try {
-      const sseUrl = `/api/payment/qr/${encodeURIComponent(qrResult.qrReference)}/stream`;
-      eventSource = new EventSource(sseUrl);
-
-      eventSource.onmessage = (event) => {
-        try {
-          const res = JSON.parse(event.data);
-          if (res.status === 'USED' && res.paidTransaction) {
-            handleSuccessfulPayment(res.paidTransaction);
-            eventSource?.close();
-          } else if (res.status === 'EXPIRED') {
-            setSecondsRemaining(0);
-            eventSource?.close();
-          }
-        } catch {
-          // ignore parsing error
-        }
-      };
-
-      eventSource.onerror = () => {
-        // หาก SSE ตัดการเชื่อมต่อ ให้ปิดและปล่อยให้ Polling สำรองทำงานต่อ
-        eventSource?.close();
-      };
-    } catch {
-      // SSE not supported or blocked
-    }
-
-    // 2. สำรองด้วย Polling เผื่อเครือข่ายไม่อนุญาต SSE (ความถี่ต่ำทุก 3 วินาทีเพื่อประหยัดทรัพยากร)
+    // ตรวจสอบทันที แล้ว polling ทุก 3 วินาทีโดยใช้ API client ที่แนบ Bearer token
     const checkPaymentStatusFallback = async () => {
       try {
         const res = await getQrPaymentStatus(qrResult.qrReference);
@@ -220,21 +191,19 @@ export const MerchantPosQrPage: React.FC = () => {
 
         if (res.status === 'USED' && res.paidTransaction) {
           handleSuccessfulPayment(res.paidTransaction);
-          eventSource?.close();
         } else if (res.status === 'EXPIRED') {
           setSecondsRemaining(0);
-          eventSource?.close();
         }
       } catch {
         // ignore network error
       }
     };
 
+    void checkPaymentStatusFallback();
     const pollInterval = setInterval(checkPaymentStatusFallback, 3000);
 
     return () => {
       active = false;
-      if (eventSource) eventSource.close();
       clearInterval(pollInterval);
     };
   }, [qrResult, paidInfo, isExpired, soundEnabled, queryClient]);

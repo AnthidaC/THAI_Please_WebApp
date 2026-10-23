@@ -19,7 +19,11 @@ export const getBuyerHistory = async (req: Request, res: Response): Promise<void
 
 export const getMerchantHistory = async (req: Request, res: Response): Promise<void> => {
   try {
-    const merchantId = req.query.merchantId as string | undefined;
+    const merchantId = req.user?.userId;
+    if (!merchantId) {
+      sendError(res, 'กรุณาเข้าสู่ระบบร้านค้า', 401);
+      return;
+    }
     const history = await transactionService.getMerchantHistory(merchantId);
     sendSuccess(res, history, 'ดึงสรุปยอดขายและสถิติร้านค้าสำเร็จ');
   } catch (error: any) {

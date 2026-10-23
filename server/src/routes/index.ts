@@ -4,6 +4,8 @@ import walletRoutes from './wallet.routes';
 import paymentRoutes from './payment.routes';
 import transactionRoutes from './transaction.routes';
 import fraudRoutes from './fraud.routes';
+import merchantApplicationRoutes from './merchant-application.routes';
+import staffRoutes from './staff.routes';
 
 const router = Router();
 
@@ -18,5 +20,7 @@ router.use('/wallet', walletRoutes);
 router.use('/payment', paymentRoutes);
 router.use('/transactions', transactionRoutes);
 router.use('/fraud', fraudRoutes);
+router.use('/merchant', merchantApplicationRoutes);
+router.use('/staff', staffRoutes);
 
 export default router;

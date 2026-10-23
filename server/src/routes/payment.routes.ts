@@ -7,7 +7,7 @@ import {
   checkoutCopay,
   validateDiscount,
 } from '../controllers/payment.controller';
-import { authenticate } from '../middlewares/auth.middleware';
+import { authenticate, requireApprovedMerchant } from '../middlewares/auth.middleware';
 import { validate } from '../middlewares/validate.middleware';
 import {
   generateQrSchema,
@@ -18,13 +18,13 @@ import {
 const router = Router();
 
 // POST /api/payment/qr/generate
-router.post('/qr/generate', validate(generateQrSchema), generateDynamicQr);
+router.post('/qr/generate', authenticate, requireApprovedMerchant, validate(generateQrSchema), generateDynamicQr);
 
 // GET /api/payment/qr/:reference/stream (Server-Sent Events: แจ้งเตือน POS ร้านค้าแบบ Real-Time ทันที 0 ms)
-router.get('/qr/:reference/stream', streamQrPaymentStatus);
+router.get('/qr/:reference/stream', authenticate, requireApprovedMerchant, streamQrPaymentStatus);
 
 // GET /api/payment/qr/:reference/status (สำหรับร้านค้าตรวจสอบสถานะการชำระเงินแบบ Real-time Polling Fallback)
-router.get('/qr/:reference/status', getQrPaymentStatus);
+router.get('/qr/:reference/status', authenticate, requireApprovedMerchant, getQrPaymentStatus);
 
 // GET /api/payment/qr/:reference
 router.get('/qr/:reference', getQrDetails);

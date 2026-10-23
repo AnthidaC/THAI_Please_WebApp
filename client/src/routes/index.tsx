@@ -21,6 +21,7 @@ import { CitizenTransactionsPage } from '../pages/citizen/transactions/CitizenTr
 import { MerchantPosQrPage } from '../pages/merchant/pos-qr/MerchantPosQrPage';
 import { MerchantSalesHistoryPage } from '../pages/merchant/sales/MerchantSalesHistoryPage';
 import { AdminFraudAlertsPage } from '../pages/admin/fraud-alerts/AdminFraudAlertsPage';
+import { AdminMerchantApplicationsPage } from '../pages/admin/merchant-applications/AdminMerchantApplicationsPage';
 
 export const router = createBrowserRouter([
   // Main Application Routes
@@ -52,21 +53,35 @@ export const router = createBrowserRouter([
 
       // Merchant Flow (Dev 2)
       {
-        path: APP_ROUTES.MERCHANT_POS_QR,
-        element: <MerchantPosQrPage />,
-      },
-      {
-        path: APP_ROUTES.MERCHANT_SALES,
-        element: <MerchantSalesHistoryPage />,
+        element: <ProtectedRoute allowedRoles={['MERCHANT']} loginPath={APP_ROUTES.MERCHANT_LOGIN} />,
+        children: [
+          {
+            path: APP_ROUTES.MERCHANT_POS_QR,
+            element: <MerchantPosQrPage />,
+          },
+          {
+            path: APP_ROUTES.MERCHANT_SALES,
+            element: <MerchantSalesHistoryPage />,
+          },
+        ],
       },
 
-      // Admin Flow (Dev 2)
+      // Staff-only administration and fraud operations.
       {
-        path: APP_ROUTES.ADMIN_FRAUD_ALERTS,
-        element: <AdminFraudAlertsPage />,
+        element: <ProtectedRoute allowedRoles={['ADMIN', 'STAFF']} loginPath={APP_ROUTES.STAFF_LOGIN} />,
+        children: [
+          {
+            path: APP_ROUTES.ADMIN_FRAUD_ALERTS,
+            element: <AdminFraudAlertsPage />,
+          },
+          {
+            path: APP_ROUTES.ADMIN_MERCHANT_APPLICATIONS,
+            element: <AdminMerchantApplicationsPage />,
+          },
+        ],
       },
 
-      // Protected Routes (Required Authentication)
+      // General authenticated routes.
       {
         element: <ProtectedRoute />,
         children: [
