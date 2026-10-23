@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import { Wallet, QrCode, Store, ShieldAlert, TrendingUp, History, ScanLine, ClipboardCheck, MapPin, UserRound } from 'lucide-react';
+import { Wallet, QrCode, Store, ShieldAlert, TrendingUp, History, ScanLine, ClipboardCheck, MapPin, UserRound, Activity } from 'lucide-react';
 import { APP_ROUTES } from '../../constants/routes';
 
 /**
@@ -38,6 +38,7 @@ export const NAV_BY_ROLE: Record<NavRole, NavItem[]> = {
     { to: APP_ROUTES.ADMIN_MERCHANT_APPLICATIONS, label: 'คำขอร้านค้า', fullLabel: 'ตรวจสอบคำขอร้านค้า', icon: ClipboardCheck },
     { to: APP_ROUTES.ADMIN_MERCHANTS, label: 'จัดการร้านค้า', fullLabel: 'จัดการข้อมูลร้านค้า', icon: Store },
     { to: APP_ROUTES.ADMIN_MERCHANT_LOCATION_REQUESTS, label: 'อนุมัติพิกัด', fullLabel: 'คำขอเปลี่ยนพิกัด', icon: MapPin },
+    { to: APP_ROUTES.ADMIN_SOCIAL_IMPACT, label: 'ผลกระทบ', fullLabel: 'ผลกระทบทางสังคม', icon: Activity },
     { to: APP_ROUTES.ADMIN_FRAUD_ALERTS, label: 'ตรวจทุจริต', fullLabel: 'ตรวจจับทุจริต', icon: ShieldAlert },
   ],
 };

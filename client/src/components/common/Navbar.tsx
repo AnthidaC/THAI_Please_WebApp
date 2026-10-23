@@ -12,7 +12,9 @@ export const Navbar: React.FC = () => {
 
   // เมนูแยกตามบทบาท (ประชาชน / ร้านค้า / ผู้ดูแลระบบ) — ไม่รวมเมนูหลายบทบาทไว้ด้วยกัน
   const role = resolveNavRole(user?.role, location.pathname);
-  const navItems = NAV_BY_ROLE[role];
+  const navItems = NAV_BY_ROLE[role].filter(
+    ({ to }) => user?.role !== 'STAFF' || to !== APP_ROUTES.ADMIN_SOCIAL_IMPACT
+  );
   const RoleIcon = ROLE_LABEL[role].icon;
   const isAdmin = role === 'ADMIN';
 

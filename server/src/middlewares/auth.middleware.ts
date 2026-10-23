@@ -53,6 +53,31 @@ export const requireStaff = async (
   }
 };
 
+export const requireAdmin = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  const staffId = req.user?.userId;
+  if (!staffId || req.user?.role.toUpperCase() !== 'ADMIN') {
+    res.status(403).json({ status: 'error', message: 'ต้องใช้สิทธิ์ผู้ดูแลระบบ' });
+    return;
+  }
+  try {
+    const staff = await prisma.staff_accounts.findUnique({
+      where: { staff_id: staffId },
+      select: { role: true, is_active: true },
+    });
+    if (!staff || !staff.is_active || staff.role !== 'ADMIN') {
+      res.status(403).json({ status: 'error', message: 'บัญชีผู้ดูแลระบบถูกระงับหรือไม่มีสิทธิ์' });
+      return;
+    }
+    next();
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const requireApprovedMerchant = async (
   req: Request,
   res: Response,

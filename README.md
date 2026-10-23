@@ -166,6 +166,15 @@ reviewed separately at `/admin/merchant-location-requests`.
 
 Deploy the `20261024010000_merchant_profile_editing` Prisma migration before using these pages.
 
+### Admin social impact dashboard
+
+The admin-only dashboard at `/admin/social-impact` refreshes aggregate totals and location bins
+every 15 seconds. It reports SUCCESS and FLAGGED transactions with a positive total amount,
+including flagged payments awaiting fraud review because the customer payment has already been
+charged. The heatmap uses the merchant-side location recorded at payment time (falling back to the
+merchant's current location) and groups coordinates to approximately 1 km; it never plots
+citizen location data. Deploy the `20261024020000_social_impact_dashboard` migration before use.
+
 ---
 
 ### 3. Frontend Setup (`/client`)

@@ -370,6 +370,8 @@ model transactions {
   @@index([merchant_id, created_at], map: "idx_transactions_merchant_created_at")
   @@index([qr_reference], map: "idx_transactions_qr_reference")
   @@index([status], map: "idx_transactions_status")
+  @@index([status, completed_at], map: "idx_transactions_status_completed_at")
+  @@index([status, created_at], map: "idx_transactions_status_created_at")
   @@index([user_id, created_at], map: "idx_transactions_user_created_at")
 }
 

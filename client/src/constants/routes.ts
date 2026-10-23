@@ -24,6 +24,7 @@ export const APP_ROUTES = {
   ADMIN_MERCHANT_APPLICATIONS: '/admin/merchant-applications',
   ADMIN_MERCHANTS: '/admin/merchants',
   ADMIN_MERCHANT_LOCATION_REQUESTS: '/admin/merchant-location-requests',
+  ADMIN_SOCIAL_IMPACT: '/admin/social-impact',
 } as const;
 
 export type AppRoute = typeof APP_ROUTES[keyof typeof APP_ROUTES];

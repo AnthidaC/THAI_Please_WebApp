@@ -6,6 +6,7 @@ import transactionRoutes from './transaction.routes';
 import fraudRoutes from './fraud.routes';
 import merchantApplicationRoutes from './merchant-application.routes';
 import staffRoutes from './staff.routes';
+import socialImpactRoutes from './social-impact.routes';
 
 const router = Router();
 
@@ -22,5 +23,6 @@ router.use('/transactions', transactionRoutes);
 router.use('/fraud', fraudRoutes);
 router.use('/merchant', merchantApplicationRoutes);
 router.use('/staff', staffRoutes);
+router.use('/admin/social-impact', socialImpactRoutes);
 
 export default router;

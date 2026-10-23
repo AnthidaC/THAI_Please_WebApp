@@ -25,6 +25,7 @@ import { AdminMerchantApplicationsPage } from '../pages/admin/merchant-applicati
 import { AdminMerchantsPage } from '../pages/admin/merchants/AdminMerchantsPage';
 import { AdminMerchantLocationRequestsPage } from '../pages/admin/merchant-location-requests/AdminMerchantLocationRequestsPage';
 import { MerchantProfilePage } from '../pages/merchant/profile/MerchantProfilePage';
+import { AdminSocialImpactPage } from '../pages/admin/social-impact/AdminSocialImpactPage';
 
 export const router = createBrowserRouter([
   // Main Application Routes
@@ -96,6 +97,15 @@ export const router = createBrowserRouter([
           {
             path: APP_ROUTES.ADMIN_MERCHANT_LOCATION_REQUESTS,
             element: <AdminMerchantLocationRequestsPage />,
+          },
+          {
+            element: <ProtectedRoute allowedRoles={['ADMIN']} loginPath={APP_ROUTES.STAFF_LOGIN} />,
+            children: [
+              {
+                path: APP_ROUTES.ADMIN_SOCIAL_IMPACT,
+                element: <AdminSocialImpactPage />,
+              },
+            ],
           },
         ],
       },
