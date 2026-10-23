@@ -17,10 +17,13 @@ export const APP_ROUTES = {
   // เส้นทางร้านค้า (Merchant Flow - Dev 2)
   MERCHANT_POS_QR: '/merchant/pos-qr',
   MERCHANT_SALES: '/merchant/sales',
+  MERCHANT_PROFILE: '/merchant/profile',
 
   // เส้นทางผู้ดูแลระบบ (Admin Flow - Dev 2)
   ADMIN_FRAUD_ALERTS: '/admin/fraud-alerts',
   ADMIN_MERCHANT_APPLICATIONS: '/admin/merchant-applications',
+  ADMIN_MERCHANTS: '/admin/merchants',
+  ADMIN_MERCHANT_LOCATION_REQUESTS: '/admin/merchant-location-requests',
 } as const;
 
 export type AppRoute = typeof APP_ROUTES[keyof typeof APP_ROUTES];

@@ -22,6 +22,9 @@ import { MerchantPosQrPage } from '../pages/merchant/pos-qr/MerchantPosQrPage';
 import { MerchantSalesHistoryPage } from '../pages/merchant/sales/MerchantSalesHistoryPage';
 import { AdminFraudAlertsPage } from '../pages/admin/fraud-alerts/AdminFraudAlertsPage';
 import { AdminMerchantApplicationsPage } from '../pages/admin/merchant-applications/AdminMerchantApplicationsPage';
+import { AdminMerchantsPage } from '../pages/admin/merchants/AdminMerchantsPage';
+import { AdminMerchantLocationRequestsPage } from '../pages/admin/merchant-location-requests/AdminMerchantLocationRequestsPage';
+import { MerchantProfilePage } from '../pages/merchant/profile/MerchantProfilePage';
 
 export const router = createBrowserRouter([
   // Main Application Routes
@@ -63,6 +66,10 @@ export const router = createBrowserRouter([
             path: APP_ROUTES.MERCHANT_SALES,
             element: <MerchantSalesHistoryPage />,
           },
+          {
+            path: APP_ROUTES.MERCHANT_PROFILE,
+            element: <MerchantProfilePage />,
+          },
         ],
       },
 
@@ -77,6 +84,18 @@ export const router = createBrowserRouter([
           {
             path: APP_ROUTES.ADMIN_MERCHANT_APPLICATIONS,
             element: <AdminMerchantApplicationsPage />,
+          },
+          {
+            path: APP_ROUTES.ADMIN_MERCHANTS,
+            element: <AdminMerchantsPage />,
+          },
+          {
+            path: `${APP_ROUTES.ADMIN_MERCHANTS}/:merchantId/edit`,
+            element: <MerchantProfilePage />,
+          },
+          {
+            path: APP_ROUTES.ADMIN_MERCHANT_LOCATION_REQUESTS,
+            element: <AdminMerchantLocationRequestsPage />,
           },
         ],
       },

@@ -14,6 +14,7 @@ export interface MerchantApplicationDocument {
 
 export interface MerchantApplication {
   id: string;
+  merchantId: string | null;
   businessType: 'INDIVIDUAL' | 'JURISTIC';
   taxId: string;
   businessName: string;

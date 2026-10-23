@@ -61,6 +61,7 @@ const getRequiredFiles = (
 
 const mapApplication = (application: {
   application_id: string;
+  merchant_id: string | null;
   business_type: string;
   tax_id: string;
   shop_name: string;
@@ -79,6 +80,7 @@ const mapApplication = (application: {
   audit_logs?: Array<{ action: string; note: string | null; created_at: Date; staff: { full_name: string; email: string } }>;
 }) => ({
   id: application.application_id,
+  merchantId: application.merchant_id,
   businessType: application.business_type,
   taxId: application.tax_id,
   businessName: application.shop_name,
@@ -226,6 +228,7 @@ export const merchantApplicationService = {
       orderBy: { created_at: 'asc' },
       select: {
         application_id: true,
+        merchant_id: true,
         business_type: true,
         tax_id: true,
         shop_name: true,
@@ -260,6 +263,7 @@ export const merchantApplicationService = {
       where: { application_id: applicationId },
       select: {
         application_id: true,
+        merchant_id: true,
         business_type: true,
         tax_id: true,
         shop_name: true,

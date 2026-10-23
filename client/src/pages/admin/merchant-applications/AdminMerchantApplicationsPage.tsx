@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { isAxiosError } from 'axios';
+import { Link } from 'react-router-dom';
 import {
   CheckCircle2,
   Clock3,
@@ -18,6 +19,7 @@ import {
   getMerchantApplications,
   MerchantApplicationStatus,
 } from '../../../services/merchantApplicationApi';
+import { APP_ROUTES } from '../../../constants/routes';
 
 const STATUS_TABS: Array<{ value: MerchantApplicationStatus; label: string }> = [
   { value: 'PENDING', label: 'รอตรวจสอบ' },
@@ -195,6 +197,14 @@ export const AdminMerchantApplicationsPage: React.FC = () => {
                   {STATUS_TABS.find((tab) => tab.value === selected.status)?.label}
                 </span>
               </div>
+              {selected.status === 'APPROVED' && selected.merchantId && (
+                <Link
+                  to={`${APP_ROUTES.ADMIN_MERCHANTS}/${selected.merchantId}/edit`}
+                  className="inline-flex items-center gap-2 rounded-pill border border-blue-200 bg-blue-50 px-4 py-2 text-xs font-semibold text-brand-blue hover:bg-blue-100"
+                >
+                  <Store className="h-4 w-4" /> แก้ไขข้อมูลร้านค้าที่อนุมัติแล้ว
+                </Link>
+              )}
 
               <dl className="grid gap-3 rounded-xl bg-surface-soft p-4 text-xs sm:grid-cols-2">
                 <div><dt className="text-ink-muted">ผู้ติดต่อ</dt><dd className="mt-1 font-semibold">{selected.contactName}</dd></div>

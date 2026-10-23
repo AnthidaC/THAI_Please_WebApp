@@ -154,6 +154,18 @@ staging, and do not enable production collection until access, retention/deletio
 and incident-response policies have been approved. Demo fast-login buttons are UI-only and cannot
 authenticate API requests.
 
+### Merchant profile and location changes
+
+Approved merchants can edit their store name, contact details, login email, phone number, and
+address from the Merchant Web App. Their tax ID is read-only. Basic profile changes take effect
+immediately. A merchant-submitted location change remains pending and the currently approved
+coordinates continue to be used for QR payments and fraud checks until authorized staff approves it.
+Staff can also edit an approved merchant's profile and coordinates directly; those changes take
+effect immediately and are written to the merchant profile audit log. Pending location changes are
+reviewed separately at `/admin/merchant-location-requests`.
+
+Deploy the `20261024010000_merchant_profile_editing` Prisma migration before using these pages.
+
 ---
 
 ### 3. Frontend Setup (`/client`)

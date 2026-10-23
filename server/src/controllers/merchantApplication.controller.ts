@@ -5,6 +5,7 @@ import { comparePassword } from '../utils/bcrypt';
 import { signToken } from '../utils/jwt';
 import { prisma } from '../utils/prisma';
 import { HttpError } from '../utils/http-error';
+import { merchantProfileService } from '../services/merchantProfile.service';
 
 export const submitMerchantApplication = async (
   req: Request,
@@ -116,6 +117,127 @@ export const loginStaff = async (
         token: signToken({ userId: staff.staff_id, role: staff.role }),
       },
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const parseUuid = (value: string): string => {
+  const parsed = z.string().uuid().safeParse(value);
+  if (!parsed.success) throw new HttpError(400, 'รหัสร้านค้าหรือคำขอไม่ถูกต้อง');
+  return parsed.data;
+};
+
+export const getOwnMerchantProfile = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const merchantId = req.user?.userId;
+    if (!merchantId) throw new HttpError(401, 'กรุณาเข้าสู่ระบบใหม่');
+    res.json({ status: 'success', data: await merchantProfileService.getProfile(merchantId) });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const updateOwnMerchantProfile = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const merchantId = req.user?.userId;
+    if (!merchantId) throw new HttpError(401, 'กรุณาเข้าสู่ระบบใหม่');
+    const profile = await merchantProfileService.updateOwnProfile(merchantId, req.body);
+    res.json({ status: 'success', data: profile });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const listApprovedMerchants = async (
+  _req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    res.json({ status: 'success', data: await merchantProfileService.listApproved() });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getMerchantProfileByStaff = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    res.json({ status: 'success', data: await merchantProfileService.getProfile(parseUuid(id)) });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const updateMerchantProfileByStaff = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const staffId = req.user?.userId;
+    const role = req.user?.role.toUpperCase();
+    if (!staffId || (role !== 'ADMIN' && role !== 'STAFF')) {
+      throw new HttpError(403, 'คุณไม่มีสิทธิ์ดำเนินการนี้');
+    }
+    const profile = await merchantProfileService.updateByStaff(
+      parseUuid(id),
+      staffId,
+      role,
+      req.body
+    );
+    res.json({ status: 'success', data: profile });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const listPendingMerchantLocationChanges = async (
+  _req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    res.json({ status: 'success', data: await merchantProfileService.listPendingLocationChanges() });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const decideMerchantLocationChange = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const staffId = req.user?.userId;
+    const role = req.user?.role.toUpperCase();
+    if (!staffId || (role !== 'ADMIN' && role !== 'STAFF')) {
+      throw new HttpError(403, 'คุณไม่มีสิทธิ์ดำเนินการนี้');
+    }
+    const result = await merchantProfileService.decideLocationChange(
+      parseUuid(id),
+      staffId,
+      req.body.action,
+      req.body.note,
+      role
+    );
+    res.json({ status: 'success', data: result });
   } catch (error) {
     next(error);
   }

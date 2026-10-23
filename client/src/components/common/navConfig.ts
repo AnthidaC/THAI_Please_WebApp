@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import { Wallet, QrCode, Store, ShieldAlert, TrendingUp, History, ScanLine, ClipboardCheck } from 'lucide-react';
+import { Wallet, QrCode, Store, ShieldAlert, TrendingUp, History, ScanLine, ClipboardCheck, MapPin, UserRound } from 'lucide-react';
 import { APP_ROUTES } from '../../constants/routes';
 
 /**
@@ -32,9 +32,12 @@ export const NAV_BY_ROLE: Record<NavRole, NavItem[]> = {
   MERCHANT: [
     { to: APP_ROUTES.MERCHANT_POS_QR, label: 'สร้าง QR', fullLabel: 'สร้าง QR รับเงิน', icon: QrCode, primary: true },
     { to: APP_ROUTES.MERCHANT_SALES, label: 'ยอดขาย', fullLabel: 'สถิติยอดขาย', icon: TrendingUp },
+    { to: APP_ROUTES.MERCHANT_PROFILE, label: 'ข้อมูลร้าน', fullLabel: 'แก้ไขข้อมูลร้านค้า', icon: UserRound },
   ],
   ADMIN: [
     { to: APP_ROUTES.ADMIN_MERCHANT_APPLICATIONS, label: 'คำขอร้านค้า', fullLabel: 'ตรวจสอบคำขอร้านค้า', icon: ClipboardCheck },
+    { to: APP_ROUTES.ADMIN_MERCHANTS, label: 'จัดการร้านค้า', fullLabel: 'จัดการข้อมูลร้านค้า', icon: Store },
+    { to: APP_ROUTES.ADMIN_MERCHANT_LOCATION_REQUESTS, label: 'อนุมัติพิกัด', fullLabel: 'คำขอเปลี่ยนพิกัด', icon: MapPin },
     { to: APP_ROUTES.ADMIN_FRAUD_ALERTS, label: 'ตรวจทุจริต', fullLabel: 'ตรวจจับทุจริต', icon: ShieldAlert },
   ],
 };
