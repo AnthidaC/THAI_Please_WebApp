@@ -12,6 +12,15 @@ import { RegisterPage } from '../pages/auth/RegisterPage';
 import { DashboardPage } from '../pages/dashboard/DashboardPage';
 import { NotFoundPage } from '../pages/notFound/NotFoundPage';
 
+// Developer 2: Payment & Fraud Engine Pages
+import { CitizenWalletPage } from '../pages/citizen/wallet/CitizenWalletPage';
+import { CitizenScanCopayPage } from '../pages/citizen/scan-copay/CitizenScanCopayPage';
+import { CitizenPaymentSlipPage } from '../pages/citizen/scan-copay/CitizenPaymentSlipPage';
+import { CitizenTransactionsPage } from '../pages/citizen/transactions/CitizenTransactionsPage';
+import { MerchantPosQrPage } from '../pages/merchant/pos-qr/MerchantPosQrPage';
+import { MerchantSalesHistoryPage } from '../pages/merchant/sales/MerchantSalesHistoryPage';
+import { AdminFraudAlertsPage } from '../pages/admin/fraud-alerts/AdminFraudAlertsPage';
+
 export const router = createBrowserRouter([
   // Main Application Routes
   {
@@ -22,6 +31,40 @@ export const router = createBrowserRouter([
         index: true,
         element: <HomePage />,
       },
+      // Citizen Flow (Dev 2)
+      {
+        path: APP_ROUTES.CITIZEN_WALLET,
+        element: <CitizenWalletPage />,
+      },
+      {
+        path: APP_ROUTES.CITIZEN_SCAN_COPAY,
+        element: <CitizenScanCopayPage />,
+      },
+      {
+        path: APP_ROUTES.CITIZEN_SLIP,
+        element: <CitizenPaymentSlipPage />,
+      },
+      {
+        path: APP_ROUTES.CITIZEN_TRANSACTIONS,
+        element: <CitizenTransactionsPage />,
+      },
+
+      // Merchant Flow (Dev 2)
+      {
+        path: APP_ROUTES.MERCHANT_POS_QR,
+        element: <MerchantPosQrPage />,
+      },
+      {
+        path: APP_ROUTES.MERCHANT_SALES,
+        element: <MerchantSalesHistoryPage />,
+      },
+
+      // Admin Flow (Dev 2)
+      {
+        path: APP_ROUTES.ADMIN_FRAUD_ALERTS,
+        element: <AdminFraudAlertsPage />,
+      },
+
       // Protected Routes (Required Authentication)
       {
         element: <ProtectedRoute />,

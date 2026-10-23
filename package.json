@@ -9,5 +9,8 @@
     "build:client": "npm --prefix client run build",
     "db:migrate": "npm --prefix server run db:migrate",
     "db:studio": "npm --prefix server run db:studio"
+  },
+  "dependencies": {
+    "puppeteer-core": "^25.14.0"
   }
 }

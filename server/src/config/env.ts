@@ -14,6 +14,10 @@ const envSchema = z.object({
   UPSTASH_REDIS_REST_TOKEN: z.string().optional(),
   JWT_SECRET: z.string().min(8, 'JWT_SECRET must be at least 8 characters'),
   JWT_EXPIRES_IN: z.string().default('1d'),
+  AI_PROVIDER: z.enum(['gemini', 'openai', 'custom']).default('gemini'),
+  AI_FRAUD_API_KEY: z.string().optional(),
+  AI_FRAUD_MODEL: z.string().default('gemini-1.5-flash'),
+  AI_FRAUD_ENDPOINT: z.string().optional(),
 });
 
 const parsedEnv = envSchema.safeParse(process.env);
