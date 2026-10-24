@@ -47,6 +47,33 @@ export const LoginPage: React.FC<LoginPageProps> = ({ audience = 'CITIZEN' }) =>
   // ดึงหน้าปลายทางที่ต้องการไปหลังล็อกอิน (ถ้ามี redirect มา)
   const from = (location.state as { from?: { pathname: string } } | null)?.from?.pathname || DEFAULT_ROUTE_BY_AUDIENCE[audience];
 
+  const handleRealDemoLogin = async (roleType: LoginAudience) => {
+    setErrorMsg(null);
+    setIsSubmitting(true);
+    try {
+      const response = roleType === 'CITIZEN'
+        ? await authApi.login({ citizenId: '1101700203456' })
+        : roleType === 'MERCHANT'
+          ? await authApi.loginMerchant({ email: 'noodle.shop@thaiplease.go.th', password: 'DemoMerchant123!' })
+          : await authApi.loginStaff({ email: 'admin.super@thaiplease.go.th', password: 'DemoAdmin123!' });
+      const apiUser = response.data.user as AuthUser & { user_id?: string; full_name?: string };
+      const user: AuthUser = {
+        id: apiUser.id || apiUser.user_id || '',
+        email: apiUser.email || (roleType === 'CITIZEN' ? 'somchai.citizen@thaiplease.go.th' : ''),
+        name: apiUser.name || apiUser.full_name,
+        role: roleType === 'CITIZEN' ? 'USER' : apiUser.role,
+        createdAt: apiUser.createdAt || new Date().toISOString(),
+      };
+      setAuth(user, response.data.token);
+      navigate(roleType === audience ? from : DEFAULT_ROUTE_BY_AUDIENCE[roleType], { replace: true });
+    } catch (error) {
+      const message = isAxiosError<{ message?: string }>(error) ? error.response?.data?.message : undefined;
+      setErrorMsg(message || 'ไม่สามารถเข้าสู่ระบบ Demo ได้ กรุณาตรวจสอบข้อมูล seed และ server');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleDemoLogin = (roleType: LoginAudience) => {
     let mockUser: AuthUser;
     if (roleType === 'CITIZEN') {
@@ -79,6 +106,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ audience = 'CITIZEN' }) =>
     navigate(roleType === audience ? from : DEFAULT_ROUTE_BY_AUDIENCE[roleType], { replace: true });
   };
 
+  // Kept only for backwards compatibility with the old demo helper; all UI demo buttons use the real API flow above.
+  void handleDemoLogin;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) {
@@ -86,7 +116,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ audience = 'CITIZEN' }) =>
       return;
     }
     if (audience === 'CITIZEN') {
-      handleDemoLogin(audience);
+      void handleRealDemoLogin(audience);
       return;
     }
 
@@ -190,7 +220,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ audience = 'CITIZEN' }) =>
           <button
             type="button"
             id="btn-demo-citizen"
-            onClick={() => handleDemoLogin('CITIZEN')}
+            onClick={() => void handleRealDemoLogin('CITIZEN')}
             className="w-full flex items-center justify-between rounded-xl border border-hairline bg-surface-soft/60 hover:bg-blue-50 hover:border-blue-200 p-2.5 text-xs font-medium text-ink transition group"
           >
             <div className="flex items-center space-x-2">
@@ -208,7 +238,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ audience = 'CITIZEN' }) =>
           <button
             type="button"
             id="btn-demo-merchant"
-            onClick={() => handleDemoLogin('MERCHANT')}
+            onClick={() => void handleRealDemoLogin('MERCHANT')}
             className="w-full flex items-center justify-between rounded-xl border border-hairline bg-surface-soft/60 hover:bg-emerald-50 hover:border-emerald-200 p-2.5 text-xs font-medium text-ink transition group"
           >
             <div className="flex items-center space-x-2">
@@ -226,7 +256,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ audience = 'CITIZEN' }) =>
           <button
             type="button"
             id="btn-demo-admin"
-            onClick={() => handleDemoLogin('ADMIN')}
+            onClick={() => void handleRealDemoLogin('ADMIN')}
             className="w-full flex items-center justify-between rounded-xl border border-hairline bg-surface-soft/60 hover:bg-red-50 hover:border-red-200 p-2.5 text-xs font-medium text-ink transition group"
           >
             <div className="flex items-center space-x-2">
