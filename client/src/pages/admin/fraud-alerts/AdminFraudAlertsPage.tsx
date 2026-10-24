@@ -227,7 +227,7 @@ export const AdminFraudAlertsPage: React.FC = () => {
               {isDossiersLoading ? '...' : (summary?.suppressedNoiseCount ?? 0)} รายการ
             </div>
             <span className="text-[10px] sm:text-[11px] text-emerald-700 block mt-1">
-              ตัดบิลย่อยครั้งเดียว ไม่ให้ Admin ล้า
+              กรองรายการปกติและบิลเดี่ยวอัตโนมัติ
             </span>
           </div>
 
