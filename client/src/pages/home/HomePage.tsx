@@ -4,18 +4,15 @@ import {
   Wallet,
   QrCode,
   Store,
-  LayoutDashboard,
+  ShieldAlert,
   ArrowRight,
   Sparkles,
   ShieldCheck,
 } from 'lucide-react';
 import { APP_ROUTES } from '../../constants/routes';
-import { useAuthStore } from '../../stores/authStore';
 
 export const HomePage: React.FC = () => {
   const navigate = useNavigate();
-  const { isAuthenticated, user } = useAuthStore();
-  const isAdmin = user?.role === 'ADMIN';
 
   return (
     <div className="min-h-[85vh] bg-surface-soft py-6 md:py-8 px-4 pb-24 md:pb-12 font-sans text-ink">
@@ -56,7 +53,7 @@ export const HomePage: React.FC = () => {
 
         {/* เมนูทางลัดตามบทบาท 3 กลุ่ม (Citizen, Merchant, Admin) */}
         <div>
-          <h2 className="text-base font-bold text-ink mb-4">โมดูลของโครงการ</h2>
+          <h2 className="text-base font-bold text-ink mb-4">โมดูลงาน Developer 2: Payment & Fraud Engine</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Card 1: ฝั่งประชาชน */}
             <div
@@ -105,29 +102,26 @@ export const HomePage: React.FC = () => {
             </div>
 
             {/* Card 3: ฝั่งผู้ดูแลระบบ */}
-            <div className="rounded-card border border-blue-100 bg-white p-6 shadow-sm transition flex flex-col justify-between">
+            <div
+              onClick={() => navigate(APP_ROUTES.ADMIN_FRAUD_ALERTS)}
+              className="rounded-card border border-red-100 bg-white p-6 shadow-sm hover:shadow-md transition cursor-pointer group flex flex-col justify-between"
+            >
               <div>
-                <div className="h-12 w-12 rounded-2xl bg-brand-blue-light text-brand-blue flex items-center justify-center mb-4">
-                  <LayoutDashboard className="h-6 w-6" />
+                <div className="h-12 w-12 rounded-2xl bg-red-50 text-status-error flex items-center justify-center mb-4 group-hover:scale-105 transition">
+                  <ShieldAlert className="h-6 w-6" />
                 </div>
-                <h3 className="text-base font-bold text-ink">แดชบอร์ดผู้ดูแลระบบ (Admin)</h3>
+                <h3 className="text-base font-bold text-ink">ฝั่งผู้ดูแลระบบ (Admin)</h3>
                 <p className="text-xs text-ink-muted mt-2 leading-relaxed">
-                  ตรวจสอบธุรกรรมที่น่าสงสัย และจัดการแคมเปญ ภารกิจ รางวัล และแบดจ์
-                  <br />
-                  {isAdmin
-                    ? 'เปิดแดชบอร์ดเพื่อเลือกโมดูลที่ต้องการจัดการ'
-                    : 'ต้องเข้าสู่ระบบด้วยบัญชี Admin เพื่อใช้งาน'}
+                  • 4.2 ระบบตรวจจับทุจริตพิกัด GPS Geofence<br />
+                  • Semi-AI Anomaly Scoring แบบหลายมิติ<br />
+                  • รายการธุรกรรมต้องสงสัย (Flagged Queue)<br />
+                  • ปุ่มตรวจสอบและอนุมัติ/ระงับรายการ
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => navigate(APP_ROUTES.ADMIN_DASHBOARD)}
-                disabled={isAuthenticated && !isAdmin}
-                className="mt-5 w-full border-t border-hairline pt-3 flex items-center justify-between text-left text-xs font-semibold text-brand-blue transition hover:text-brand-blue-hover disabled:cursor-not-allowed disabled:text-ink-muted"
-              >
-                <span>{isAdmin ? 'เปิดแดชบอร์ดผู้ดูแลระบบ' : 'เข้าสู่ระบบด้วยบัญชี Admin'}</span>
-                <ArrowRight className="h-4 w-4" />
-              </button>
+              <div className="mt-5 pt-3 border-t border-hairline flex items-center justify-between text-xs font-semibold text-status-error">
+                <span>เปิดแดชบอร์ดตรวจทุจริต</span>
+                <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition" />
+              </div>
             </div>
           </div>
         </div>
@@ -144,7 +138,7 @@ export const HomePage: React.FC = () => {
             </div>
           </div>
           <span className="text-xs font-mono font-semibold text-brand-blue bg-brand-blue-light px-3 py-1 rounded-pill">
-            แดชบอร์ดผู้ดูแลระบบ
+            branch: developer-2-payment-fraud-engine
           </span>
         </div>
       </div>
