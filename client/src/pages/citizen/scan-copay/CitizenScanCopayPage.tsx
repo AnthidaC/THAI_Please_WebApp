@@ -198,40 +198,40 @@ export const CitizenScanCopayPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-surface-soft pb-24 md:pb-12 font-sans text-ink">
-      {/* Page Title & Action Bar (กระชับบนมือถือ เพื่อให้กล้องและปุ่มหลักอยู่ใน 1 จอ) */}
-      <div className="bg-white border-b border-hairline px-3.5 sm:px-6 lg:px-8 py-2.5 sm:py-3.5 mb-3 sm:mb-4 shadow-2xs">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 sm:gap-3">
-          <div className="flex items-center space-x-2 sm:space-x-2.5 min-w-0">
+    <div className="min-h-[calc(100dvh-64px)] flex flex-col bg-surface-soft pb-24 md:pb-12 font-sans text-ink">
+      {/* Page Title & Action Bar (ขนาดชัดเจน อ่านง่ายบนหน้าจอมือถือและคอม) */}
+      <div className="bg-white border-b border-hairline px-4 sm:px-6 lg:px-8 py-3 sm:py-3.5 mb-3 sm:mb-4 shadow-2xs">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-2.5 sm:gap-3">
+          <div className="flex items-center space-x-2.5 sm:space-x-3 min-w-0">
             <button
               onClick={() => navigate(APP_ROUTES.CITIZEN_WALLET)}
-              className="flex items-center space-x-1.5 rounded-pill px-2.5 py-1.5 text-xs font-medium text-ink-muted bg-surface-soft hover:bg-gray-200 hover:text-ink transition border border-hairline shrink-0"
+              className="flex items-center space-x-1.5 rounded-pill px-3 py-2 text-xs sm:text-sm font-medium text-ink-muted bg-surface-soft hover:bg-gray-200 hover:text-ink transition border border-hairline shrink-0"
               title="กลับกระเป๋าเงิน"
             >
               <ArrowLeft className="h-4 w-4" />
               <span className="hidden sm:inline">กลับกระเป๋าเงิน</span>
             </button>
             <div className="border-l border-hairline pl-2.5 sm:pl-3 min-w-0">
-              <h1 className="text-sm sm:text-base md:text-lg font-bold text-ink truncate">สแกนชำระเงินร่วม</h1>
-              <p className="hidden sm:block text-xs text-brand-blue font-medium truncate">
+              <h1 className="text-base sm:text-lg font-bold text-ink truncate leading-normal">สแกนชำระเงินร่วม</h1>
+              <p className="hidden sm:block text-xs text-brand-blue font-medium truncate leading-normal">
                 สแกน QR ร้านค้าเพื่อรับสิทธิร่วมจ่าย
               </p>
             </div>
           </div>
-          <div className="flex items-center space-x-1.5 rounded-pill bg-surface-soft border border-hairline px-2.5 sm:px-3 py-1 text-xs font-mono shrink-0">
-            <span className="text-ink-muted hidden sm:inline">กระเป๋าส่วนตัว:</span>
+          <div className="flex items-center space-x-1.5 rounded-pill bg-surface-soft border border-hairline px-3 sm:px-3.5 py-1.5 text-xs sm:text-sm font-mono shrink-0">
+            <span className="text-ink-muted hidden xs:inline">กระเป๋าส่วนตัว:</span>
             <span className="font-bold text-ink">฿{(wallet?.balance ?? 0).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</span>
           </div>
         </div>
       </div>
 
-      <main className="mx-auto w-full max-w-6xl px-3.5 sm:px-6 lg:px-8 space-y-3 sm:space-y-4">
+      <main className="flex-1 flex flex-col mx-auto w-full max-w-6xl px-3.5 sm:px-6 lg:px-8 space-y-3.5 sm:space-y-4">
         {/* กล่องแจ้งเตือนข้อผิดพลาด (ถ้ามี) - แสดงด้านบนสุด เด่นชัดทั้งบนมือถือและคอม */}
         {checkoutError && (
-          <div className="rounded-2xl border border-red-200 bg-red-50 p-3.5 sm:p-4 text-xs text-status-error flex items-start space-x-2.5 shadow-xs animate-in fade-in max-w-lg mx-auto lg:max-w-none">
+          <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-xs sm:text-sm text-status-error flex items-start space-x-2.5 shadow-xs animate-in fade-in max-w-lg mx-auto w-full lg:max-w-none">
             <AlertTriangle className="h-5 w-5 flex-shrink-0 mt-0.5 text-red-600" />
             <div className="flex-1 min-w-0">
-              <p className="font-bold text-xs sm:text-sm text-red-700">แจ้งเตือนระบบ</p>
+              <p className="font-bold text-sm text-red-700">แจ้งเตือนระบบ</p>
               <p className="mt-0.5 text-red-800 font-medium break-words">{checkoutError}</p>
             </div>
             <button
@@ -244,19 +244,19 @@ export const CitizenScanCopayPage: React.FC = () => {
           </div>
         )}
 
-        {/* ส่วนกล้องสแกน QR สด (จัดกึ่งกลางอย่างสมดุล รองรับทุกขนาดหน้าจอ) */}
+        {/* ส่วนกล้องสแกน QR สด (ขยายเต็มสัดส่วนหน้าจอมือถือ ไม่เหลือพื้นที่ว่างโล่งด้านล่าง) */}
         {!scannedData ? (
-          <div className="max-w-lg mx-auto space-y-3.5 animate-in fade-in duration-200">
-            <section className="rounded-card border border-hairline bg-white p-3.5 sm:p-5 shadow-sm">
-              <div className="relative">
+          <div className="flex-1 flex flex-col justify-between max-w-lg w-full mx-auto space-y-3.5 animate-in fade-in duration-200">
+            <section className="flex-1 flex flex-col rounded-card border border-hairline bg-white p-3.5 sm:p-5 shadow-sm">
+              <div className="relative flex-1 flex flex-col min-h-[370px] xs:min-h-[420px] sm:min-h-[450px]">
                 <QrCameraScanner
                   active={!scannedData && !previewMutation.isPending}
                   onDetected={handleDetected}
-                  className="w-full aspect-square max-h-[55vh] sm:max-h-[60vh] mx-auto"
+                  className="w-full flex-1 min-h-[370px] xs:min-h-[420px] sm:min-h-[450px] mx-auto"
                 />
                 {previewMutation.isPending && (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center rounded-2xl sm:rounded-3xl bg-black/60 text-white text-xs sm:text-sm font-medium">
-                    <RefreshCw className="h-6 w-6 animate-spin mb-2" />
+                  <div className="absolute inset-0 flex flex-col items-center justify-center rounded-2xl sm:rounded-3xl bg-black/60 text-white text-sm sm:text-base font-medium">
+                    <RefreshCw className="h-7 w-7 animate-spin mb-2.5" />
                     กำลังตรวจสอบรายการ...
                   </div>
                 )}
@@ -266,26 +266,26 @@ export const CitizenScanCopayPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setShowManualInput((v) => !v)}
-                className="mt-3 w-full flex items-center justify-center gap-1 py-1 text-xs font-medium text-ink-muted hover:text-ink transition"
+                className="mt-3.5 w-full flex items-center justify-center gap-1.5 py-2.5 px-4 rounded-xl bg-surface-soft hover:bg-gray-200/70 border border-hairline text-xs sm:text-sm font-semibold text-ink transition"
               >
                 <span>กรอกรหัส QR ด้วยตนเอง</span>
-                <ChevronDown className={`h-3.5 w-3.5 transition ${showManualInput ? 'rotate-180' : ''}`} />
+                <ChevronDown className={`h-4 w-4 transition ${showManualInput ? 'rotate-180' : ''}`} />
               </button>
               {showManualInput && (
-                <div className="mt-2 flex flex-col xs:flex-row gap-2">
+                <div className="mt-2.5 flex flex-col xs:flex-row gap-2">
                   <input
                     id="input-qr-ref"
                     type="text"
                     placeholder="กรอกหรือวางรหัส QR Reference"
                     value={qrReference}
                     onChange={(e) => setQrReference(e.target.value)}
-                    className="w-full rounded-pill border border-hairline px-4 py-2.5 text-xs text-ink focus:border-brand-blue focus:outline-none"
+                    className="w-full rounded-pill border border-hairline px-4 py-3 text-sm text-ink focus:border-brand-blue focus:outline-none"
                   />
                   <button
                     id="btn-inspect-qr"
                     disabled={!qrReference || previewMutation.isPending}
                     onClick={() => previewMutation.mutate({ ref: qrReference })}
-                    className="rounded-pill bg-brand-blue px-5 py-2.5 text-xs font-semibold text-white transition hover:bg-brand-blue-hover disabled:opacity-40 shrink-0"
+                    className="rounded-pill bg-brand-blue px-6 py-3 text-sm font-semibold text-white transition hover:bg-brand-blue-hover disabled:opacity-40 shrink-0"
                   >
                     {previewMutation.isPending ? 'ตรวจ...' : 'ตรวจสอบ'}
                   </button>
@@ -294,12 +294,12 @@ export const CitizenScanCopayPage: React.FC = () => {
             </section>
 
             {/* โควตาสิทธิรัฐช่วยจ่ายคงเหลือวันนี้ */}
-            <div className="rounded-2xl border border-blue-100 bg-blue-50/50 px-4 py-2.5 flex items-center justify-between text-xs text-brand-blue">
-              <span className="flex items-center gap-1.5 font-medium">
-                <Sparkles className="h-3.5 w-3.5 shrink-0" />
+            <div className="rounded-2xl border border-blue-200 bg-blue-50/75 px-4 sm:px-5 py-3.5 flex items-center justify-between text-sm sm:text-base text-brand-blue shadow-2xs">
+              <span className="flex items-center gap-2 font-semibold">
+                <Sparkles className="h-4 w-4 shrink-0" />
                 <span>โควตารัฐช่วยจ่ายคงเหลือวันนี้</span>
               </span>
-              <span className="font-mono font-bold">
+              <span className="font-mono text-base sm:text-lg font-bold">
                 {wallet?.eligibilityStatus === 'ELIGIBLE'
                   ? `฿${(wallet.dailyQuotaRemaining ?? 200).toFixed(2)}`
                   : 'ไม่มีสิทธิรับ'}
@@ -651,8 +651,8 @@ export const CitizenScanCopayPage: React.FC = () => {
         )}
 
         {/* แถบแจ้งความปลอดภัย */}
-        <div className="pt-1 text-center text-[11px] text-ink-muted flex items-center justify-center space-x-1.5 pb-4">
-          <ShieldCheck className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+        <div className="pt-1 text-center text-xs sm:text-sm text-ink-muted flex items-center justify-center space-x-1.5 pb-4">
+          <ShieldCheck className="h-4 w-4 text-emerald-600 shrink-0" />
           <span>ทำรายการอย่างปลอดภัยตามมาตรฐานโครงการ</span>
         </div>
       </main>

@@ -163,14 +163,14 @@ export const QrCameraScanner: React.FC<QrCameraScannerProps> = ({ onDetected, ac
       />
 
       {/* ปุ่มควบคุมมุมบน (สลับกล้อง & เลือกรูป QR จากเครื่อง) */}
-      <div className="absolute top-2.5 inset-x-2.5 z-10 flex items-center justify-between gap-2 pointer-events-auto">
+      <div className="absolute top-3.5 inset-x-3.5 z-10 flex items-center justify-between gap-2 pointer-events-auto">
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
-          className="inline-flex items-center space-x-1.5 rounded-pill bg-black/60 hover:bg-black/80 backdrop-blur-md px-3 py-1.5 text-[11px] font-medium text-white border border-white/15 transition active:scale-95"
+          className="inline-flex items-center gap-2 rounded-pill bg-black/65 hover:bg-black/85 backdrop-blur-md px-4 py-2 text-xs sm:text-sm font-semibold text-white border border-white/20 transition leading-normal"
           title="เลือกรูป QR Code จากอุปกรณ์"
         >
-          <ImageUp className="h-3.5 w-3.5 text-blue-300 shrink-0" />
+          <ImageUp className="h-4 w-4 text-blue-300 shrink-0" />
           <span>อัปโหลดรูป QR</span>
         </button>
 
@@ -178,63 +178,65 @@ export const QrCameraScanner: React.FC<QrCameraScannerProps> = ({ onDetected, ac
           <button
             type="button"
             onClick={() => setFacingMode((m) => (m === 'environment' ? 'user' : 'environment'))}
-            className="inline-flex items-center space-x-1 rounded-pill bg-black/60 hover:bg-black/80 backdrop-blur-md px-2.5 py-1.5 text-[11px] font-medium text-white border border-white/15 transition active:scale-95"
+            className="inline-flex items-center gap-1.5 rounded-pill bg-black/65 hover:bg-black/85 backdrop-blur-md px-3.5 py-2 text-xs sm:text-sm font-semibold text-white border border-white/20 transition leading-normal"
             title="สลับกล้องหน้า/หลัง"
           >
-            <SwitchCamera className="h-3.5 w-3.5 text-white shrink-0" />
-            <span className="hidden xs:inline">สลับกล้อง</span>
+            <SwitchCamera className="h-4 w-4 text-white shrink-0" />
+            <span>สลับกล้อง</span>
           </button>
         )}
       </div>
 
-      {/* กรอบเล็งสแกน (ปรับขนาดตามสัดส่วนหน้าจออัตโนมัติ) */}
+      {/* กรอบเล็งสแกน (ปรับขนาดตามสัดส่วนหน้าจอมือถือและคอม) */}
       {state === 'running' && (
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center p-6">
-          <div className="relative w-[60%] max-w-[220px] aspect-square">
-            <span className="absolute left-0 top-0 h-6 w-6 sm:h-7 sm:w-7 border-l-4 border-t-4 border-white rounded-tl-xl" />
-            <span className="absolute right-0 top-0 h-6 w-6 sm:h-7 sm:w-7 border-r-4 border-t-4 border-white rounded-tr-xl" />
-            <span className="absolute left-0 bottom-0 h-6 w-6 sm:h-7 sm:w-7 border-l-4 border-b-4 border-white rounded-bl-xl" />
-            <span className="absolute right-0 bottom-0 h-6 w-6 sm:h-7 sm:w-7 border-r-4 border-b-4 border-white rounded-br-xl" />
+          <div className="relative w-[68%] max-w-[250px] aspect-square">
+            <span className="absolute left-0 top-0 h-7 w-7 sm:h-8 sm:w-8 border-l-4 border-t-4 border-white rounded-tl-xl" />
+            <span className="absolute right-0 top-0 h-7 w-7 sm:h-8 sm:w-8 border-r-4 border-t-4 border-white rounded-tr-xl" />
+            <span className="absolute left-0 bottom-0 h-7 w-7 sm:h-8 sm:w-8 border-l-4 border-b-4 border-white rounded-bl-xl" />
+            <span className="absolute right-0 bottom-0 h-7 w-7 sm:h-8 sm:w-8 border-r-4 border-b-4 border-white rounded-br-xl" />
             <span className="absolute inset-x-3 top-1/2 h-0.5 bg-red-500 shadow-[0_0_8px_red] animate-pulse" />
           </div>
-          <span className="mt-3 rounded-pill bg-black/60 backdrop-blur-xs px-3 py-1 text-[11px] text-white text-center">
+          <span className="mt-4 rounded-pill bg-black/65 backdrop-blur-xs px-4 py-1.5 text-xs sm:text-sm font-medium text-white text-center leading-normal">
             เล็ง QR ร้านค้าให้อยู่ในกรอบ หรือกดอัปโหลดรูป
           </span>
         </div>
       )}
 
       {state === 'starting' && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center text-white/80 text-xs p-4 text-center">
-          <RefreshCw className="h-6 w-6 animate-spin mb-2" />
-          <span>กำลังเปิดกล้องสแกน QR...</span>
+        <div className="absolute inset-0 flex flex-col items-center justify-center text-white/90 text-sm sm:text-base p-6 text-center">
+          <RefreshCw className="h-8 w-8 animate-spin mb-3 text-blue-400" />
+          <span className="font-medium leading-normal">กำลังเปิดกล้องสแกน QR...</span>
         </div>
       )}
 
       {(state === 'denied' || state === 'unavailable') && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center p-4 sm:p-6 text-center text-white">
-          <CameraOff className="h-7 w-7 sm:h-8 sm:w-8 mb-2 text-white/80" />
-          <p className="text-xs sm:text-sm font-semibold">
+        <div className="absolute inset-0 flex flex-col items-center justify-center p-6 sm:p-8 text-center text-white">
+          <div className="h-16 w-16 sm:h-20 sm:w-20 rounded-full bg-white/10 border border-white/15 flex items-center justify-center mb-4">
+            <CameraOff className="h-8 w-8 sm:h-10 sm:w-10 text-white/90" />
+          </div>
+          <p className="text-base sm:text-lg font-bold leading-normal">
             {state === 'denied' ? 'ไม่ได้รับอนุญาตให้ใช้กล้อง' : 'ไม่สามารถเปิดกล้องสดได้'}
           </p>
-          <p className="text-[11px] text-white/70 mt-1 max-w-xs">
+          <p className="text-sm text-white/75 mt-1.5 max-w-xs sm:max-w-sm leading-relaxed">
             {state === 'denied'
               ? 'กรุณาอนุญาตการเข้าถึงกล้อง หรือเลือกอัปโหลดรูปภาพ QR จากเครื่องแทน'
               : 'อุปกรณ์ไม่มีกล้อง หรือสามารถเลือกอัปโหลดรูปภาพ QR จากเครื่องได้ทันที'}
           </p>
-          <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+          <div className="mt-5 flex flex-wrap items-center justify-center gap-3 w-full">
             <button
               type="button"
               onClick={() => setRetryKey((k) => k + 1)}
-              className="rounded-pill bg-white/15 hover:bg-white/25 border border-white/30 px-3.5 py-1.5 text-xs font-semibold text-white active:scale-95 transition"
+              className="rounded-pill bg-white/15 hover:bg-white/25 border border-white/30 px-5 py-2.5 text-sm font-semibold text-white transition leading-normal"
             >
               ลองเปิดกล้องใหม่
             </button>
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="inline-flex items-center space-x-1.5 rounded-pill bg-brand-blue hover:bg-brand-blue-hover px-3.5 py-1.5 text-xs font-semibold text-white active:scale-95 transition shadow-sm"
+              className="inline-flex items-center gap-2 rounded-pill bg-brand-blue hover:bg-brand-blue-hover px-5 py-2.5 text-sm font-bold text-white transition shadow-md shadow-blue-500/30 leading-normal"
             >
-              <ImageUp className="h-3.5 w-3.5" />
+              <ImageUp className="h-4 w-4 shrink-0" />
               <span>เลือกรูป QR ในเครื่อง</span>
             </button>
           </div>
@@ -243,7 +245,7 @@ export const QrCameraScanner: React.FC<QrCameraScannerProps> = ({ onDetected, ac
 
       {/* ข้อความแจ้งเตือนกรณีอัปโหลดรูปแล้วไม่พบ QR */}
       {imageScanError && (
-        <div className="absolute bottom-2.5 inset-x-3 z-10 rounded-xl bg-red-600/90 backdrop-blur-xs px-3 py-1.5 text-center text-[11px] font-medium text-white shadow-md">
+        <div className="absolute bottom-3.5 inset-x-3.5 z-10 rounded-xl bg-red-600/95 backdrop-blur-xs px-4 py-2 text-center text-xs sm:text-sm font-semibold text-white shadow-md leading-normal">
           {imageScanError}
         </div>
       )}

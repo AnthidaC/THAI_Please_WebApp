@@ -275,7 +275,7 @@ export const AdminCampaignsPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-[calc(100vh-65px)] bg-surface-soft pb-10">
+    <div className="min-h-[calc(100vh-65px)] bg-surface-soft pb-24 md:pb-12">
       <div className="mx-auto max-w-7xl px-4 pb-12 pt-7 sm:px-6 sm:pt-9 lg:px-8">
         <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
           <div>

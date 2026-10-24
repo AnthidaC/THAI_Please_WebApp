@@ -14,7 +14,6 @@ import {
   Calendar,
   CheckCircle2,
   Award,
-  Clock,
   UserCheck,
   Info,
 } from 'lucide-react';
@@ -232,49 +231,44 @@ export const CitizenWalletPage: React.FC = () => {
 
             {/* กรณีที่ 1: ผู้ใช้มีสิทธิ์รับเงินสมทบ (ELIGIBLE) */}
             {isEligible && (
-              <section className="rounded-card border border-blue-100 bg-gradient-to-br from-blue-50/80 to-white p-4 sm:p-5 md:p-6 shadow-sm">
+              <section className="rounded-card border border-blue-100 bg-gradient-to-br from-blue-50/80 to-white p-3.5 sm:p-4 shadow-sm">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center space-x-1.5 min-w-0">
                     <Sparkles className="h-4 w-4 text-brand-blue shrink-0" />
-                    <h2 className="text-sm sm:text-base font-semibold text-ink">
+                    <h2 className="text-xs sm:text-sm font-semibold text-ink truncate">
                       {wallet.campaignInfo?.campaignName || 'สิทธิรัฐช่วยจ่าย 60% (Co-pay)'}
                     </h2>
                   </div>
-                  <span className="inline-flex items-center rounded-pill bg-blue-100/70 px-2.5 py-0.5 text-[11px] sm:text-xs font-semibold text-brand-blue border border-blue-200">
-                    <Calendar className="mr-1 h-3 w-3 shrink-0" />
-                    <span>งวดปัจจุบัน: {currentCycleName}</span>
+                  <span className="inline-flex items-center rounded-pill bg-blue-100/70 px-2 py-0.5 text-[10px] sm:text-[11px] font-semibold text-brand-blue border border-blue-200 shrink-0">
+                    <Calendar className="mr-1 h-2.5 w-2.5 shrink-0" />
+                    <span>{currentCycleName}</span>
                   </span>
                 </div>
 
-                <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* แถบโควตา 2 คอลัมน์ติดกัน (แม้บนหน้าจอมือถือ เพื่อประหยัดพื้นที่แนวตั้ง) */}
+                <div className="mt-2.5 grid grid-cols-2 gap-2.5">
                   {/* การ์ดโควตารายวัน */}
-                  <div className="rounded-2xl border border-hairline/60 bg-white p-3.5 sm:p-4 shadow-2xs flex flex-col justify-between">
+                  <div className="rounded-xl border border-hairline/60 bg-white p-2.5 sm:p-3 shadow-2xs flex flex-col justify-between">
                     <div>
-                      <span className="text-xs font-medium text-ink-muted block">โควตาวันนี้คงเหลือ</span>
-                      <div className="mt-1 font-mono text-xl sm:text-2xl font-bold text-brand-blue">
-                        ฿ {isWalletLoading ? '---' : wallet.dailyQuotaRemaining.toFixed(2)}
+                      <span className="text-[11px] font-medium text-ink-muted block truncate">โควตาวันนี้คงเหลือ</span>
+                      <div className="mt-0.5 font-mono text-base sm:text-xl font-bold text-brand-blue">
+                        ฿{isWalletLoading ? '---' : wallet.dailyQuotaRemaining.toFixed(2)}
                       </div>
                     </div>
-                    <div className="mt-2 pt-2 border-t border-hairline/60 flex items-center justify-between text-[11px] text-ink-muted">
-                      <span>เพดานรายวัน (จาก DB)</span>
+                    <div className="mt-1.5 pt-1.5 border-t border-hairline/50 flex items-center justify-between gap-1 text-[10px] text-ink-muted">
+                      <span>เพดาน</span>
                       <span className="font-mono font-semibold text-ink">
-                        ฿{wallet.dailyQuotaLimit.toFixed(2)} / วัน
+                        ฿{wallet.dailyQuotaLimit.toFixed(0)}/วัน
                       </span>
                     </div>
                   </div>
 
                   {/* การ์ดโควตารอบย่อยปัจจุบัน */}
-                  <div className="rounded-2xl border border-hairline/60 bg-white p-3.5 sm:p-4 shadow-2xs flex flex-col justify-between">
+                  <div className="rounded-xl border border-hairline/60 bg-white p-2.5 sm:p-3 shadow-2xs flex flex-col justify-between">
                     <div>
-                      <div className="flex flex-wrap items-center justify-between gap-1">
-                        <span className="text-xs font-medium text-ink-muted">โควตารอบปัจจุบันคงเหลือ</span>
-                        <span className={`rounded-pill px-2 py-0.5 text-[10px] font-bold border ${isOutsidePeriod ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'}`}>
-                          {isOutsidePeriod ? 'อยู่นอกรอบโครงการ' : (currentPeriod ? currentPeriod.periodName : `งวดนี้ (฿1,000)`)}
-                        </span>
-                      </div>
-                      <div className={`mt-1 font-mono text-xl sm:text-2xl font-bold ${isOutsidePeriod ? 'text-ink-muted' : 'text-emerald-600'}`}>
-                        ฿{' '}
-                        {isWalletLoading
+                      <span className="text-[11px] font-medium text-ink-muted block truncate">โควตารอบนี้คงเหลือ</span>
+                      <div className={`mt-0.5 font-mono text-base sm:text-xl font-bold ${isOutsidePeriod ? 'text-ink-muted' : 'text-emerald-600'}`}>
+                        ฿{isWalletLoading
                           ? '---'
                           : isOutsidePeriod
                             ? '0.00'
@@ -283,43 +277,26 @@ export const CitizenWalletPage: React.FC = () => {
                               })}
                       </div>
                     </div>
-                    <div className="mt-2 pt-2 border-t border-hairline/60 flex items-center justify-between gap-2 text-[11px]">
-                      <span className="text-ink-muted">ใช้ได้ถึงวันที่:</span>
-                      <span className="font-semibold text-brand-blue">{currentValidUntil}</span>
+                    <div className="mt-1.5 pt-1.5 border-t border-hairline/50 flex items-center justify-between gap-1 text-[10px]">
+                      <span className="text-ink-muted">ใช้ได้ถึง</span>
+                      <span className="font-semibold text-brand-blue truncate">{currentValidUntil}</span>
                     </div>
                   </div>
                 </div>
 
-                {/* แถบการใช้สิทธิรายวัน */}
-                <div className="mt-4 pt-3.5 border-t border-hairline/70">
-                  <div className="flex items-center justify-between gap-2 text-[11px] sm:text-xs text-ink-muted mb-1.5">
-                    <span className="font-medium text-ink truncate">
-                      การใช้สิทธิวันนี้ (รีเซ็ตทุกวัน 06:00 น.)
-                    </span>
-                    <span className="font-mono font-semibold text-brand-blue shrink-0">
-                      {dailyUsedPercent}%
-                    </span>
-                  </div>
-                  <div className="h-2.5 w-full rounded-full bg-gray-200 overflow-hidden">
+                {/* แถบการใช้สิทธิรายวันแบบกระชับ */}
+                <div className="mt-2.5 flex items-center gap-2.5 text-[11px] text-ink-muted">
+                  <span className="shrink-0 font-medium text-ink">ใช้สิทธิวันนี้</span>
+                  <div className="h-1.5 flex-1 rounded-full bg-gray-200 overflow-hidden">
                     <div
                       className="h-full rounded-full bg-brand-blue transition-all duration-500"
                       style={{ width: `${dailyUsedPercent}%` }}
                     />
                   </div>
+                  <span className="font-mono font-semibold text-brand-blue shrink-0">
+                    {dailyUsedPercent}%
+                  </span>
                 </div>
-
-                {/* ระยะเวลาของโครงการจาก DB */}
-                {wallet.campaignInfo && (
-                  <div className="mt-3 flex items-center justify-between text-[11px] text-ink-muted pt-2 border-t border-hairline/60">
-                    <span className="flex items-center space-x-1">
-                      <Clock className="h-3 w-3 text-brand-blue shrink-0" />
-                      <span>ระยะเวลาโครงการ:</span>
-                    </span>
-                    <span className="font-medium text-ink">
-                      {formatThaiDate(wallet.campaignInfo.startDate)} - {formatThaiDate(wallet.campaignInfo.endDate)}
-                    </span>
-                  </div>
-                )}
               </section>
             )}
 

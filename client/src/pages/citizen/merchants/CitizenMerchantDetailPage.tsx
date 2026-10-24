@@ -202,7 +202,7 @@ export const CitizenMerchantDetailPage: React.FC = () => {
   if (!merchantId) {
     return (
       <div className="min-h-screen bg-surface-soft pb-24 font-sans text-ink">
-        <nav className="bg-white border-b border-hairline px-4 sm:px-6 py-3.5 sticky top-0 z-20 shadow-2xs">
+        <nav className="bg-white border-b border-hairline px-4 sm:px-6 py-3 shadow-2xs">
           <button
             onClick={() => navigate(APP_ROUTES.CITIZEN_NEAR_ME)}
             className="inline-flex items-center gap-1.5 text-ink hover:text-brand-blue font-semibold transition py-1 pr-2 text-xs sm:text-sm"
@@ -236,7 +236,7 @@ export const CitizenMerchantDetailPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-surface-soft pb-24 md:pb-16 font-sans text-ink">
       {/* 1. TOP NAVIGATION & BREADCRUMB BAR */}
-      <nav className="bg-white border-b border-hairline px-4 sm:px-6 lg:px-8 py-3.5 sticky top-0 z-20 shadow-2xs">
+      <nav className="bg-white border-b border-hairline px-4 sm:px-6 lg:px-8 py-3 shadow-2xs">
         <div className="max-w-4xl mx-auto flex items-center justify-between gap-4">
           <div className="flex items-center gap-2 text-xs sm:text-sm text-ink-muted">
             <button
