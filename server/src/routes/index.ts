@@ -4,6 +4,7 @@ import walletRoutes from './wallet.routes';
 import paymentRoutes from './payment.routes';
 import transactionRoutes from './transaction.routes';
 import fraudRoutes from './fraud.routes';
+import gamificationRoutes from './gamification.routes';
 
 const router = Router();
 
@@ -18,5 +19,6 @@ router.use('/wallet', walletRoutes);
 router.use('/payment', paymentRoutes);
 router.use('/transactions', transactionRoutes);
 router.use('/fraud', fraudRoutes);
+router.use('/', gamificationRoutes);
 
 export default router;
