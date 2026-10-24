@@ -4,6 +4,10 @@ import walletRoutes from './wallet.routes';
 import paymentRoutes from './payment.routes';
 import transactionRoutes from './transaction.routes';
 import fraudRoutes from './fraud.routes';
+import reviewRoutes from './review.routes';
+import referralRoutes from './referral.routes';
+import preferenceRoutes from './preference.routes';
+import recommendationRoutes from './recommendation.routes';
 import gamificationRoutes from './gamification.routes';
 
 const router = Router();
@@ -19,6 +23,10 @@ router.use('/wallet', walletRoutes);
 router.use('/payment', paymentRoutes);
 router.use('/transactions', transactionRoutes);
 router.use('/fraud', fraudRoutes);
+router.use('/reviews', reviewRoutes);
+router.use('/referrals', referralRoutes);
+router.use('/preferences', preferenceRoutes);
+router.use('/recommendations', recommendationRoutes);
 router.use('/', gamificationRoutes);
 
 export default router;

@@ -132,6 +132,51 @@ export const HomePage: React.FC = () => {
           </div>
         </div>
 
+        {/* โมดูลงาน Developer 3: AI Discovery & Growth */}
+        <div>
+          <h2 className="text-base font-bold text-ink mb-4">โมดูลงาน Developer 3: AI Discovery & Growth</h2>
+          <div
+            onClick={() => navigate(APP_ROUTES.CITIZEN_NEAR_ME)}
+            className="rounded-card border border-hairline hover:border-blue-300 bg-white p-6 shadow-sm hover:shadow-md transition cursor-pointer group flex flex-col justify-between"
+          >
+            <div>
+              <div className="flex items-start justify-between">
+                <div className="h-12 w-12 rounded-2xl bg-brand-blue-light text-brand-blue flex items-center justify-center mb-4 group-hover:scale-105 transition shadow-xs">
+                  <Sparkles className="h-6 w-6" />
+                </div>
+                <span className="inline-flex items-center space-x-1 rounded-pill bg-brand-blue-light px-2.5 py-0.5 text-xs font-semibold text-brand-blue border border-blue-200">
+                  <span>Co-pay 60/40</span>
+                </span>
+              </div>
+              <h3 className="text-base font-bold text-ink">Developer 3: AI Discovery & Growth</h3>
+              <p className="text-xs text-brand-blue font-medium mt-1">
+                AI แนะนำร้านค้าใกล้ฉัน ระบบรีวิว และแนะนำเพื่อน
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3 pt-2 text-xs text-ink-muted leading-relaxed border-t border-hairline/60">
+                <div>
+                  <span className="font-semibold text-ink">• AI Near-Me:</span> ค้นหาร้านค้า Co-pay รอบตัวด้วยพิกัด GPS จริง
+                </div>
+                <div>
+                  <span className="font-semibold text-ink">• Merchant Reviews:</span> รีวิว คะแนนดาว และความพึงพอใจของร้านค้า
+                </div>
+                <div>
+                  <span className="font-semibold text-ink">• Referral:</span> แนะนำเพื่อนและสิทธิประโยชน์ร่วมจ่าย Co-pay
+                </div>
+                <div>
+                  <span className="font-semibold text-ink">• Category Preferences:</span> คัดกรองและปรับแต่งตามหมวดหมู่ร้านค้า
+                </div>
+              </div>
+            </div>
+            <div className="mt-5 pt-3 border-t border-hairline flex items-center justify-between text-xs font-semibold text-brand-blue">
+              <span>เปิดใช้งานระบบ AI แนะนำร้านค้าใกล้ฉัน</span>
+              <div className="flex items-center space-x-1 group-hover:translate-x-1 transition">
+                <span>เข้าสู่หน้าร้านค้าใกล้ฉัน</span>
+                <ArrowRight className="h-4 w-4" />
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* มาตรฐานวิศวกรรมซอฟต์แวร์ระดับสากล */}
         <div className="rounded-card border border-hairline bg-white p-6 shadow-sm flex items-center justify-between">
           <div className="flex items-center space-x-3">
