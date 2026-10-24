@@ -1,16 +1,15 @@
 import React from 'react';
-import { createBrowserRouter, RouterProvider } from 'react-router-dom';
+import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom';
 import { APP_ROUTES } from '../constants/routes';
 import { RootLayout } from '../layouts/RootLayout';
 import { AuthLayout } from '../layouts/AuthLayout';
-import { ProtectedRoute } from './ProtectedRoute';
 import { AdminRoute } from './AdminRoute';
 import { PublicRoute } from './PublicRoute';
 
 import { HomePage } from '../pages/home/HomePage';
 import { LoginPage } from '../pages/auth/LoginPage';
 import { RegisterPage } from '../pages/auth/RegisterPage';
-import { DashboardPage } from '../pages/dashboard/DashboardPage';
+import { DashboardPage } from '../pages/admin/dashboard/DashboardPage';
 import { NotFoundPage } from '../pages/notFound/NotFoundPage';
 
 // Developer 2: Payment & Fraud Engine Pages
@@ -61,16 +60,22 @@ export const router = createBrowserRouter([
         element: <MerchantSalesHistoryPage />,
       },
 
-      // Admin Flow (Dev 2)
+      // Admin routes
       {
-        path: APP_ROUTES.ADMIN_FRAUD_ALERTS,
-        element: <AdminFraudAlertsPage />,
+        path: APP_ROUTES.ADMIN_ROOT,
+        element: <Navigate to={APP_ROUTES.ADMIN_DASHBOARD} replace />,
       },
-
-      // Admin Flow (Dev 4)
       {
         element: <AdminRoute />,
         children: [
+          {
+            path: APP_ROUTES.ADMIN_DASHBOARD,
+            element: <DashboardPage />,
+          },
+          {
+            path: APP_ROUTES.ADMIN_FRAUD_ALERTS,
+            element: <AdminFraudAlertsPage />,
+          },
           {
             path: APP_ROUTES.ADMIN_CAMPAIGNS,
             element: (
@@ -82,15 +87,10 @@ export const router = createBrowserRouter([
         ],
       },
 
-      // Protected Routes (Required Authentication)
+      // Legacy dashboard URL
       {
-        element: <ProtectedRoute />,
-        children: [
-          {
-            path: APP_ROUTES.DASHBOARD,
-            element: <DashboardPage />,
-          },
-        ],
+        path: APP_ROUTES.DASHBOARD,
+        element: <Navigate to={APP_ROUTES.ADMIN_DASHBOARD} replace />,
       },
     ],
   },

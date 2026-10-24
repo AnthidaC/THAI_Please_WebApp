@@ -49,6 +49,7 @@ export const Navbar: React.FC = () => {
               <NavLink
                 key={to}
                 to={to}
+                end={to === APP_ROUTES.ADMIN_DASHBOARD}
                 className={({ isActive }) =>
                   `inline-flex items-center space-x-1.5 px-2.5 lg:px-3 py-1.5 rounded-pill transition whitespace-nowrap ${
                     isActive
@@ -123,6 +124,7 @@ export const Navbar: React.FC = () => {
               <NavLink
                 key={to}
                 to={to}
+                end={to === APP_ROUTES.ADMIN_DASHBOARD}
                 className={({ isActive }) =>
                   `flex flex-col items-center py-1 px-3 rounded-xl transition ${
                     isActive ? 'text-brand-blue font-semibold' : 'text-ink-muted hover:text-ink'

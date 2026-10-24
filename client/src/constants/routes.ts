@@ -16,6 +16,8 @@ export const APP_ROUTES = {
   MERCHANT_SALES: '/merchant/sales',
 
   // เส้นทางผู้ดูแลระบบ (Admin Flow - Dev 2)
+  ADMIN_ROOT: '/admin',
+  ADMIN_DASHBOARD: '/admin/dashboard',
   ADMIN_FRAUD_ALERTS: '/admin/fraud-alerts',
   ADMIN_CAMPAIGNS: '/admin/campaigns',
 } as const;
