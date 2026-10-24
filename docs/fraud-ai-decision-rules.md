@@ -1,5 +1,5 @@
-# 🤖 กฎการตัดสินใจส่ง Prompt AI และระบบป้องกันการสิ้นเปลือง Token
-## (AI Fraud Decision Rules & Zero-Token Gating Architecture)
+# 🤖 กฎการตัดสินใจส่ง Prompt AI และระบบป้องกันการสิ้นเปลือง Token & ไบแอส
+## (AI Fraud Decision Rules, Baseline Profiling & Zero-Token Gating)
 ### แพลตฟอร์มดิจิทัล "ไทยช่วยไทยพลีส" (THAI Please WebApp)
 
 ---
@@ -7,8 +7,11 @@
 ## 🎯 1. วัตถุประสงค์และหลักการออกแบบ (Core Philosophy)
 ในระบบการเงินร่วมจ่าย Co-pay ที่มีปริมาณธุรกรรมระดับประเทศ (High-throughput):
 1. **Zero-Token First:** ธุรกรรมปกติกว่า 90–95% ต้องผ่านการอนุมัติแบบ Real-time โดย**ไม่ส่ง Prompt เข้าโมเดล AI เลย (ใช้ 0 Token)** เพื่อลดต้นทุนและป้องกันความล่าช้าหน้าเคาน์เตอร์ร้านค้า
-2. **Targeted AI Reasoning:** ส่ง Prompt เรียกโมเดล AI ภายนอก (เช่น Google Gemini Flash) เฉพาะกรณีที่มีความผิดปกติหรือพฤติกรรมน่าสงสัยซ้ำๆ (Gray Zone)
-3. **Non-blocking Policy:** AI ไม่มีอำนาจสั่งบล็อกการค้าขายของร้านค้าและประชาชนทันที (ยกเว้นพิกัดอยู่นอกเกณฑ์ 2 กม.) หากพบความน่าสงสัย จะอนุมัติให้ชำระเงินสำเร็จ แต่ติดสถานะ `FLAGGED_FOR_REVIEW` เข้าสู่คิวงานของผู้ดูแลระบบ (Admin) เพื่อตรวจสอบย้อนหลัง
+2. **Context-Aware & Anti-Bias (ป้องกันอคติ):** 
+   - ไม่ตัดสินจากบิลเดี่ยวและไม่ส่งข้อความชี้นำเชิงลบ (Anchoring Bias) เข้า AI
+   - นำ **สถิติพื้นฐานของร้านค้า (Merchant Baseline)** เช่น ยอดใช้จ่ายเฉลี่ย, ค่าความผันผวนของยอดเงิน (Std Dev), และสัดส่วนลูกค้าหน้าร้าน vs ออเดอร์เดลิเวอรี/LINE OpenChat ในชุมชน มาเปรียบเทียบเสมอ
+   - ให้ AI มองหาเหตุผลการค้าขายปกติก่อน (Devil's Advocate Policy) เพื่อคุ้มครองพ่อค้าแม่ค้าที่ขายอาหารทางแชตหรือส่งตามบ้านในระยะไม่เกิน 2 กม.
+3. **Non-blocking Policy:** AI ไม่มีอำนาจสั่งบล็อกการค้าขายของร้านค้าและประชาชนทันที หากพบความน่าสงสัย จะอนุมัติให้ชำระเงินสำเร็จ แต่ติดสถานะ `FLAGGED_FOR_REVIEW` เข้าสู่คิวงานของผู้ดูแลระบบ (Admin) เพื่อตรวจสอบย้อนหลัง
 
 ---
 
@@ -22,19 +25,19 @@ flowchart TD
     Haversine --> CheckDistance{"ระยะทางห่างเกิน<br/>2,000 เมตร (2 กม.) หรือไม่?"}
     CheckDistance -- "ใช่ (ห่าง > 2 กม.)" --> HardReject["❌ ปฏิเสธรายการทันที (REJECTED)<br/>ระงับ QR Code หน้าร้าน<br/><b>[ใช้ 0 Token]</b>"]
     
-    %% Stage 1: Zero-Token Gating
-    CheckDistance -- "ไม่เกิน (<= 2,000 ม.)" --> ExtractFeatures["สกัด Feature Vector จาก PostgreSQL & Redis:<br/>- ความเร็วเปลี่ยนพิกัด (speedKmH)<br/>- ความถี่ 10 นาที (txCount10m)<br/>- สแกนซ้ำร้านเดิมวันนี้ (sameShopToday)<br/>- ประวัติเคยถูก Flagged (prevFlags)<br/>- ยอดเงินทำรายการ (amount)"]
+    %% Stage 1: Baseline Extraction & Zero-Token Gating
+    CheckDistance -- "ไม่เกิน (<= 2,000 ม.)" --> ExtractBaselines["สกัด Feature Vector & สถิติพื้นฐาน (Baselines):<br/>- Merchant: ยอดเฉลี่ย, ความผันผวน (StdDev), สัดส่วนหน้าร้าน vs เดลิเวอรี<br/>- Citizen: ประวัติสะอาด, วันใช้งาน, ยอดเฉลี่ย<br/>- Current: ยอดเงิน, พิกัด, ความเร็ว, Z-Score เทียบร้าน"]
 
-    ExtractFeatures --> GatingDecision{"💡 ตรวจสอบ 6 กฎ Heuristic Gating<br/>(เข้าเกณฑ์น่าสงสัยข้อใดข้อหนึ่งหรือไม่?)"}
+    ExtractBaselines --> GatingDecision{"💡 ตรวจสอบ 8 กฎ Heuristic Gating<br/>(มีเงื่อนไขความเสี่ยงหรือไม่?)"}
 
     %% Safe Zone (0 Token)
-    GatingDecision -- "ไม่เข้าเกณฑ์ใดเลย (ปลอดภัย 100%)" --> SafeApprove["✅ อนุมัติทันที (AUTO_APPROVED)<br/>ทำรายการสำเร็จ ไม่หน่วงเวลา<br/><b>[ประหยัด Token 100% - ใช้ 0 Token]</b>"]
+    GatingDecision -- "ไม่เข้าเกณฑ์เสี่ยงใดเลย (ปลอดภัย 100%)" --> SafeApprove["✅ อนุมัติทันที (AUTO_APPROVED)<br/>ทำรายการสำเร็จ ไม่หน่วงเวลา<br/><b>[ประหยัด Token 100% - ใช้ 0 Token]</b>"]
 
     %% Suspicious Zone -> Needs AI
-    GatingDecision -- "ตรงเงื่อนไข 1 ใน 6 กฎ" --> CheckApiKey{"ตั้งค่า AI API Key หรือ<br/>External AI Endpoint หรือไม่?"}
+    GatingDecision -- "ตรงเงื่อนไข 1 ใน 8 กฎ" --> CheckApiKey{"ตั้งค่า AI API Key หรือ<br/>External AI Endpoint หรือไม่?"}
 
     %% Stage 2: AI Prompt Execution
-    CheckApiKey -- "มี API Key (Gemini Flash / OpenAI)" --> BuildPrompt["สร้าง Compact Prompt (เฉพาะ Key-Value)<br/>กำหนด max_output_tokens: 80<br/>บังคับ Output เป็น JSON Schema"]
+    CheckApiKey -- "มี API Key (Gemini Flash / OpenAI)" --> BuildPrompt["สร้าง Unbiased Compact Prompt<br/>ส่งสถิติ Merchant/Citizen + Z-Score<br/>กำหนด max_output_tokens: 80 (JSON)"]
     BuildPrompt --> CallAI["🤖 ส่ง Prompt ไปยัง Google Gemini Flash API<br/>(Timeout: 2.5 วินาที)"]
     
     CallAI --> AIResponse{"ผลประเมินจาก AI Model"}
@@ -61,87 +64,63 @@ flowchart TD
 
 ---
 
-## 📋 3. ตาราง 6 กฎการตัดสินใจส่ง Prompt (Heuristic Gating Matrix)
+## 📋 3. ตาราง 8 กฎการตัดสินใจส่ง Prompt (Heuristic Gating Matrix)
 
-หากธุรกรรมไม่ผ่านข้อใดข้อหนึ่งในตารางนี้ ระบบจะตัดสินใจ**เรียกส่ง Prompt เข้า AI ทันที**:
-
-| ลำดับกฎ | ชื่อกฎ (Rule Identifier) | เงื่อนไขการตัดสินใจ (Trigger Condition) | เหตุผลความเสี่ยง (Risk Rationalization) | การจัดการ Token |
+| ลำดับกฎ | ชื่อกฎ (Rule Identifier) | เงื่อนไขการตัดสินใจ (Trigger Condition) | เหตุผลความเสี่ยง (Risk Rationalization) | นโยบาย Anti-Bias |
 | :--- | :--- | :--- | :--- | :--- |
-| **กฎที่ 1** | `NEAR_GEOFENCE_LIMIT` | `distanceMeters > 1500` (แต่ $\le 2000$) | พิกัดเริ่มใกล้ขอบเพดาน 2 กม. อาจใช้ GPS Spoofing หรืออยู่นอกร้าน | ส่ง AI วิเคราะห์ร่วมกับพฤติกรรมอื่น |
-| **กฎที่ 2** | `ABNORMAL_VELOCITY` | `estimatedSpeedKmH > 70` | มีการเคลื่อนที่ระหว่าง 2 ธุรกรรมด้วยความเร็วสูงผิดปกติ (เสี่ยงแชร์บัญชี) | ส่ง AI วิเคราะห์เส้นทางและความเป็นไปได้ |
-| **กฎที่ 3** | `HIGH_FREQUENCY_BURST` | `recentTxCountIn10Min >= 3` | สแกนจ่ายถี่ผิดวิสัยการซื้อสินค้าหน้าร้านทั่วไป (มากกว่า 2 ครั้งใน 10 นาที) | ส่ง AI วิเคราะห์รูปแบบเวลา |
-| **กฎที่ 4** | `SPLIT_BILLING_SUSPICION` | `samePairRepeatCountToday >= 3` | ผู้ใช้คนเดิมสแกนร้านเดิมซ้ำมากกว่า 2 ครั้งใน 1 วัน (สงสัยการซอยบิลแลกเงินสด) | ส่ง AI ประเมินเจตนาธุรกรรม |
-| **กฎที่ 5** | `REPEATED_OFFENSE_HISTORY` | `repeatedSuspiciousCount >= 1` | ผู้ใช้หรือร้านค้านี้เคยมีประวัติถูก Flagged หรืออยู่ในรายการเฝ้าระวัง | ส่ง AI ตรวจสอบพฤติกรรมย้อนหลัง |
+| **กฎที่ 1** | `NEAR_GEOFENCE_LIMIT` | `distanceMeters > 1500` (แต่ $\le 2000$) | พิกัดเริ่มใกล้ขอบเพดาน 2 กม. อาจใช้ GPS Spoofing หรืออยู่นอกร้าน | หากร้านมีลูกค้าหน้าร้าน $\ge 65\%$ และยอดปกติ จะระบุเป็นออเดอร์เดลิเวอรีชุมชน |
+| **กฎที่ 2** | `ABNORMAL_VELOCITY` | `estimatedSpeedKmH > 70` | เคลื่อนที่ข้ามธุรกรรมด้วยความเร็วสูงผิดปกติ (เสี่ยงแชร์บัญชี) | ส่ง AI วิเคราะห์เส้นทางและความเป็นไปได้ |
+| **กฎที่ 3** | `HIGH_FREQUENCY_BURST` | `recentTxCountIn10Min >= 3` | สแกนจ่ายถี่ผิดวิสัย (มากกว่า 2 ครั้งใน 10 นาที) | ส่ง AI วิเคราะห์รูปแบบเวลา |
+| **กฎที่ 4** | `SPLIT_BILLING_SUSPICION` | `samePairRepeatCountToday >= 3` | สแกนร้านเดิมซ้ำมากกว่า 2 ครั้งใน 1 วัน (เสี่ยงซอยบิลแลกเงินสด) | ส่ง AI ประเมินเจตนาธุรกรรม |
+| **กฎที่ 5** | `REPEATED_OFFENSE_HISTORY` | `repeatedSuspiciousCount >= 1` | ผู้ใช้หรือร้านค้านี้เคยมีประวัติถูก Flagged สะสม | ส่ง AI ตรวจสอบพฤติกรรมย้อนหลัง |
 | **กฎที่ 6** | `HIGH_VALUE_HIGH_DISTANCE`| `amount > 1500` และ `distanceMeters > 1000` | ยอดเงินสูงเกิน 1,500 บาท ร่วมกับระยะทางห่างร้านเกิน 1 กม. | ส่ง AI ประเมินมูลค่าสินค้าเทียบกับพิกัด |
+| **กฎที่ 7** | `AMOUNT_VOLATILITY_OUTLIER` | `amountZScoreVsMerchant > 3.0` | ยอดเงินบิลนี้ผันผวนสูงกว่าค่าเฉลี่ยร้านค้าเกิน 3 เท่าของส่วนเบี่ยงเบนมาตรฐาน ($Z > 3$) | เทียบกับยอดเฉลี่ยและสถิติของร้านค้าจริง |
+| **กฎที่ 8** | `LOW_IN_STORE_RATIO` | `totalTx >= 10` และ `inStoreRatio < 0.30` | ร้านค้ามีสัดส่วนลูกค้าหน้าร้านต่ำผิดปกติ (< 30%) เสี่ยงเป็นร้านตัวแทน/ฮั้ว | ป้องกันร้านค้าผีที่ไม่มีหน้าร้านจริง |
 
 ---
 
-## 📝 4. ข้อกำหนดโครงสร้าง Prompt (Strict JSON & Compact Template)
+## 📝 4. ข้อกำหนดโครงสร้าง Prompt แบบลดความลำเอียง (Anti-Bias Minimal Prompt)
 
-เพื่อป้องกันการเปลือง Token จากคำตอบที่ยาวเกินไป ระบบใช้โครงสร้างแบบ **Minimal Token Engineering**:
-
-### 4.1 System Instruction
+### 4.1 System Instruction (Neutral & Devil's Advocate)
 ```text
-You are an anti-fraud risk engine for Thailand Co-pay. Evaluate risk. Output ONLY valid JSON: {"riskScore": number(0-1), "decision": "AUTO_APPROVED"|"FLAGGED_FOR_REVIEW", "reason": "สรุปสั้นๆภาษาไทย 1 ประโยค"}. Never return REJECTED directly; always FLAGGED_FOR_REVIEW if suspicious.
+You are an objective fraud evaluator for Thailand Co-pay. Evaluate risk without bias. 
+Commercial context: neighborhood delivery, LINE OpenChat orders, and takeaway within 2km are normal if merchant has healthy in-store ratio (>=60%) and realistic ticket sizes. 
+Evaluate amount volatility against merchant/citizen average and std dev. 
+Output ONLY valid JSON: {
+  "riskScore": number(0-1), 
+  "decision": "AUTO_APPROVED" | "FLAGGED_FOR_REVIEW", 
+  "reason": "สรุปสั้นๆภาษาไทย 1 ประโยค อธิบายความสมเหตุสมผลเชิงสถิติ"
+}. 
+Never return REJECTED.
 ```
 
-### 4.2 Compact User Prompt (ประหยัด Token สูงสุด)
-ส่งเฉพาะตัวแปรสำคัญในรูปแบบ Key-Value บรรทัดเดียว:
+### 4.2 Compact User Prompt (ส่ง Baseline สถิติแบบกระชับ)
 ```text
-TxFeatures: dist=1650m, speed=95km/h, tx10m=4, sameShopToday=3, prevFlags=2, amt=800THB, triggers=[พิกัดห่าง 1650 ม.; ความเร็วการเคลื่อนที่ผิดปกติ (95 กม./ชม.)]
+TxData: amt=180THB, dist=1612m, spd=15km/h, 10mTx=1, sameShopToday=1, flags=0
+MerchantBase: avgAmt=160THB (std=35), inStoreRatio=85%, uniqCust=60, zScore=0.57
+CitizenBase: totalTx=25, avgAmt=150THB (std=30), cleanRatio=100%, acctDays=120
+Observations: [พิกัดห่าง 1612 ม. (อยู่ในระยะส่งเดลิเวอรี/ออเดอร์แชตชุมชน)]
 ```
 
-### 4.3 พารามิเตอร์การเรียกใช้งาน (Generation Config)
-* `maxOutputTokens`: **80** (จำกัดคำตอบไม่เกิน 80 tokens ป้องกันคำอธิบายเวิ่นเว้อ)
-* `temperature`: **0.1** (ต้องการผลลัพธ์ที่นิ่งและเป็นระเบียบตาม JSON Schema)
-* `responseMimeType`: `"application/json"`
-* `timeout`: **2,500 ms** (หาก AI ตอบช้าเกิน 2.5 วินาที ระบบจะตัดจบและใช้ Local Engine แทนทันที)
+* **ผลการวินิจฉัยจาก AI:**
+  ```json
+  {
+    "riskScore": 0.03,
+    "decision": "AUTO_APPROVED",
+    "reason": "พิกัด 1.6 กม. สอดคล้องกับออเดอร์เดลิเวอรี/แชตชุมชน โดยร้านค้ามีสัดส่วนหน้าร้านปกติสูงถึง 85% และยอดเงินอยู่ในกรอบปกติ"
+  }
+  ```
 
 ---
 
-## 💰 5. การประเมินความคุ้มค่าและผลลัพธ์ (Token Savings & Latency Benchmark)
-
-| มิติการเปรียบเทียบ | แบบเดิม (ยิง AI ทุกธุรกรรม) | แบบใหม่ (Zero-Token Gating) | ผลลัพธ์ที่ปรับปรุงได้ |
-| :--- | :--- | :--- | :--- |
-| **สัดส่วนการเรียก AI API** | 100% ของทุกธุรกรรม | **~ 5% – 8%** (เฉพาะธุรกรรมที่น่าสงสัย) | 🟢 **ลดการยิง API ลง 92% – 95%** |
-| **การใช้ Token ต่อ 10,000 รายการ** | ~ 2,500,000 Tokens | **~ 125,000 Tokens** | 🟢 **ประหยัด Token ได้กว่า 95%** |
-| **เวลาตอบสนองหน้าร้าน (Latency)** | หน่วง 1,200 – 2,500 ms ทุกรายการ | **< 5 ms** สำหรับ 95% ของรายการทั่วไป | ⚡ **สแกนจ่ายได้ลื่นไหล ไม่ต้องยืนรอ** |
-| **ความเสี่ยงระบบล่มจาก Rate Limit** | สูงมากเมื่อมีคนสแกนพร้อมกัน | ต่ำมาก เพราะกรองที่แอปพลิเคชันก่อน | 🛡️ **ระบบรองรับโหลดสูงได้อย่างมั่นคง** |
+## 👥 5. การรวมกลุ่มแฟ้มคดีระดับบุคคล/ร้านค้า (User & Merchant Dossiers)
+* **ตัดสัญญาณรบกวน (Noise Suppression):** บิลย่อยเดี่ยวๆ (< 150 บาท) ไม่นำขึ้นแสดงในคิวหลักของ Admin
+* **เกณฑ์ส่งต่อเข้าคิว Admin:** ทำซ้ำ $\ge 2$ ครั้ง หรือเสี่ยงเงินสมทบ $\ge 300$ บาท หรือ Risk Score $\ge 0.80$
+* **Batch 1-Click Action:** Admin ตรวจสอบภาพรวมทั้งร้านหรือผู้ใช้ และกด Approve All หรือ Suspend ได้ในคลิกเดียว
 
 ---
 
----
-
-## 👥 7. การรวมกลุ่มแฟ้มคดีและการตัดสัญญาณรบกวน (User & Merchant Dossier Rollup)
-
-เพื่อแก้ไขปัญหา **Alert Fatigue** ของผู้ดูแลระบบ (ป้องกันไม่ให้ Admin ต้องตรวจบิลย่อยเป็นล้านรายการ):
-
-### 7.1 กฎตัดสัญญาณรบกวนธุรกรรมย่อย (Micro-transaction Noise Suppression)
-* **Isolated Single Tx (< 150 บาท):** บิลย่อยเดี่ยวๆ ที่ไม่มีประวัติทำซ้ำ จะถูกบันทึกเงียบๆ (Silent Audit Log) โดย**ไม่นำขึ้นแสดงในคิวหลักของ Admin**
-* **เกณฑ์ส่งต่อเข้าคิว Admin (Actionable Criteria):**
-  1. `flaggedCount >= 2` (ทำซ้ำตั้งแต่ 2 รายการขึ้นไป)
-  2. `governmentCopayAtRisk >= 300` (ยอดเงินรัฐสมทบ 60% ที่เสี่ยงสูญเสียสะสม $\ge$ 300 บาท)
-  3. `maxRiskScore >= 0.80` (มีความผิดปกติรุนแรง เช่น วาร์ปข้ามเขต หรือความเร็วผิดมนุษย์)
-
-### 7.2 แฟ้มคดีระดับบุคคล/ร้านค้า (AI Case Dossiers)
-* รวบรวมธุรกรรมที่น่าสงสัยตาม `userId` และ `merchantId`
-* AI สังเคราะห์พฤติกรรมภาพรวมเป็น **Executive Summary 1-2 ประโยค** (เช่น ส่อเจตนาซอยบิลแลกเงินสด, แชร์บัญชี)
-* รองรับปุ่มจัดการแบบ **Batch 1-Click Action:**
-  * `APPROVE_ALL`: อนุมัติทุกบิลในแฟ้มคดีในคลิกเดียว
-  * `SUSPEND_USER`: ระงับสิทธิ์ Co-pay ประชาชนรายนี้
-  * `SUSPEND_MERCHANT`: ระงับสิทธิ์ร้านค้าเพื่อส่งเจ้าหน้าที่ลงพื้นที่
-
----
-
-## 🛠️ 8. ไฟล์ที่เกี่ยวข้องในระบบ (Code Mapping)
-
-* **คลาสและตรรกะการตัดสินใจ:** [`server/src/services/fraud.service.ts`](file:///d:/Y4/THAI_Please_WebApp/server/src/services/fraud.service.ts)
-  * ฟังก์ชันตัดสินใจส่ง Prompt: `shouldInvokeAi(features)`
-  * ฟังก์ชันรวบรวมแฟ้มคดีและตัด Noise: `getFraudDossiers(includeMinorNoise)`
-  * ฟังก์ชันจัดการเคสแบบ Batch: `resolveDossier(params)`
-* **API Endpoints:** [`server/src/routes/fraud.routes.ts`](file:///d:/Y4/THAI_Please_WebApp/server/src/routes/fraud.routes.ts)
-  * `GET /api/fraud/dossiers`
-  * `POST /api/fraud/dossier/resolve`
-* **หน้า UI ผู้ดูแลระบบ:** [`client/src/pages/admin/fraud-alerts/AdminFraudAlertsPage.tsx`](file:///d:/Y4/THAI_Please_WebApp/client/src/pages/admin/fraud-alerts/AdminFraudAlertsPage.tsx)
-* **การตั้งค่า Environment:** [`server/src/config/env.ts`](file:///d:/Y4/THAI_Please_WebApp/server/src/config/env.ts) และ [`server/.env`](file:///d:/Y4/THAI_Please_WebApp/server/.env)
-* **ชุดทดสอบความถูกต้อง:** [`server/src/tests/payment-engine.test.ts`](file:///d:/Y4/THAI_Please_WebApp/server/src/tests/payment-engine.test.ts#L112-L162)
+## 🛠️ 6. ไฟล์ที่เกี่ยวข้องในระบบ (Developer 2 Scope)
+* **คลาสคำนวณและประเมินความเสี่ยง:** [`server/src/services/fraud.service.ts`](file:///d:/Y4/THAI_Please_WebApp/server/src/services/fraud.service.ts)
+* **การคำนวณ Co-pay และจุดตัด Geofence:** [`server/src/services/payment.service.ts`](file:///d:/Y4/THAI_Please_WebApp/server/src/services/payment.service.ts)
+* **ชุดทดสอบ Unit Tests:** [`server/src/tests/payment-engine.test.ts`](file:///d:/Y4/THAI_Please_WebApp/server/src/tests/payment-engine.test.ts)

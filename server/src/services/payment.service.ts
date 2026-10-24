@@ -36,6 +36,7 @@ export interface CopayCalculationResult {
   dailyQuotaRemainingAfter: number;
   totalQuotaRemainingBefore: number;
   totalQuotaRemainingAfter: number;
+  quotaWarning?: string | null;
 }
 
 export interface DynamicQrData {
@@ -92,13 +93,28 @@ export class PaymentService {
     );
     const governmentCopayAmount = Math.round(maxGovAllowable * 100) / 100;
 
-    // 3. ประชาชนจ่าย 40% ของยอดสุทธิ หรือส่วนที่เกินจากสิทธิรัฐ
+    // 3. ประชาชนจ่าย 40% ของยอดสุทธิ หรือส่วนที่เกินจากสิทธิรัฐ (จ่ายส่วนต่างเพิ่มเองอัตโนมัติ)
     const citizenPaidAmount = Math.round((netTotalAmount - governmentCopayAmount) * 100) / 100;
 
     const governmentPercentage =
       netTotalAmount > 0 ? Math.round((governmentCopayAmount / netTotalAmount) * 100) : 0;
     const citizenPercentage = 100 - governmentPercentage;
     const totalSavingsAmount = Math.round((discountAmount + governmentCopayAmount) * 100) / 100;
+
+    // ตรวจสอบแจ้งเตือนโควตาเต็มหรือเหลือน้อยกว่าสิทธิ์ 60%
+    let quotaWarning: string | null = null;
+    if (netTotalAmount > 0 && tentativeGovCopay > 0) {
+      if (dailyQuotaRemaining <= 0 && totalQuotaRemaining <= 0) {
+        quotaWarning = 'โควตารัฐช่วยจ่ายของคุณหมดแล้ว คุณต้องชำระยอดเต็มเอง';
+      } else if (dailyQuotaRemaining <= 0) {
+        quotaWarning = 'โควตาวันนี้หมดแล้ว คุณต้องชำระยอดเต็มเอง';
+      } else if (totalQuotaRemaining <= 0) {
+        quotaWarning = 'โควตารอบปัจจุบันหมดแล้ว คุณต้องชำระยอดเต็มเอง';
+      } else if (governmentCopayAmount < tentativeGovCopay) {
+        const shortQuota = tentativeGovCopay > dailyQuotaRemaining ? 'โควตารายวัน' : 'โควตารอบย่อย';
+        quotaWarning = `${shortQuota}ไม่พอรับสิทธิ์ 60% เต็มจำนวน คุณต้องจ่ายส่วนขาดเพิ่มเอง`;
+      }
+    }
 
     return {
       originalTotalAmount: totalAmount,
@@ -118,6 +134,7 @@ export class PaymentService {
       totalQuotaRemainingBefore: totalQuotaRemaining,
       totalQuotaRemainingAfter:
         Math.round((totalQuotaRemaining - governmentCopayAmount) * 100) / 100,
+      quotaWarning,
     };
   }
 
@@ -540,14 +557,34 @@ export class PaymentService {
 
     if (userId) {
       walletInfo = await walletService.getWalletByUserId(userId);
+      const isEligible = walletInfo.eligibilityStatus === 'ELIGIBLE';
+      const isOutside = !!walletInfo.isOutsidePeriod;
+
+      const effectiveDailyQuota = (isEligible && !isOutside) ? walletInfo.dailyQuotaRemaining : 0;
+      const effectiveCap = (isEligible && !isOutside)
+        ? (walletInfo.currentPeriod != null
+            ? walletInfo.currentPeriod.quotaRemaining
+            : walletInfo.totalQuotaRemaining)
+        : 0;
+
       copaySplit = this.calculateCopay(
         qrData.totalAmount,
-        walletInfo.dailyQuotaRemaining,
-        walletInfo.totalQuotaRemaining,
+        effectiveDailyQuota,
+        effectiveCap,
         discountAmount,
         discountInfo?.code,
         discountInfo?.sourceDescription
       );
+
+      if (!isEligible) {
+        if (walletInfo.eligibilityStatus === 'CAMPAIGN_EXPIRED') {
+          copaySplit.quotaWarning = 'โครงการสิ้นสุดระยะเวลาแล้ว คุณต้องชำระยอดเต็ม 100% เอง';
+        } else {
+          copaySplit.quotaWarning = 'คุณยังไม่ได้ลงทะเบียนเข้าร่วมโครงการ จึงไม่มีสิทธิ์รับเงินสมทบจากรัฐ (ต้องชำระยอดเต็ม 100%)';
+        }
+      } else if (isOutside) {
+        copaySplit.quotaWarning = 'ปัจจุบันอยู่นอกรอบโครงการ จึงไม่มีสิทธิ์รับเงินสมทบจากรัฐในขณะนี้ (ต้องชำระยอดเต็ม 100%)';
+      }
     }
 
     return {
@@ -622,22 +659,20 @@ export class PaymentService {
       );
     }
 
-    if (wallet.eligibilityStatus === 'CAMPAIGN_EXPIRED') {
-      throw new Error(
-        'ไม่สามารถใช้สิทธิ์ร่วมจ่ายได้ เนื่องจากโครงการ Co-pay สิ้นสุดระยะเวลาตามที่กำหนดในระบบแล้ว'
-      );
-    }
-
-    if (wallet.eligibilityStatus !== 'ELIGIBLE') {
-      throw new Error(
-        'คุณไม่มีสิทธิเข้าร่วมโครงการ Co-pay ในขณะนี้ กรุณากดลงทะเบียนรับสิทธิที่หน้ากระเป๋าเงินก่อนทำรายการ'
-      );
-    }
+    // ตรวจสอบสิทธิ์โครงการ: หากไม่มีสิทธิ์, หมดโครงการ, หรืออยู่นอกรอบโครงการ ให้ชำระเต็มจำนวน 100% (ไม่บล็อกการซื้อ)
+    const isEligible = wallet.eligibilityStatus === 'ELIGIBLE';
+    const isOutside = !!wallet.isOutsidePeriod;
+    const effectiveDailyQuota = (isEligible && !isOutside) ? wallet.dailyQuotaRemaining : 0;
+    const effectiveCap = (isEligible && !isOutside)
+      ? (wallet.currentPeriod != null
+          ? wallet.currentPeriod.quotaRemaining
+          : wallet.totalQuotaRemaining)
+      : 0;
 
     const copay = this.calculateCopay(
       qrData.totalAmount,
-      wallet.dailyQuotaRemaining,
-      wallet.totalQuotaRemaining,
+      effectiveDailyQuota,
+      effectiveCap,
       discountAmount,
       discountInfo?.code,
       discountInfo?.sourceDescription
@@ -729,6 +764,38 @@ export class PaymentService {
           total_quota_remaining: newTotalQuotaRemaining,
         },
       });
+
+      // 4.1.1 ตัดยอดในรอบโครงการปัจจุบัน (wallet_period_quotas) หากมีรอบที่กำลังดำเนินการ
+      if (wallet.currentPeriod && copay.governmentCopayAmount > 0) {
+        const periodQuota = await tx.wallet_period_quotas.findUnique({
+          where: {
+            wallet_id_period_id: {
+              wallet_id: wallet.walletId,
+              period_id: wallet.currentPeriod.periodId,
+            },
+          },
+        });
+
+        if (periodQuota) {
+          const newPeriodUsed =
+            Math.round((Number(periodQuota.quota_used) + copay.governmentCopayAmount) * 100) / 100;
+          const newPeriodRemaining =
+            Math.max(0, Math.round((Number(periodQuota.quota_remaining) - copay.governmentCopayAmount) * 100) / 100);
+
+          await tx.wallet_period_quotas.update({
+            where: {
+              wallet_id_period_id: {
+                wallet_id: wallet.walletId,
+                period_id: wallet.currentPeriod.periodId,
+              },
+            },
+            data: {
+              quota_used: newPeriodUsed,
+              quota_remaining: newPeriodRemaining,
+            },
+          });
+        }
+      }
 
       // 4.2 สร้างรายการธุรกรรมหลัก
       const newTx = await tx.transactions.create({
