@@ -4,6 +4,7 @@ import { APP_ROUTES } from '../constants/routes';
 import { RootLayout } from '../layouts/RootLayout';
 import { AuthLayout } from '../layouts/AuthLayout';
 import { ProtectedRoute } from './ProtectedRoute';
+import { AdminRoute } from './AdminRoute';
 import { PublicRoute } from './PublicRoute';
 
 import { HomePage } from '../pages/home/HomePage';
@@ -20,6 +21,7 @@ import { CitizenTransactionsPage } from '../pages/citizen/transactions/CitizenTr
 import { MerchantPosQrPage } from '../pages/merchant/pos-qr/MerchantPosQrPage';
 import { MerchantSalesHistoryPage } from '../pages/merchant/sales/MerchantSalesHistoryPage';
 import { AdminFraudAlertsPage } from '../pages/admin/fraud-alerts/AdminFraudAlertsPage';
+const AdminCampaignsPage = React.lazy(() => import('../pages/admin/campaigns/AdminCampaignsPage').then((module) => ({ default: module.AdminCampaignsPage })));
 
 export const router = createBrowserRouter([
   // Main Application Routes
@@ -63,6 +65,21 @@ export const router = createBrowserRouter([
       {
         path: APP_ROUTES.ADMIN_FRAUD_ALERTS,
         element: <AdminFraudAlertsPage />,
+      },
+
+      // Admin Flow (Dev 4)
+      {
+        element: <AdminRoute />,
+        children: [
+          {
+            path: APP_ROUTES.ADMIN_CAMPAIGNS,
+            element: (
+              <React.Suspense fallback={<div className="mx-auto flex min-h-64 max-w-7xl items-center justify-center px-6 text-sm text-ink-muted">กำลังโหลดเครื่องมือจัดการ...</div>}>
+                <AdminCampaignsPage />
+              </React.Suspense>
+            ),
+          },
+        ],
       },
 
       // Protected Routes (Required Authentication)

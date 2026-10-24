@@ -52,7 +52,7 @@ export const Navbar: React.FC = () => {
                 className={({ isActive }) =>
                   `inline-flex items-center space-x-1.5 px-2.5 lg:px-3 py-1.5 rounded-pill transition whitespace-nowrap ${
                     isActive
-                      ? isAdmin
+                      ? isAdmin && to === APP_ROUTES.ADMIN_FRAUD_ALERTS
                         ? 'bg-red-600 text-white shadow-sm'
                         : 'bg-brand-blue text-white shadow-sm'
                       : 'text-ink-body hover:bg-surface-soft hover:text-ink'
