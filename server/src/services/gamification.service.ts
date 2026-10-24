@@ -75,6 +75,42 @@ const mapBadge = (row: any) => ({
   awardedCount: row._count?.user_badges ?? 0,
 });
 
+const badgeLevels = ['Bronze', 'Silver', 'Gold', 'Rainbow'] as const;
+type BadgeLevel = typeof badgeLevels[number];
+
+const mapBadgeConfig = (rows: any[]) => {
+  const byLevel = new Map<string, any>(rows.map((row) => [row.badge_level, row]));
+  const firstConfiguredLevel = badgeLevels.map((level) => byLevel.get(level)).find(Boolean) ?? rows[0];
+  const statuses = new Set(rows.map((row) => row.status));
+  const createdAt = rows.reduce((earliest, row) => row.created_at < earliest ? row.created_at : earliest, rows[0].created_at);
+
+  return {
+    id: byLevel.get('Bronze')?.badge_id ?? firstConfiguredLevel.badge_id,
+    name: firstConfiguredLevel.badge_name,
+    description: firstConfiguredLevel.description,
+    conditionType: firstConfiguredLevel.condition_type,
+    thresholds: Object.fromEntries(
+      badgeLevels.flatMap((level) => {
+        const row = byLevel.get(level);
+        return row ? [[level, row.required_count]] : [];
+      })
+    ) as Partial<Record<BadgeLevel, number>>,
+    status: statuses.size === 1 ? firstConfiguredLevel.status : 'paused',
+    createdAt: toIso(createdAt),
+    awardedCount: rows.reduce((total, row) => total + (row._count?.user_badges ?? 0), 0),
+  };
+};
+
+const mapBadgeConfigs = (rows: any[]) => {
+  const groups = new Map<string, any[]>();
+  for (const row of rows) {
+    const group = groups.get(row.condition_type) ?? [];
+    group.push(row);
+    groups.set(row.condition_type, group);
+  }
+  return Array.from(groups.values(), mapBadgeConfig).sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+};
+
 const assertDateRange = (start: Date, end: Date) => {
   if (start >= end) throw new GamificationServiceError('End date must be after start date', 400);
 };
@@ -238,4 +274,75 @@ export const gamificationService = {
     ...(input.requiredCount !== undefined && { required_count: input.requiredCount }),
     ...(input.status !== undefined && { status: input.status }),
   }, include: { _count: { select: { user_badges: true } } } }))),
+
+  listBadgeConfigs: () => withDatabaseErrors(async () =>
+    mapBadgeConfigs(await prisma.badges.findMany({
+      orderBy: { created_at: 'desc' },
+      include: { _count: { select: { user_badges: true } } },
+    }))
+  ),
+  createBadgeConfig: (input: any) => withDatabaseErrors(async () => prisma.$transaction(async (tx: any) => {
+    const rows = await Promise.all(badgeLevels.map((level) => tx.badges.create({
+      data: {
+        badge_name: input.badgeName,
+        badge_level: level,
+        description: input.description ?? null,
+        condition_type: input.conditionType,
+        required_count: input.thresholds[level],
+        status: input.status,
+      },
+      include: { _count: { select: { user_badges: true } } },
+    })));
+    return mapBadgeConfig(rows);
+  })),
+  updateBadgeConfig: (id: string, input: any) => withDatabaseErrors(async () => {
+    const selected = await prisma.badges.findUnique({ where: { badge_id: id } });
+    if (!selected) throw new GamificationServiceError('Record not found', 404);
+
+    return prisma.$transaction(async (tx: any) => {
+      const rows = await tx.badges.findMany({
+        where: { condition_type: selected.condition_type },
+        include: { _count: { select: { user_badges: true } } },
+      });
+      if (!rows.length) throw new GamificationServiceError('Record not found', 404);
+
+      const name = input.badgeName ?? selected.badge_name;
+      const description = input.description !== undefined ? input.description : selected.description;
+      const conditionType = input.conditionType ?? selected.condition_type;
+
+      for (const level of badgeLevels) {
+        const current = rows.find((row: any) => row.badge_level === level);
+        const data = {
+          ...(input.badgeName !== undefined && { badge_name: input.badgeName }),
+          ...(input.description !== undefined && { description: input.description }),
+          ...(input.conditionType !== undefined && { condition_type: input.conditionType }),
+          ...(input.thresholds !== undefined && { required_count: input.thresholds[level] }),
+          ...(input.status !== undefined && { status: input.status }),
+        };
+
+        if (current) {
+          if (Object.keys(data).length > 0) {
+            await tx.badges.update({ where: { badge_id: current.badge_id }, data });
+          }
+        } else if (input.thresholds !== undefined) {
+          await tx.badges.create({
+            data: {
+              badge_name: name,
+              badge_level: level,
+              description,
+              condition_type: conditionType,
+              required_count: input.thresholds[level],
+              status: input.status ?? selected.status,
+            },
+          });
+        }
+      }
+
+      const updatedRows = await tx.badges.findMany({
+        where: { condition_type: conditionType },
+        include: { _count: { select: { user_badges: true } } },
+      });
+      return mapBadgeConfig(updatedRows);
+    });
+  }),
 };

@@ -50,10 +50,9 @@ export interface RewardRecord {
 export interface BadgeRecord {
   id: string;
   name: string;
-  level: string;
   description: string | null;
   conditionType: string;
-  requiredCount: number;
+  thresholds: Partial<Record<'Bronze' | 'Silver' | 'Gold' | 'Rainbow', number>>;
   status: RecordStatus;
   createdAt: string;
   awardedCount: number;
@@ -90,7 +89,7 @@ export const gamificationApi = {
   rewards: () => getList<RewardRecord>('/rewards'),
   createReward: (body: Record<string, unknown>) => createRecord<RewardRecord>('/rewards', body),
   updateReward: (id: string, body: Record<string, unknown>) => updateRecord<RewardRecord>('/rewards', id, body),
-  badges: () => getList<BadgeRecord>('/badges'),
-  createBadge: (body: Record<string, unknown>) => createRecord<BadgeRecord>('/badges', body),
-  updateBadge: (id: string, body: Record<string, unknown>) => updateRecord<BadgeRecord>('/badges', id, body),
+  badges: () => getList<BadgeRecord>('/badge-configs'),
+  createBadge: (body: Record<string, unknown>) => createRecord<BadgeRecord>('/badge-configs', body),
+  updateBadge: (id: string, body: Record<string, unknown>) => updateRecord<BadgeRecord>('/badge-configs', id, body),
 };

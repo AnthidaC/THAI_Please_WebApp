@@ -198,7 +198,7 @@ export const AdminCampaignsPage: React.FC = () => {
         ? `${(record as MissionRecord).name} ${(record as MissionRecord).campaignName ?? ''} ${(record as MissionRecord).type}`
         : resource === 'rewards'
           ? `${(record as RewardRecord).name} ${(record as RewardRecord).type}`
-          : `${(record as BadgeRecord).name} ${(record as BadgeRecord).conditionType} ${(record as BadgeRecord).level}`;
+          : `${(record as BadgeRecord).name} ${(record as BadgeRecord).conditionType}`;
     const matchesText = searchable.toLocaleLowerCase('th').includes(search.trim().toLocaleLowerCase('th'));
     const matchesStatus = statusFilter === 'all' || normalizeStatus(record.status) === statusFilter;
     return matchesText && matchesStatus;
@@ -265,10 +265,15 @@ export const AdminCampaignsPage: React.FC = () => {
       ];
     }
     const item = record as BadgeRecord;
+    const conditionLabel = item.conditionType === 'shop_visits'
+      ? 'เยี่ยมชมร้านค้า'
+      : item.conditionType === 'successful_referrals'
+        ? 'แนะนำเพื่อนสำเร็จ'
+        : item.conditionType.replace(/_/g, ' ');
     return [
       <div key="primary" className="flex items-start gap-3"><div className="mt-0.5 rounded-xl bg-amber-50 p-2 text-amber-700"><BadgeCheck className="h-4 w-4" /></div><div><p className="font-semibold text-ink">{item.name}</p><p className="mt-1 max-w-[250px] truncate text-xs text-ink-muted">{item.description || 'แบดจ์ความสำเร็จสำหรับประชาชน'}</p></div></div>,
-      <div key="level" className="min-w-[100px]"><span className="inline-flex rounded-pill border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800">{item.level}</span><p className="mt-1 text-xs text-ink-muted">ระดับแบดจ์</p></div>,
-      <div key="condition" className="min-w-[130px]"><p className="text-sm font-medium text-ink">{item.conditionType.replace(/_/g, ' ')}</p><p className="mt-1 text-xs text-ink-muted">ต้องทำให้ครบ {formatNumber(item.requiredCount)} ครั้ง</p></div>,
+      <div key="levels" className="min-w-[185px]"><div className="flex flex-wrap gap-1">{(['Bronze', 'Silver', 'Gold', 'Rainbow'] as const).map((level) => <span key={level} className="rounded-pill border border-amber-100 bg-amber-50 px-2 py-1 text-[10px] font-semibold text-amber-800">{level}: {item.thresholds[level] == null ? '—' : formatNumber(item.thresholds[level]!)}</span>)}</div><p className="mt-1 text-xs text-ink-muted">จำนวนครั้งต่อระดับ</p></div>,
+      <div key="condition" className="min-w-[130px]"><p className="text-sm font-medium text-ink">{conditionLabel}</p><p className="mt-1 text-xs text-ink-muted">ประเภทเงื่อนไข</p></div>,
       <div key="count" className="min-w-[100px]"><p className="font-mono text-sm font-medium text-ink">{formatNumber(item.awardedCount)}</p><p className="mt-1 text-xs text-ink-muted">ได้รับแบดจ์แล้ว</p></div>,
       <div key="status"><StatusPill status={item.status} /></div>,
     ];

@@ -1,14 +1,17 @@
 import { Router } from 'express';
 import {
   createBadge,
+  createBadgeConfig,
   createCampaign,
   createQuest,
   createReward,
   listBadges,
+  listBadgeConfigs,
   listCampaigns,
   listQuests,
   listRewards,
   updateBadge,
+  updateBadgeConfig,
   updateCampaign,
   updateQuest,
   updateReward,
@@ -17,10 +20,12 @@ import { authenticateAdmin } from '../middlewares/admin.middleware';
 import { validate } from '../middlewares/validate.middleware';
 import {
   createBadgeSchema,
+  createBadgeConfigSchema,
   createCampaignSchema,
   createQuestSchema,
   createRewardSchema,
   updateBadgeSchema,
+  updateBadgeConfigSchema,
   updateCampaignSchema,
   updateQuestSchema,
   updateRewardSchema,
@@ -43,5 +48,9 @@ router.patch('/rewards/:id', authenticateAdmin, validate(updateRewardSchema), up
 router.get('/badges', authenticateAdmin, listBadges);
 router.post('/badges', authenticateAdmin, validate(createBadgeSchema), createBadge);
 router.patch('/badges/:id', authenticateAdmin, validate(updateBadgeSchema), updateBadge);
+
+router.get('/badge-configs', authenticateAdmin, listBadgeConfigs);
+router.post('/badge-configs', authenticateAdmin, validate(createBadgeConfigSchema), createBadgeConfig);
+router.patch('/badge-configs/:id', authenticateAdmin, validate(updateBadgeConfigSchema), updateBadgeConfig);
 
 export default router;

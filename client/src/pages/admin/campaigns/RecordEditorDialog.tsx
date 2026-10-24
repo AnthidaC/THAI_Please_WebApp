@@ -75,10 +75,12 @@ const initialValues = (resource: ManagedResource, record: ManagedRecord | null):
   const item = record as BadgeRecord | null;
   return {
     name: item?.name ?? '',
-    level: item?.level ?? 'Bronze',
     description: item?.description ?? '',
     conditionType: item?.conditionType ?? 'shop_visits',
-    requiredCount: String(item?.requiredCount ?? 1),
+    thresholdBronze: item?.thresholds.Bronze == null ? '' : String(item.thresholds.Bronze),
+    thresholdSilver: item?.thresholds.Silver == null ? '' : String(item.thresholds.Silver),
+    thresholdGold: item?.thresholds.Gold == null ? '' : String(item.thresholds.Gold),
+    thresholdRainbow: item?.thresholds.Rainbow == null ? '' : String(item.thresholds.Rainbow),
     status: item?.status ?? 'active',
   };
 };
@@ -111,9 +113,34 @@ const badgeConditionOptions = [
   { value: 'successful_referrals', label: 'แนะนำเพื่อนให้สมัครสำเร็จครบตามจำนวน' },
 ];
 
+const badgeThresholdFields = [
+  { level: 'Bronze', key: 'thresholdBronze' },
+  { level: 'Silver', key: 'thresholdSilver' },
+  { level: 'Gold', key: 'thresholdGold' },
+  { level: 'Rainbow', key: 'thresholdRainbow' },
+] as const;
+type BadgeTier = typeof badgeThresholdFields[number]['level'];
+
 export const RecordEditorDialog: React.FC<Props> = ({ resource, record, campaigns, rewards, saving, onClose, onSave }) => {
   const [values, setValues] = useState(() => initialValues(resource, record));
   const [error, setError] = useState('');
+  const [selectedBadgeTier, setSelectedBadgeTier] = useState<BadgeTier>('Bronze');
+  const selectedBadgeThreshold = badgeThresholdFields.find(({ level }) => level === selectedBadgeTier) ?? badgeThresholdFields[0];
+  const selectedBadgeThresholdValue = Number(values[selectedBadgeThreshold.key]);
+  const selectedBadgeThresholdConfigured = selectedBadgeThresholdValue >= 1 && selectedBadgeThresholdValue <= 100;
+  const badgeThresholdValues = badgeThresholdFields.map(({ key }) => Number(values[key]));
+  let previousConfiguredThreshold = 0;
+  const badgeThresholdsOrdered = badgeThresholdValues.every((threshold) => {
+    if (threshold === 0) return true;
+    if (threshold < previousConfiguredThreshold) return false;
+    previousConfiguredThreshold = threshold;
+    return true;
+  });
+  const selectedBadgeTierIndex = badgeThresholdFields.findIndex(({ level }) => level === selectedBadgeTier);
+  const configuredEarlierThresholds = badgeThresholdValues.slice(0, selectedBadgeTierIndex).filter((threshold) => threshold > 0);
+  const configuredLaterThresholds = badgeThresholdValues.slice(selectedBadgeTierIndex + 1).filter((threshold) => threshold > 0);
+  const badgeThresholdMinimum = badgeThresholdsOrdered ? Math.max(1, ...configuredEarlierThresholds) : 1;
+  const badgeThresholdMaximum = badgeThresholdsOrdered ? Math.min(100, ...configuredLaterThresholds) : 100;
   const content = titles[resource];
 
   useEffect(() => {
@@ -134,6 +161,14 @@ export const RecordEditorDialog: React.FC<Props> = ({ resource, record, campaign
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError('');
+    if (resource === 'badges' && badgeThresholdFields.some(({ key }) => Number(values[key]) < 1 || Number(values[key]) > 100)) {
+      setError('กรุณากำหนดจำนวนครั้งของแต่ละระดับระหว่าง 1–100');
+      return;
+    }
+    if (resource === 'badges' && !badgeThresholdsOrdered) {
+      setError('จำนวนครั้งต้องเพิ่มขึ้นหรือเท่ากันตามลำดับ Bronze, Silver, Gold และ Rainbow');
+      return;
+    }
     try {
       let payload: Record<string, unknown>;
       if (resource === 'campaigns') {
@@ -172,10 +207,14 @@ export const RecordEditorDialog: React.FC<Props> = ({ resource, record, campaign
       } else {
         payload = {
           badgeName: values.name.trim(),
-          badgeLevel: values.level,
           description: values.description.trim() || null,
           conditionType: values.conditionType.trim(),
-          requiredCount: Number(values.requiredCount),
+          thresholds: {
+            Bronze: Number(values.thresholdBronze),
+            Silver: Number(values.thresholdSilver),
+            Gold: Number(values.thresholdGold),
+            Rainbow: Number(values.thresholdRainbow),
+          },
           status: values.status,
         };
       }
@@ -283,15 +322,68 @@ export const RecordEditorDialog: React.FC<Props> = ({ resource, record, campaign
                 <Field label="ชื่อแบดจ์" htmlFor="badge-name"><input id="badge-name" autoFocus required maxLength={100} value={values.name} onChange={(event) => set('name', event.target.value)} className={inputClass} placeholder="เช่น นักช้อปชุมชน" /></Field>
                 <Field label="รายละเอียด" htmlFor="badge-description"><textarea id="badge-description" rows={3} maxLength={1000} value={values.description} onChange={(event) => set('description', event.target.value)} className={`${inputClass} resize-y`} placeholder="รายละเอียดที่แสดงให้ผู้ใช้เห็น" /></Field>
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <Field label="ระดับแบดจ์" htmlFor="badge-level"><select id="badge-level" value={values.level} onChange={(event) => set('level', event.target.value)} className={inputClass}><option>Bronze</option><option>Silver</option><option>Gold</option><option>Rainbow</option></select></Field>
                   <Field label="ประเภทเงื่อนไข" htmlFor="badge-condition" hint="เลือกสิ่งที่ผู้ใช้ต้องทำให้ครบเพื่อรับแบดจ์">
                     <select id="badge-condition" required value={values.conditionType} onChange={(event) => set('conditionType', event.target.value)} className={inputClass}>
                       {!badgeConditionOptions.some((option) => option.value === values.conditionType) && <option value={values.conditionType}>ประเภทเดิม: {values.conditionType}</option>}
                       {badgeConditionOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                     </select>
                   </Field>
-                  <Field label="จำนวนที่ต้องทำ" htmlFor="badge-count"><input id="badge-count" required type="number" min="1" step="1" value={values.requiredCount} onChange={(event) => set('requiredCount', event.target.value)} className={inputClass} /></Field>
                   <Field label="สถานะ" htmlFor="badge-status"><select id="badge-status" value={values.status} onChange={(event) => set('status', event.target.value)} className={inputClass}><option value="active">เปิดใช้งาน</option><option value="paused">หยุดชั่วคราว</option><option value="archived">เก็บถาวร</option></select></Field>
+                </div>
+                <div className="rounded-2xl border border-amber-100 bg-amber-50/50 p-4">
+                  <div className="mb-3">
+                    <h3 className="text-sm font-semibold text-ink">จำนวนเป้าหมายของแต่ละระดับ</h3>
+                    <p className="mt-1 text-xs leading-5 text-ink-muted">เลือกระดับที่ต้องการ แล้วเลื่อนเพื่อกำหนดจำนวนครั้ง โดยระดับถัดไปต้องไม่น้อยกว่าระดับก่อนหน้า</p>
+                  </div>
+                  <div role="group" aria-label="เลือกระดับแบดจ์" className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    {badgeThresholdFields.map(({ level, key }) => {
+                      const value = Number(values[key]);
+                      const configured = value >= 1 && value <= 100;
+                      return (
+                        <button
+                          key={level}
+                          type="button"
+                          aria-pressed={selectedBadgeTier === level}
+                          onClick={() => setSelectedBadgeTier(level)}
+                          className={`rounded-xl border px-3 py-2 text-left transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-amber-100 ${selectedBadgeTier === level ? 'border-amber-300 bg-white text-amber-900 shadow-sm' : 'border-amber-100 bg-amber-50/70 text-ink-body hover:bg-white'}`}
+                        >
+                          <span className="block text-xs font-semibold">{level}</span>
+                          <span className="mt-1 block text-[11px] tabular-nums text-ink-muted">{configured ? `${value.toLocaleString('th-TH')} ครั้ง` : 'ยังไม่กำหนด'}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {!badgeThresholdsOrdered && <p role="alert" className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-status-error">จำนวนครั้งต้องเพิ่มขึ้นหรือเท่ากันตามลำดับ Bronze, Silver, Gold และ Rainbow</p>}
+                  <Field label={`${selectedBadgeTier} · จำนวนครั้ง`} htmlFor="badge-threshold-slider">
+                    <div className="rounded-xl border border-hairline bg-white px-3.5 py-3">
+                      <div className="mb-2 flex items-center justify-between gap-3">
+                        <span className="text-xs text-ink-muted">เกณฑ์ปลดล็อก</span>
+                        <output htmlFor="badge-threshold-slider" aria-live="polite" className="text-sm font-semibold tabular-nums text-ink">
+                          {selectedBadgeThresholdConfigured ? `${selectedBadgeThresholdValue.toLocaleString('th-TH')} ครั้ง` : 'ยังไม่ได้กำหนด'}
+                        </output>
+                      </div>
+                      <input
+                        id="badge-threshold-slider"
+                        type="range"
+                        min="0"
+                        max="100"
+                        step="1"
+                        value={selectedBadgeThresholdConfigured ? selectedBadgeThresholdValue : 0}
+                        onChange={(event) => {
+                          const nextThreshold = Number(event.target.value);
+                          if (nextThreshold === 0) {
+                            set(selectedBadgeThreshold.key, '');
+                            return;
+                          }
+                          set(selectedBadgeThreshold.key, String(Math.min(badgeThresholdMaximum, Math.max(badgeThresholdMinimum, nextThreshold))));
+                        }}
+                        aria-valuetext={selectedBadgeThresholdConfigured ? `${selectedBadgeThresholdValue} ครั้ง` : 'ยังไม่ได้กำหนด'}
+                        className="w-full cursor-pointer accent-amber-600 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-amber-100"
+                      />
+                      <div className="flex justify-between text-[10px] text-ink-muted"><span>0 · ยังไม่กำหนด</span><span>100 ครั้ง</span></div>
+                      <p className="mt-1 text-right text-[10px] text-ink-muted">ช่วงที่ใช้ได้: {badgeThresholdMinimum}–{badgeThresholdMaximum} ครั้ง</p>
+                    </div>
+                  </Field>
                 </div>
               </>
             )}

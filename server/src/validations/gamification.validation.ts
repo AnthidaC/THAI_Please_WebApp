@@ -116,4 +116,46 @@ export const updateBadgeSchema = z.object({
   status: z.enum(['active', 'paused', 'archived']).optional(),
 }).strict().refine((value) => Object.keys(value).length > 0, 'Provide at least one field to update');
 
+const badgeThresholds = z.object({
+  Bronze: z.coerce.number().int().positive().max(100),
+  Silver: z.coerce.number().int().positive().max(100),
+  Gold: z.coerce.number().int().positive().max(100),
+  Rainbow: z.coerce.number().int().positive().max(100),
+}).strict().superRefine((thresholds, context) => {
+  const levels = ['Bronze', 'Silver', 'Gold', 'Rainbow'] as const;
+  for (let index = 1; index < levels.length; index += 1) {
+    const previousLevel = levels[index - 1];
+    const level = levels[index];
+    if (thresholds[level] < thresholds[previousLevel]) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: [level],
+        message: `${level} threshold cannot be lower than ${previousLevel}`,
+      });
+    }
+  }
+});
+
+const badgeConfigFields = {
+  badgeName: badgeFields.badgeName,
+  description,
+  conditionType: badgeFields.conditionType,
+  thresholds: badgeThresholds,
+  status: badgeFields.status,
+};
+
+export const createBadgeConfigSchema = z.object(badgeConfigFields).strict();
+export const updateBadgeConfigSchema = z.object({
+  badgeName: badgeConfigFields.badgeName.optional(),
+  description: badgeConfigFields.description,
+  conditionType: badgeConfigFields.conditionType.optional(),
+  thresholds: badgeThresholds.optional(),
+  status: badgeFields.status.optional(),
+}).strict()
+  .refine((value) => Object.keys(value).length > 0, 'Provide at least one field to update')
+  .refine((value) => value.conditionType === undefined || value.thresholds !== undefined, {
+    path: ['thresholds'],
+    message: 'Changing the condition type requires thresholds for every badge level',
+  });
+
 export const uuidParamSchema = z.string().uuid();
