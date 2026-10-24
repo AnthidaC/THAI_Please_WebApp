@@ -21,6 +21,10 @@ import { MerchantPosQrPage } from '../pages/merchant/pos-qr/MerchantPosQrPage';
 import { MerchantSalesHistoryPage } from '../pages/merchant/sales/MerchantSalesHistoryPage';
 import { AdminFraudAlertsPage } from '../pages/admin/fraud-alerts/AdminFraudAlertsPage';
 
+// Developer 3: AI Discovery & Growth Pages
+import { CitizenNearMePage } from '../pages/citizen/recommendations/CitizenNearMePage';
+import { CitizenMerchantDetailPage } from '../pages/citizen/merchants/CitizenMerchantDetailPage';
+
 export const router = createBrowserRouter([
   // Main Application Routes
   {
@@ -48,6 +52,11 @@ export const router = createBrowserRouter([
         path: APP_ROUTES.CITIZEN_TRANSACTIONS,
         element: <CitizenTransactionsPage />,
       },
+      // Developer 3: AI Near-Me Discovery
+      {
+        path: APP_ROUTES.CITIZEN_NEAR_ME,
+        element: <CitizenNearMePage />,
+      },
 
       // Merchant Flow (Dev 2)
       {
@@ -72,6 +81,10 @@ export const router = createBrowserRouter([
           {
             path: APP_ROUTES.DASHBOARD,
             element: <DashboardPage />,
+          },
+          {
+            path: APP_ROUTES.CITIZEN_MERCHANT_DETAIL,
+            element: <CitizenMerchantDetailPage />,
           },
         ],
       },
