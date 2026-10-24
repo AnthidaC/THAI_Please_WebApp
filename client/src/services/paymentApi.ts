@@ -1,16 +1,5 @@
 import axios from '../lib/axios';
 
-export interface CurrentPeriodInfo {
-  periodId: string;
-  periodName: string;
-  startDate: string;
-  endDate: string;
-  quotaLimit: number;
-  quotaUsed: number;
-  quotaRemaining: number;
-  validUntilDate: string;
-}
-
 export interface MonthlyCycleInfo {
   currentMonthName: string;
   validUntilDate?: string;
@@ -44,9 +33,6 @@ export interface WalletData {
   status: string;
   lastQuotaResetDate: string;
   monthlyCycle?: MonthlyCycleInfo;
-  currentPeriod?: CurrentPeriodInfo | null;
-  hasCampaignPeriods?: boolean;
-  isOutsidePeriod?: boolean;
   campaignInfo?: {
     campaignId: string;
     campaignName: string;
@@ -103,7 +89,6 @@ export interface CopayPreviewData {
     totalSavingsAmount?: number;
     dailyQuotaRemainingBefore: number;
     dailyQuotaRemainingAfter: number;
-    quotaWarning?: string | null;
   };
   discountInfo?: DiscountValidationResult | null;
 }

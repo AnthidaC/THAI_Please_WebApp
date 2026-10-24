@@ -1,16 +1,5 @@
 import prisma from '../utils/prisma';
 
-export interface CurrentPeriodInfo {
-  periodId: string;
-  periodName: string;
-  startDate: string;
-  endDate: string;
-  quotaLimit: number;
-  quotaUsed: number;
-  quotaRemaining: number;
-  validUntilDate: string;
-}
-
 export interface MonthlyCycleInfo {
   currentMonthName: string;
   validUntilDate: string;
@@ -44,9 +33,6 @@ export interface WalletDetails {
   status: string;
   lastQuotaResetDate: string;
   monthlyCycle: MonthlyCycleInfo;
-  currentPeriod?: CurrentPeriodInfo | null;
-  hasCampaignPeriods?: boolean;
-  isOutsidePeriod?: boolean;
   campaignInfo?: {
     campaignId: string;
     campaignName: string;
@@ -219,77 +205,6 @@ export class WalletService {
       }
     }
 
-    // -------------------------------------------------------------------------
-    // ตรวจสอบรอบโครงการย่อย (Campaign Period Quota)
-    // -------------------------------------------------------------------------
-    let currentPeriod: CurrentPeriodInfo | null = null;
-    let hasCampaignPeriods = false;
-    let isOutsidePeriod = false;
-
-    if (linkedCampaign && effectiveEligibility === 'ELIGIBLE') {
-      // ตรวจสอบว่าแคมเปญนี้มีการตั้งค่ารอบย่อยไว้หรือไม่
-      const periodCount = await prisma.campaign_periods.count({
-        where: { campaign_id: linkedCampaign.campaign_id },
-      });
-      hasCampaignPeriods = periodCount > 0;
-
-      // ค้นหารอบโครงการปัจจุบันที่ครอบคลุมเวลาปัจจุบัน
-      const period = await prisma.campaign_periods.findFirst({
-        where: {
-          campaign_id: linkedCampaign.campaign_id,
-          start_date: { lte: now },
-          end_date: { gte: now },
-        },
-        orderBy: { start_date: 'asc' },
-      });
-
-      if (period) {
-        // ค้นหาหรือสร้าง wallet_period_quotas สำหรับ wallet นี้
-        let walletPeriodQuota = await prisma.wallet_period_quotas.findUnique({
-          where: {
-            wallet_id_period_id: {
-              wallet_id: wallet.wallet_id,
-              period_id: period.period_id,
-            },
-          },
-        });
-
-        if (!walletPeriodQuota) {
-          const limit = Number(period.period_quota_limit);
-          walletPeriodQuota = await prisma.wallet_period_quotas.create({
-            data: {
-              wallet_id: wallet.wallet_id,
-              period_id: period.period_id,
-              quota_limit: limit,
-              quota_used: 0,
-              quota_remaining: limit,
-            },
-          });
-        }
-
-        const pEndDate = new Date(period.end_date);
-        const thaiMonths = [
-          'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
-          'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม',
-        ];
-        const validUntilDate = `${pEndDate.getDate()} ${thaiMonths[pEndDate.getMonth()]} ${pEndDate.getFullYear() + 543}`;
-
-        currentPeriod = {
-          periodId: period.period_id,
-          periodName: period.period_name,
-          startDate: period.start_date.toISOString(),
-          endDate: period.end_date.toISOString(),
-          quotaLimit: Number(walletPeriodQuota.quota_limit),
-          quotaUsed: Number(walletPeriodQuota.quota_used),
-          quotaRemaining: Number(walletPeriodQuota.quota_remaining),
-          validUntilDate,
-        };
-      } else if (hasCampaignPeriods) {
-        // โครงการมีระบบรอบย่อย แต่ ณ เวลานี้ไม่อยู่ในรอบใดเลย
-        isOutsidePeriod = true;
-      }
-    }
-
     const dailyUsed = Number(wallet.daily_quota_used);
     const dailyRemaining =
       effectiveEligibility === 'ELIGIBLE'
@@ -309,9 +224,6 @@ export class WalletService {
       status: wallet.status,
       lastQuotaResetDate: wallet.last_quota_reset_date.toISOString(),
       monthlyCycle: getMonthlyCycleDetails(now, campaignEndDate),
-      currentPeriod,
-      hasCampaignPeriods,
-      isOutsidePeriod,
       campaignInfo,
       availableCampaignForRegistration,
     };

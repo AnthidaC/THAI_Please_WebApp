@@ -14,7 +14,7 @@ export const LoginPage: React.FC = () => {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // ดึงหน้าปลายทางที่ต้องการไปหลังล็อกอิน (ถ้ามี redirect มา)
-  const from = (location.state as { from?: { pathname: string } } | null)?.from?.pathname;
+  const from = (location.state as { from?: { pathname: string } } | null)?.from?.pathname || APP_ROUTES.DASHBOARD;
 
   const handleDemoLogin = (roleType: 'CITIZEN' | 'MERCHANT' | 'ADMIN') => {
     let mockUser: any;
@@ -45,7 +45,7 @@ export const LoginPage: React.FC = () => {
     }
 
     setAuth(mockUser, 'demo-token-' + roleType.toLowerCase());
-    navigate(from || (roleType === 'ADMIN' ? APP_ROUTES.ADMIN_DASHBOARD : APP_ROUTES.HOME), { replace: true });
+    navigate(from, { replace: true });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
