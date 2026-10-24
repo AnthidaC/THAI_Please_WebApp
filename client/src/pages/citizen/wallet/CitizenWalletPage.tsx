@@ -107,8 +107,14 @@ export const CitizenWalletPage: React.FC = () => {
     };
   };
   const fallbackCycle = getFallbackCycleDates();
-  const currentCycleName = wallet?.monthlyCycle?.currentMonthName ?? fallbackCycle.monthName;
-  const currentValidUntil = wallet?.monthlyCycle?.validUntilDate ?? fallbackCycle.validUntil;
+  const currentPeriod = wallet?.currentPeriod;
+  const isOutsidePeriod = !!wallet?.isOutsidePeriod;
+  const currentCycleName = isOutsidePeriod
+    ? 'อยู่นอกรอบโครงการ'
+    : (currentPeriod?.periodName ?? wallet?.monthlyCycle?.currentMonthName ?? fallbackCycle.monthName);
+  const currentValidUntil = isOutsidePeriod
+    ? '-'
+    : (currentPeriod?.validUntilDate ?? wallet?.monthlyCycle?.validUntilDate ?? fallbackCycle.validUntil);
 
   // แปลงวันที่แบบย่อภาษาไทย
   const formatThaiDate = (dateStr?: string) => {
@@ -257,22 +263,24 @@ export const CitizenWalletPage: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* การ์ดโควตารวมสะสม */}
+                  {/* การ์ดโควตารอบย่อยปัจจุบัน */}
                   <div className="rounded-2xl border border-hairline/60 bg-white p-3.5 sm:p-4 shadow-2xs flex flex-col justify-between">
                     <div>
                       <div className="flex flex-wrap items-center justify-between gap-1">
-                        <span className="text-xs font-medium text-ink-muted">เงินสะสมคงเหลือปัจจุบัน</span>
-                        <span className="rounded-pill bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-200">
-                          งวดนี้ (เดือนละ ฿1,000)
+                        <span className="text-xs font-medium text-ink-muted">โควตารอบปัจจุบันคงเหลือ</span>
+                        <span className={`rounded-pill px-2 py-0.5 text-[10px] font-bold border ${isOutsidePeriod ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'}`}>
+                          {isOutsidePeriod ? 'อยู่นอกรอบโครงการ' : (currentPeriod ? currentPeriod.periodName : `งวดนี้ (฿1,000)`)}
                         </span>
                       </div>
-                      <div className="mt-1 font-mono text-xl sm:text-2xl font-bold text-emerald-600">
+                      <div className={`mt-1 font-mono text-xl sm:text-2xl font-bold ${isOutsidePeriod ? 'text-ink-muted' : 'text-emerald-600'}`}>
                         ฿{' '}
                         {isWalletLoading
                           ? '---'
-                          : wallet.totalQuotaRemaining.toLocaleString('th-TH', {
-                              minimumFractionDigits: 2,
-                            })}
+                          : isOutsidePeriod
+                            ? '0.00'
+                            : (currentPeriod ? currentPeriod.quotaRemaining : wallet.totalQuotaRemaining).toLocaleString('th-TH', {
+                                minimumFractionDigits: 2,
+                              })}
                       </div>
                     </div>
                     <div className="mt-2 pt-2 border-t border-hairline/60 flex items-center justify-between gap-2 text-[11px]">

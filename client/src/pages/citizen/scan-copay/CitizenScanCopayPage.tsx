@@ -4,6 +4,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import {
   ShieldCheck,
   AlertTriangle,
+  AlertCircle,
   ArrowLeft,
   Lock,
   Sparkles,
@@ -519,20 +520,42 @@ export const CitizenScanCopayPage: React.FC = () => {
                   <div className="flex justify-between items-center gap-2 text-xs sm:text-sm text-brand-blue">
                     <span className="flex items-center space-x-1">
                       <Sparkles className="h-3.5 w-3.5 shrink-0" />
-                      <span>รัฐบาลช่วยจ่าย 60%</span>
+                      <span>
+                        {scannedData.copaySplit && scannedData.copaySplit.governmentPercentage > 0
+                          ? `รัฐบาลช่วยจ่าย (${scannedData.copaySplit.governmentPercentage}%)`
+                          : 'รัฐบาลช่วยจ่าย (ไม่มีสิทธิ์/โควตาหมด)'}
+                      </span>
                     </span>
                     <span className="font-mono font-bold shrink-0 whitespace-nowrap">
                       - ฿{(scannedData.copaySplit?.governmentCopayAmount ?? scannedData.qrData.estimatedGovCopay).toFixed(2)}
                     </span>
                   </div>
 
-                  {/* ประชาชนจ่ายจริง 40% */}
+                  {/* ประชาชนจ่ายจริง */}
                   <div className="border-t border-hairline pt-2.5 flex justify-between items-center gap-2 text-sm font-semibold">
-                    <span className="text-ink">ประชาชนจ่ายจริง (40%)</span>
+                    <div>
+                      <span className="text-ink">ประชาชนจ่ายจริง</span>
+                      {scannedData.copaySplit && (
+                        <span className="block text-[11px] font-normal text-ink-muted">
+                          (ชำระ {scannedData.copaySplit.citizenPercentage}%)
+                        </span>
+                      )}
+                    </div>
                     <span className="font-mono text-xl sm:text-2xl font-bold text-status-error shrink-0 whitespace-nowrap">
                       ฿{(scannedData.copaySplit?.citizenPaidAmount ?? scannedData.qrData.estimatedCitizenPay).toFixed(2)}
                     </span>
                   </div>
+
+                  {/* กล่องแจ้งเตือนกรณีไม่มีสิทธิ์โครงการ / โควตาไม่พอ หรือหมด */}
+                  {scannedData.copaySplit?.quotaWarning && (
+                    <div className="rounded-xl border border-amber-200 bg-amber-50/90 p-3 text-xs text-amber-900 flex items-start space-x-2.5 shadow-2xs">
+                      <AlertCircle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold text-amber-950">แจ้งเตือนสิทธิ์โครงการ</p>
+                        <p className="mt-0.5 text-amber-800 leading-relaxed">{scannedData.copaySplit.quotaWarning}</p>
+                      </div>
+                    </div>
+                  )}
 
                   {/* ป้ายสรุปเงินที่ประหยัดได้ทั้งหมด */}
                   <div className="mt-2 rounded-xl bg-blue-50 border border-blue-200 p-2.5 text-center">
