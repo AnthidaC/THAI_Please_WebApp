@@ -100,6 +100,17 @@ const Field: React.FC<{ label: string; htmlFor: string; hint?: string; children:
 
 const inputClass = 'w-full rounded-xl border border-hairline bg-white px-3.5 py-2.5 text-sm text-ink outline-none transition placeholder:text-ink-muted/70 focus:border-brand-blue focus:ring-4 focus:ring-blue-100 disabled:bg-surface-soft';
 
+const missionTypeOptions = [
+  { value: 'weekly_shop_visits', label: 'เยี่ยมชมร้านค้าให้ครบตามจำนวนครั้งต่อสัปดาห์' },
+  { value: 'referral', label: 'แนะนำเพื่อนให้เข้าร่วมโครงการ' },
+  { value: 'visit_diverse_shops', label: 'ใช้สิทธิ์กับร้านค้าหลายแห่ง' },
+];
+
+const badgeConditionOptions = [
+  { value: 'shop_visits', label: 'เยี่ยมชมร้านค้าครบตามจำนวนครั้ง' },
+  { value: 'successful_referrals', label: 'แนะนำเพื่อนให้สมัครสำเร็จครบตามจำนวน' },
+];
+
 export const RecordEditorDialog: React.FC<Props> = ({ resource, record, campaigns, rewards, saving, onClose, onSave }) => {
   const [values, setValues] = useState(() => initialValues(resource, record));
   const [error, setError] = useState('');
@@ -227,7 +238,12 @@ export const RecordEditorDialog: React.FC<Props> = ({ resource, record, campaign
                 <Field label="ชื่อภารกิจ" htmlFor="mission-name"><input id="mission-name" autoFocus required maxLength={150} value={values.name} onChange={(event) => set('name', event.target.value)} className={inputClass} placeholder="เช่น แวะร้านค้าในชุมชน 3 แห่ง" /></Field>
                 <Field label="รายละเอียด" htmlFor="mission-description"><textarea id="mission-description" rows={3} maxLength={1000} value={values.description} onChange={(event) => set('description', event.target.value)} className={`${inputClass} resize-y`} placeholder="อธิบายสิ่งที่ผู้ใช้ต้องทำ" /></Field>
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <Field label="ประเภทภารกิจ" htmlFor="mission-type" hint="ตัวอย่าง: weekly_shop_visits, referral, visit_diverse_shops"><input id="mission-type" required maxLength={50} value={values.type} onChange={(event) => set('type', event.target.value)} className={inputClass} /></Field>
+                  <Field label="ประเภทภารกิจ" htmlFor="mission-type" hint="เลือกกิจกรรมที่ใช้วัดความคืบหน้าของภารกิจ">
+                    <select id="mission-type" required value={values.type} onChange={(event) => set('type', event.target.value)} className={inputClass}>
+                      {!missionTypeOptions.some((option) => option.value === values.type) && <option value={values.type}>ประเภทเดิม: {values.type}</option>}
+                      {missionTypeOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                    </select>
+                  </Field>
                   <Field label="เป้าหมาย" htmlFor="mission-target"><input id="mission-target" required type="number" min="0.01" step="0.01" value={values.targetValue} onChange={(event) => set('targetValue', event.target.value)} className={inputClass} /></Field>
                   <Field label="แคมเปญ" htmlFor="mission-campaign">
                     <select id="mission-campaign" value={values.campaignId} onChange={(event) => set('campaignId', event.target.value)} className={inputClass}>
@@ -268,7 +284,12 @@ export const RecordEditorDialog: React.FC<Props> = ({ resource, record, campaign
                 <Field label="รายละเอียด" htmlFor="badge-description"><textarea id="badge-description" rows={3} maxLength={1000} value={values.description} onChange={(event) => set('description', event.target.value)} className={`${inputClass} resize-y`} placeholder="รายละเอียดที่แสดงให้ผู้ใช้เห็น" /></Field>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <Field label="ระดับแบดจ์" htmlFor="badge-level"><select id="badge-level" value={values.level} onChange={(event) => set('level', event.target.value)} className={inputClass}><option>Bronze</option><option>Silver</option><option>Gold</option><option>Rainbow</option></select></Field>
-                  <Field label="ประเภทเงื่อนไข" htmlFor="badge-condition" hint="ตัวอย่าง: shop_visits, successful_referrals"><input id="badge-condition" required maxLength={50} value={values.conditionType} onChange={(event) => set('conditionType', event.target.value)} className={inputClass} /></Field>
+                  <Field label="ประเภทเงื่อนไข" htmlFor="badge-condition" hint="เลือกสิ่งที่ผู้ใช้ต้องทำให้ครบเพื่อรับแบดจ์">
+                    <select id="badge-condition" required value={values.conditionType} onChange={(event) => set('conditionType', event.target.value)} className={inputClass}>
+                      {!badgeConditionOptions.some((option) => option.value === values.conditionType) && <option value={values.conditionType}>ประเภทเดิม: {values.conditionType}</option>}
+                      {badgeConditionOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                    </select>
+                  </Field>
                   <Field label="จำนวนที่ต้องทำ" htmlFor="badge-count"><input id="badge-count" required type="number" min="1" step="1" value={values.requiredCount} onChange={(event) => set('requiredCount', event.target.value)} className={inputClass} /></Field>
                   <Field label="สถานะ" htmlFor="badge-status"><select id="badge-status" value={values.status} onChange={(event) => set('status', event.target.value)} className={inputClass}><option value="active">เปิดใช้งาน</option><option value="paused">หยุดชั่วคราว</option><option value="archived">เก็บถาวร</option></select></Field>
                 </div>
