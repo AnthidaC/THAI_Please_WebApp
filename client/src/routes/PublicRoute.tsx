@@ -5,13 +5,13 @@ import { APP_ROUTES } from '../constants/routes';
 
 /**
  * Route guard for public-only pages (e.g. Login, Register).
- * Redirects authenticated users to their default landing page.
+ * Redirects to DASHBOARD if already authenticated.
  */
 export const PublicRoute: React.FC = () => {
-  const { isAuthenticated, user } = useAuthStore();
+  const { isAuthenticated } = useAuthStore();
 
   if (isAuthenticated) {
-    return <Navigate to={user?.role === 'ADMIN' ? APP_ROUTES.ADMIN_DASHBOARD : APP_ROUTES.HOME} replace />;
+    return <Navigate to={APP_ROUTES.DASHBOARD} replace />;
   }
 
   return <Outlet />;

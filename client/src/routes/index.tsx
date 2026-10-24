@@ -1,15 +1,15 @@
 import React from 'react';
-import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom';
+import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { APP_ROUTES } from '../constants/routes';
 import { RootLayout } from '../layouts/RootLayout';
 import { AuthLayout } from '../layouts/AuthLayout';
-import { AdminRoute } from './AdminRoute';
+import { ProtectedRoute } from './ProtectedRoute';
 import { PublicRoute } from './PublicRoute';
 
 import { HomePage } from '../pages/home/HomePage';
 import { LoginPage } from '../pages/auth/LoginPage';
 import { RegisterPage } from '../pages/auth/RegisterPage';
-import { DashboardPage } from '../pages/admin/dashboard/DashboardPage';
+import { DashboardPage } from '../pages/dashboard/DashboardPage';
 import { NotFoundPage } from '../pages/notFound/NotFoundPage';
 
 // Developer 2: Payment & Fraud Engine Pages
@@ -20,11 +20,6 @@ import { CitizenTransactionsPage } from '../pages/citizen/transactions/CitizenTr
 import { MerchantPosQrPage } from '../pages/merchant/pos-qr/MerchantPosQrPage';
 import { MerchantSalesHistoryPage } from '../pages/merchant/sales/MerchantSalesHistoryPage';
 import { AdminFraudAlertsPage } from '../pages/admin/fraud-alerts/AdminFraudAlertsPage';
-const AdminCampaignsPage = React.lazy(() => import('../pages/admin/campaigns/AdminCampaignsPage').then((module) => ({ default: module.AdminCampaignsPage })));
-
-// Developer 3: AI Discovery & Growth Pages
-import { CitizenNearMePage } from '../pages/citizen/recommendations/CitizenNearMePage';
-import { CitizenMerchantDetailPage } from '../pages/citizen/merchants/CitizenMerchantDetailPage';
 
 export const router = createBrowserRouter([
   // Main Application Routes
@@ -53,15 +48,6 @@ export const router = createBrowserRouter([
         path: APP_ROUTES.CITIZEN_TRANSACTIONS,
         element: <CitizenTransactionsPage />,
       },
-      // Developer 3: AI Near-Me Discovery & Merchant Detail
-      {
-        path: APP_ROUTES.CITIZEN_NEAR_ME,
-        element: <CitizenNearMePage />,
-      },
-      {
-        path: APP_ROUTES.CITIZEN_MERCHANT_DETAIL,
-        element: <CitizenMerchantDetailPage />,
-      },
 
       // Merchant Flow (Dev 2)
       {
@@ -73,37 +59,21 @@ export const router = createBrowserRouter([
         element: <MerchantSalesHistoryPage />,
       },
 
-      // Admin routes
+      // Admin Flow (Dev 2)
       {
-        path: APP_ROUTES.ADMIN_ROOT,
-        element: <Navigate to={APP_ROUTES.ADMIN_DASHBOARD} replace />,
-      },
-      {
-        element: <AdminRoute />,
-        children: [
-          {
-            path: APP_ROUTES.ADMIN_DASHBOARD,
-            element: <DashboardPage />,
-          },
-          {
-            path: APP_ROUTES.ADMIN_FRAUD_ALERTS,
-            element: <AdminFraudAlertsPage />,
-          },
-          {
-            path: APP_ROUTES.ADMIN_CAMPAIGNS,
-            element: (
-              <React.Suspense fallback={<div className="mx-auto flex min-h-64 max-w-7xl items-center justify-center px-6 text-sm text-ink-muted">กำลังโหลดเครื่องมือจัดการ...</div>}>
-                <AdminCampaignsPage />
-              </React.Suspense>
-            ),
-          },
-        ],
+        path: APP_ROUTES.ADMIN_FRAUD_ALERTS,
+        element: <AdminFraudAlertsPage />,
       },
 
-      // Legacy dashboard URL
+      // Protected Routes (Required Authentication)
       {
-        path: APP_ROUTES.DASHBOARD,
-        element: <Navigate to={APP_ROUTES.ADMIN_DASHBOARD} replace />,
+        element: <ProtectedRoute />,
+        children: [
+          {
+            path: APP_ROUTES.DASHBOARD,
+            element: <DashboardPage />,
+          },
+        ],
       },
     ],
   },
