@@ -89,3 +89,33 @@
 | `GET` | `/api/fraud/alerts` | ✅ Yes (Admin) | ดึงรายการธุรกรรมที่ถูกระงับหรือเตือนพิกัดผิดปกติ (Flagged Transactions) |
 | `POST` | `/api/fraud/resolve/:id` | ✅ Yes (Admin) | ผู้ดูแลระบบตรวจสอบและบันทึกผล (อนุมัติ / ปฏิเสธการชำระเงิน) |
 
+## 6. Developer 4: Badge Configuration
+
+จัดการแบดจ์หนึ่งชุดพร้อมเกณฑ์ปลดล็อกครบทั้ง 4 ระดับ โดย `thresholds` ระบุจำนวนครั้งที่ต้องทำตาม `conditionType` ให้ครบ
+
+| Method | Endpoint | Auth Required | Description |
+| :--- | :--- | :---: | :--- |
+| `GET` | `/api/badge-configs` | ✅ Yes (Admin) | แสดงชุดแบดจ์พร้อมจำนวนเกณฑ์ของแต่ละระดับ |
+| `POST` | `/api/badge-configs` | ✅ Yes (Admin) | สร้างชุดแบดจ์พร้อมเกณฑ์ครบทุกระดับ |
+| `PATCH` | `/api/badge-configs/:id` | ✅ Yes (Admin) | แก้ไขชุดแบดจ์หรือเกณฑ์รายระดับ |
+
+ตัวอย่างข้อมูลสำหรับ `POST` และ `PATCH`:
+
+```json
+{
+  "badgeName": "นักช้อปชุมชน",
+  "description": "สะสมการเยี่ยมชมร้านค้าในชุมชน",
+  "conditionType": "shop_visits",
+  "thresholds": {
+    "Bronze": 1,
+    "Silver": 5,
+    "Gold": 10,
+    "Rainbow": 20
+  },
+  "status": "active"
+}
+```
+
+ข้อมูลตอบกลับของแต่ละชุดประกอบด้วย `id`, `name`, `description`, `conditionType`, `thresholds`, `status`, `createdAt` และ `awardedCount`
+
+ค่า `thresholds` ของแต่ละระดับต้องเป็นจำนวนเต็มตั้งแต่ 1 ถึง 100 และต้องเพิ่มขึ้นหรือเท่ากันตามลำดับ `Bronze ≤ Silver ≤ Gold ≤ Rainbow` เมื่อแก้ไข `thresholds` ต้องส่งค่าครบทั้ง 4 ระดับ ส่วน `PATCH` ที่แก้เฉพาะชื่อ รายละเอียด หรือสถานะส่งได้เฉพาะฟิลด์ที่ต้องการเปลี่ยน การเปลี่ยน `conditionType` ต้องส่งเกณฑ์ครบทั้ง 4 ระดับด้วย
