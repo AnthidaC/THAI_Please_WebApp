@@ -6,7 +6,6 @@ import {
   AlertTriangle,
   AlertCircle,
   ArrowLeft,
-  Lock,
   Sparkles,
   Store,
   RefreshCw,
@@ -30,6 +29,7 @@ import {
 import { APP_ROUTES } from '../../../constants/routes';
 import { QrCameraScanner } from '../../../components/payment/QrCameraScanner';
 import { usePaymentPinStatus } from '../../../hooks/usePaymentPinStatus';
+import { PaymentPinConfirmation } from '../../../components/payment/PaymentPinConfirmation';
 
 export const CitizenScanCopayPage: React.FC = () => {
   const navigate = useNavigate();
@@ -43,7 +43,8 @@ export const CitizenScanCopayPage: React.FC = () => {
   // ข้อมูล QR และการเลือกสแกน
   const [qrReference, setQrReference] = useState<string>('');
   const [scannedData, setScannedData] = useState<CopayPreviewData | null>(null);
-  const [pin, setPin] = useState<string>('');
+  const [showPinConfirmation, setShowPinConfirmation] = useState(false);
+  const [pinError, setPinError] = useState<string | null>(null);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [showManualInput, setShowManualInput] = useState<boolean>(false);
   const [showCoupon, setShowCoupon] = useState<boolean>(false);
@@ -58,7 +59,7 @@ export const CitizenScanCopayPage: React.FC = () => {
     queryKey: ['wallet-balance'],
     queryFn: getWalletBalance,
   });
-  const { data: pinStatus } = usePaymentPinStatus();
+  const { data: pinStatus, refetch: refetchPinStatus } = usePaymentPinStatus();
 
   // ติดตามพิกัด GPS จริงจากเบราว์เซอร์แบบเบื้องหลัง
   useEffect(() => {
@@ -85,6 +86,7 @@ export const CitizenScanCopayPage: React.FC = () => {
       if (diffSec <= 0) {
         // หากหมดอายุ ให้เด้งกลับหน้าสแกนใหม่ทันที พร้อมแจ้งเตือนตามที่กำหนด
         setScannedData(null);
+        setShowPinConfirmation(false);
         setQrReference('');
         setCheckoutError('QR หมดอายุ กรุณาทำรายการใหม่');
       }
@@ -161,7 +163,7 @@ export const CitizenScanCopayPage: React.FC = () => {
 
   // Mutation ชำระเงินร่วม (Co-pay 60/40)
   const checkoutMutation = useMutation({
-    mutationFn: () =>
+    mutationFn: (pin: string) =>
       checkoutCopay({
         qrReference,
         userLatitude: userLocation.lat,
@@ -171,18 +173,19 @@ export const CitizenScanCopayPage: React.FC = () => {
         discountCode: appliedDiscount?.code,
       }),
     onSuccess: (data) => {
-      setPin('');
+      setShowPinConfirmation(false);
       // ชำระเงินสำเร็จ นำทางไปยังหน้า e-Slip พร้อมสั่งบันทึกสลิปอัตโนมัติ (Auto-Save)
       navigate(`/citizen/slip/${data.transactionId}?autosave=1`, {
         state: { autoSave: true },
       });
     },
     onError: (err: any) => {
-      setPin('');
       if (err.response?.data?.code?.startsWith('PIN_')) {
-        setCheckoutError(err.response.data.message);
+        setPinError(err.response.data.message);
+        if (err.response.data.code === 'PIN_LOCKED') void refetchPinStatus();
         return;
       }
+      setShowPinConfirmation(false);
       // หากไม่ผ่านหรือตำแหน่งอยู่นอกระยะ หรือหมดอายุ ให้เด้งกลับหน้าสแกนใหม่
       setScannedData(null);
       setQrReference('');
@@ -196,7 +199,8 @@ export const CitizenScanCopayPage: React.FC = () => {
 
   // เมื่อกล้องอ่าน QR ได้ → ตรวจสอบรายการทันที (ไม่ต้องกดปุ่มเพิ่ม)
   const handleDetected = (text: string) => {
-    setPin('');
+    setShowPinConfirmation(false);
+    setPinError(null);
     setCheckoutError(null);
     setAppliedDiscount(null);
     setDiscountCodeInput('');
@@ -586,9 +590,9 @@ export const CitizenScanCopayPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Right Column: PIN & Confirm Checkout (lg:col-span-5) */}
+            {/* Review the amount first; PIN authorization opens as a separate full-screen step. */}
             <div className="lg:col-span-5 space-y-4">
-              {/* ยอดเงินคงเหลือ + PIN + ปุ่มยืนยัน รวมไว้การ์ดเดียว */}
+              {/* ยอดเงินคงเหลือและปุ่มไปขั้นตอนยืนยัน PIN */}
               <div className="rounded-card border border-hairline bg-white p-4 sm:p-5 shadow-sm space-y-3.5">
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-ink-muted font-medium">ยอดเงินในกระเป๋าส่วนตัว</span>
@@ -602,29 +606,7 @@ export const CitizenScanCopayPage: React.FC = () => {
                   </p>
                 )}
 
-                <div className="pt-2 border-t border-hairline">
-                  <label htmlFor="input-copay-pin" className="text-xs font-semibold text-ink flex items-center space-x-1.5 mb-2">
-                    <Lock className="h-4 w-4 text-brand-blue shrink-0" />
-                    <span>รหัส PIN ยืนยันการชำระเงิน (6 หลัก)</span>
-                  </label>
-                  <input
-                    id="input-copay-pin"
-                    type="password"
-                    inputMode="numeric"
-                    maxLength={6}
-                    autoComplete="current-password"
-                    disabled={!pinStatus?.isSet || checkoutMutation.isPending}
-                    value={pin}
-                    onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                    placeholder="******"
-                    className="w-full text-center tracking-[0.45em] font-mono text-xl sm:text-2xl rounded-pill border border-hairline py-2.5 focus:border-brand-blue focus:outline-none focus:ring-2 focus:ring-blue-100"
-                  />
-                  {pin.length !== 6 && (
-                    <p className="text-[11px] text-amber-600 mt-1 text-center">
-                      กรุณาระบุรหัส PIN ตัวเลข 6 หลักเพื่อยืนยันการชำระเงิน
-                    </p>
-                  )}
-                </div>
+                <p className="border-t border-hairline pt-3 text-xs leading-relaxed text-ink-muted">ตรวจสอบยอดชำระ จากนั้นกดยืนยันเพื่อกรอกรหัส PIN ในขั้นตอนถัดไป</p>
 
                 {/* ปุ่มยืนยันชำระเงิน */}
                 <button
@@ -632,14 +614,13 @@ export const CitizenScanCopayPage: React.FC = () => {
                   disabled={
                     checkoutMutation.isPending ||
                     !pinStatus?.isSet ||
-                    pin.length !== 6 ||
                     (wallet
                       ? wallet.balance <
                         (scannedData.copaySplit?.citizenPaidAmount ??
                           scannedData.qrData.estimatedCitizenPay)
                       : false)
                   }
-                  onClick={() => checkoutMutation.mutate()}
+                  onClick={() => { setPinError(null); setCheckoutError(null); setShowPinConfirmation(true); }}
                   className="w-full flex items-center justify-center space-x-2 rounded-card bg-brand-blue py-3.5 text-white text-sm sm:text-base font-semibold shadow-lg shadow-blue-500/20 transition hover:bg-brand-blue-hover active:scale-98 disabled:opacity-50"
                 >
                   {checkoutMutation.isPending ? (
@@ -668,6 +649,17 @@ export const CitizenScanCopayPage: React.FC = () => {
           <span>ทำรายการอย่างปลอดภัยตามมาตรฐานโครงการ</span>
         </div>
       </main>
+      <PaymentPinConfirmation
+        open={showPinConfirmation && Boolean(scannedData)}
+        amount={scannedData?.copaySplit?.citizenPaidAmount ?? scannedData?.qrData.estimatedCitizenPay ?? 0}
+        shopName={scannedData?.qrData.shopName ?? ''}
+        isPending={checkoutMutation.isPending}
+        error={pinError}
+        lockedUntil={pinStatus?.lockedUntil}
+        onConfirm={pin => checkoutMutation.mutate(pin)}
+        onClose={() => { setShowPinConfirmation(false); setPinError(null); }}
+        onEdit={() => setPinError(null)}
+      />
     </div>
   );
 };
