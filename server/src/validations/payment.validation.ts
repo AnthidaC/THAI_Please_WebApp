@@ -40,9 +40,23 @@ export const checkoutCopaySchema = z.object({
     .max(180),
   pin: z
     .string()
-    .regex(/^\d{6}$/, 'รหัส PIN ยืนยันการชำระเงินต้องเป็นตัวเลข 6 หลัก')
-    .optional(),
+    .regex(/^\d{6}$/, 'รหัส PIN ยืนยันการชำระเงินต้องเป็นตัวเลข 6 หลัก'),
   discountCode: z.string().optional(),
+});
+
+export const setPaymentPinSchema = z.object({
+  pin: z.string().regex(/^\d{6}$/, 'รหัส PIN ต้องเป็นตัวเลข 6 หลัก'),
+  confirmPin: z.string().regex(/^\d{6}$/, 'กรุณายืนยันรหัส PIN 6 หลัก'),
+  currentPin: z.string().regex(/^\d{6}$/, 'PIN ปัจจุบันต้องเป็นตัวเลข 6 หลัก').optional(),
+}).refine(data => data.pin === data.confirmPin, {
+  message: 'รหัส PIN ทั้งสองช่องไม่ตรงกัน', path: ['confirmPin'],
+});
+
+export const resetPaymentPinSchema = z.object({
+  pin: z.string().regex(/^\d{6}$/, 'รหัส PIN ต้องเป็นตัวเลข 6 หลัก'),
+  confirmPin: z.string().regex(/^\d{6}$/, 'กรุณายืนยันรหัส PIN 6 หลัก'),
+}).refine(data => data.pin === data.confirmPin, {
+  message: 'รหัส PIN ทั้งสองช่องไม่ตรงกัน', path: ['confirmPin'],
 });
 
 export const validateDiscountSchema = z.object({

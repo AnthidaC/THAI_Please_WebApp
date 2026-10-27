@@ -25,6 +25,7 @@ import {
   getBuyerHistory,
 } from '../../../services/paymentApi';
 import { APP_ROUTES } from '../../../constants/routes';
+import { WalletSecuritySettings } from '../../../components/payment/WalletSecuritySettings';
 
 export const CitizenWalletPage: React.FC = () => {
   const navigate = useNavigate();
@@ -608,6 +609,9 @@ export const CitizenWalletPage: React.FC = () => {
                 </div>
               )}
             </section>
+
+            {/* ตั้งค่าความปลอดภัย (เปลี่ยน PIN) — วางท้ายหน้าเพื่อไม่ให้เด่นเหนือยอดเงิน */}
+            <WalletSecuritySettings />
 
             {/* Institutional Calm Badge */}
             <section className="flex items-center justify-center space-x-2 py-2 text-[11px] sm:text-xs text-ink-muted text-center">

@@ -208,6 +208,7 @@ async function testAiEngine() {
 async function testDistanceCheckAndQrSuspension() {
   // 9.1 ทดสอบระยะทางประมาณ 1.5 กม. (ไม่เกิน 2 กม.) ต้องอนุญาตให้ทำรายการได้
   const qrWithin2Km = await paymentService.generateDynamicQr({
+    merchantId: process.env.PAYMENT_TEST_MERCHANT_ID,
     amount: 150,
     latitude: 13.7500,
     longitude: 100.5000,
@@ -226,6 +227,7 @@ async function testDistanceCheckAndQrSuspension() {
 
   // 9.2 ทดสอบระยะทางเกิน 2 กม. (เช่น ~5 กม.) ต้องระงับ QR และแจ้งเตือนอย่างสุภาพ
   const qrBeyond2Km = await paymentService.generateDynamicQr({
+    merchantId: process.env.PAYMENT_TEST_MERCHANT_ID,
     amount: 150,
     latitude: 13.7500,
     longitude: 100.5000,
@@ -263,6 +265,7 @@ async function testDistanceCheckAndQrSuspension() {
 // 10. ทดสอบอายุ QR Code 3 นาที (180,000 มิลลิวินาที) และการแจ้งเตือน "QR หมดอายุ กรุณาทำรายการใหม่"
 async function testQrExpirationIn3Minutes() {
   const qr = await paymentService.generateDynamicQr({
+    merchantId: process.env.PAYMENT_TEST_MERCHANT_ID,
     amount: 100,
     latitude: 13.7563,
     longitude: 100.5018,
@@ -281,7 +284,7 @@ async function testQrExpirationIn3Minutes() {
   assert.strictEqual(validScan.qrData.qrReference, qr.qrReference);
 
   // จำลองเวลาให้ QR Code หมดอายุ (เกิน 3 นาที)
-  paymentService._simulateExpireQr(qr.qrReference);
+  await paymentService._simulateExpireQr(qr.qrReference);
 
   // ทดสอบเมื่อสแกนหลังหมดอายุ: ต้องแจ้งเตือน "QR หมดอายุ กรุณาทำรายการใหม่"
   await assert.rejects(
@@ -299,11 +302,15 @@ async function testQrExpirationIn3Minutes() {
 }
 
 async function runAllTests() {
-  await testDiscountValidation();
   await testAiEngine();
-  await testDistanceCheckAndQrSuspension();
-  await testQrExpirationIn3Minutes();
-  console.log('\n🎉 ผลการทดสอบ Unit Tests ทั้งหมด 10/10 ผ่านอย่างสมบูรณ์แบบ!');
+  if (process.env.PAYMENT_TEST_MERCHANT_ID) {
+    await testDiscountValidation();
+    await testDistanceCheckAndQrSuspension();
+    await testQrExpirationIn3Minutes();
+  } else {
+    console.log('  SKIP: seed-dependent database cases; run npm run test:payment:integration for isolated database coverage.');
+  }
+  console.log('\nPayment calculation and local fraud checks passed.');
 }
 
 runAllTests().catch((err) => {

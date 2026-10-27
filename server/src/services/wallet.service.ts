@@ -353,11 +353,17 @@ export class WalletService {
     if (!wallet) {
       throw new Error('ไม่พบข้อมูลกระเป๋าเงินของผู้ใช้');
     }
+    if (wallet.status === 'SUSPENDED' || wallet.eligibility_status === 'SUSPENDED') {
+      throw new Error('สิทธิ์ของคุณถูกระงับชั่วคราว กรุณาติดต่อผู้ดูแลระบบ');
+    }
 
     const updatedWallet = await prisma.$transaction(async (tx: any) => {
       await tx.$queryRaw`SELECT wallet_id FROM public.wallets WHERE wallet_id = ${wallet!.wallet_id}::uuid FOR UPDATE`;
       const currentWallet = await tx.wallets.findUnique({ where: { wallet_id: wallet!.wallet_id } });
       if (!currentWallet) throw new Error('ไม่พบข้อมูลกระเป๋าเงินของผู้ใช้');
+      if (currentWallet.status === 'SUSPENDED' || currentWallet.eligibility_status === 'SUSPENDED') {
+        throw new Error('สิทธิ์ของคุณถูกระงับชั่วคราว กรุณาติดต่อผู้ดูแลระบบ');
+      }
       const sameCampaign = currentWallet.campaign_id === campaign.campaign_id;
       const updated = await tx.wallets.update({
         where: { wallet_id: currentWallet.wallet_id },
@@ -386,6 +392,7 @@ export class WalletService {
 
     return {
       success: true,
+      wallet: await this.getWalletByUserId(userId),
       message: `ลงทะเบียนรับสิทธิ์ ${campaign.campaign_name} สำเร็จเรียบร้อยแล้ว`,
       campaignName: campaign.campaign_name,
       dailyQuotaLimit: Number(campaign.daily_quota_limit),
@@ -415,7 +422,7 @@ export class WalletService {
       const updatedWallet = await tx.wallets.update({
         where: { wallet_id: currentWallet.walletId },
         data: {
-          balance: newBalance,
+          balance: { increment: amount },
         },
       });
 
@@ -426,7 +433,7 @@ export class WalletService {
           amount,
           payment_channel: paymentChannel,
           reference_number: refNumber,
-          balance_after: newBalance,
+          balance_after: updatedWallet.balance,
         },
       });
 

@@ -64,16 +64,10 @@ async function renderBankSlipCanvasPng(
   ctx.fillRect(0, 0, width, height);
 
   // แถบเส้นสีเอกลักษณ์ด้านบนสุด (Top Brand Accent)
-  const isFlagged = slip.status === 'FLAGGED';
   const topBarGrad = ctx.createLinearGradient(0, 0, width, 0);
-  if (isFlagged) {
-    topBarGrad.addColorStop(0, '#D97706');
-    topBarGrad.addColorStop(1, '#F59E0B');
-  } else {
-    topBarGrad.addColorStop(0, '#1D4ED8');
-    topBarGrad.addColorStop(0.5, '#2563EB');
-    topBarGrad.addColorStop(1, '#059669');
-  }
+  topBarGrad.addColorStop(0, '#1D4ED8');
+  topBarGrad.addColorStop(0.5, '#2563EB');
+  topBarGrad.addColorStop(1, '#059669');
   ctx.fillStyle = topBarGrad;
   ctx.fillRect(0, 0, width, 8);
 
@@ -92,9 +86,9 @@ async function renderBankSlipCanvasPng(
   // สถานะและวันเวลาด้านขวา
   const rightX = width - 50;
   ctx.textAlign = 'right';
-  ctx.fillStyle = isFlagged ? '#D97706' : '#059669';
+  ctx.fillStyle = '#059669';
   ctx.font = 'bold 22px "Prompt", "Noto Sans Thai", sans-serif';
-  ctx.fillText(isFlagged ? 'ชำระเงินสำเร็จ (รอตรวจสอบ)' : '✓ ชำระเงินสำเร็จ', rightX, curY);
+  ctx.fillText('✓ ชำระเงินสำเร็จ', rightX, curY);
 
   const formattedDate = new Date(slip.timestamp).toLocaleString('th-TH', {
     day: 'numeric',
@@ -566,8 +560,6 @@ export const CitizenPaymentSlipPage: React.FC = () => {
       </div>
     );
   }
-
-  const isFlagged = slip.status === 'FLAGGED';
   const maskedWalletId = `G-Wallet •••-•-•${(slip.transactionId || '8492').slice(-4)}`;
   const formattedTimestamp = new Date(slip.timestamp).toLocaleString('th-TH', {
     day: 'numeric',
@@ -762,11 +754,7 @@ export const CitizenPaymentSlipPage: React.FC = () => {
         >
           {/* เส้นขอบสีด้านบนของสลิป (Top Accent Line) */}
           <div
-            className={`h-2 w-full ${
-              isFlagged
-                ? 'bg-amber-500'
-                : 'bg-gradient-to-r from-blue-700 via-indigo-600 to-emerald-500'
-            }`}
+            className="h-2 w-full bg-gradient-to-r from-blue-700 via-indigo-600 to-emerald-500"
           />
 
           <div className="p-5 sm:p-6 space-y-5">
@@ -781,13 +769,9 @@ export const CitizenPaymentSlipPage: React.FC = () => {
                 </span>
               </div>
               <div className="text-right">
-                <span
-                  className={`inline-flex items-center space-x-1 text-xs sm:text-sm font-bold ${
-                    isFlagged ? 'text-amber-600' : 'text-emerald-600'
-                  }`}
-                >
+                <span className="inline-flex items-center space-x-1 text-xs sm:text-sm font-bold text-emerald-600">
                   <CheckCircle2 className="h-4 w-4 shrink-0" />
-                  <span>{isFlagged ? 'ชำระเงินสำเร็จ (รอตรวจสอบ)' : 'ชำระเงินสำเร็จ'}</span>
+                  <span>ชำระเงินสำเร็จ</span>
                 </span>
                 <p className="font-mono text-[11px] text-slate-400 mt-0.5">
                   {formattedTimestamp} น.
