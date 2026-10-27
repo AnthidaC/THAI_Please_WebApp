@@ -50,7 +50,7 @@ The `0_init` baseline contains 18 tables. The applied merchant onboarding and pr
 | `reviews` | รีวิวและคะแนนประเมินร้านค้าหลังทำรายการ (จำกัด 24 ชม.) | Dev 3 |
 | `quests` | ภารกิจ Gamification ภายในแคมเปญ | Dev 4 |
 | `user_quests` | สถานะการทำภารกิจของผู้ใช้งาน | Dev 4 |
-| `achievement_condition_types` | Thai condition metadata and implementation workflow; handler availability comes from the backend registry | Dev 4 |
+| `badge_condition_types` | Thai condition metadata and implementation workflow; handler availability comes from the backend registry | Dev 4 |
 | `badges` | เหรียญตราความสำเร็จแบบหลายระดับ | Dev 4 |
 | `badge_tiers` | Tier names, levels, thresholds, and optional icons for each Badge series | Dev 4 |
 | `user_badge_history` | Permanent per-tier unlock timestamps | Dev 4 |
@@ -127,6 +127,6 @@ Reconciliation timestamps missing unlocks at the time it runs, because the schem
 - Period quota rows remain independent. Unused quota expires at the period end and is never carried into a later period.
 - SQL CHECK constraints enforce per-row ranges. Deferred database triggers serialize period writes on the parent campaign and verify non-overlap, campaign containment, and the configured total at commit. Prisma ORM 6 does not model these triggers or cross-table rules; preserve their SQL migration definitions.
 
-Daily quota accounting uses the Bangkok calendar date, stored as PostgreSQL `DATE`. Wallet reads and checkout serialize daily resets with a wallet-row lock. `achievement_condition_types.condition_key` is unique and referenced by `badges.condition_type`; its immutable-key trigger protects Badge references. The catalog stores display/workflow metadata only. Handler availability comes from the backend registry and must not be inferred from a catalog row alone.
+Daily quota accounting uses the Bangkok calendar date, stored as PostgreSQL `DATE`. Wallet reads and checkout serialize daily resets with a wallet-row lock. `badge_condition_types.condition_key` is unique and referenced by `badges.condition_type`; its immutable-key trigger protects Badge references. The catalog stores display/workflow metadata only. Handler availability comes from the backend registry and must not be inferred from a catalog row alone.
 
 The new migration assumes these historical tables already exist. A clean database still needs a verified schema baseline that includes them; do not fabricate their missing historical migration. Back up the target database and run the read-only preflight before applying the constraints migration.

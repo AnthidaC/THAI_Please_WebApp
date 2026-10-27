@@ -40,7 +40,7 @@ model badges {
   implementation_status String        @default("pending") @db.VarChar(20)
   created_at            DateTime      @default(now()) @db.Timestamptz(6)
   updated_at            DateTime      @default(now()) @updatedAt @db.Timestamptz(6)
-  condition_type_definition achievement_condition_types @relation(fields: [condition_type], references: [condition_key], onDelete: Restrict, onUpdate: NoAction, map: "fk_badges_condition_type")
+  condition_type_definition badge_condition_types @relation(fields: [condition_type], references: [condition_key], onDelete: Restrict, onUpdate: NoAction, map: "fk_badges_condition_type")
   badge_tiers           badge_tiers[]
   user_badges           user_badges[] @relation("BadgeUserBadges")
   user_badge_history    user_badge_history[] @relation("BadgeHistory")
@@ -48,7 +48,7 @@ model badges {
   @@index([status, implementation_status], map: "idx_badges_status_implementation")
 }
 
-model achievement_condition_types {
+model badge_condition_types {
   condition_type_id    String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   condition_key        String    @unique(map: "uq_achievement_condition_types_key") @db.VarChar(50)
   display_name         String    @db.VarChar(100)
