@@ -114,7 +114,7 @@ export const getMe = async (req: Request, res: Response, next: NextFunction): Pr
       include: {
         wallets: true,
         user_badges: {
-          include: { badges: true },
+          include: { badges: true, badge_tiers: true },
         },
       },
     });
