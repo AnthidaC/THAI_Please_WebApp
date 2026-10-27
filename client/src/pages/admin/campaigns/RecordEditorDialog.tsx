@@ -181,6 +181,7 @@ export const RecordEditorDialog: React.FC<Props> = ({ resource, record, campaign
   const [error, setError] = useState('');
   const dialogRef = useRef<HTMLElement>(null);
   const content = titles[resource];
+  const selectedConditionType = conditionTypes.find((condition) => condition.key === values.conditionType);
   const hasPersistedPeriod = periods.some((period) => Boolean(period.periodId));
   const hasLockedPeriod = periods.some((period) => !period.isEditable);
   const configuredPeriodQuotaCents = sumMoneyCents(periods.map((period) => period.periodQuotaLimit));
@@ -601,11 +602,15 @@ export const RecordEditorDialog: React.FC<Props> = ({ resource, record, campaign
                   </select>
                   {conditionTypesError ? (
                     <p role="alert" className="mt-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-status-error">โหลดรายการประเภทเงื่อนไขไม่สำเร็จ กรุณาลองใหม่ก่อนสร้างเหรียญตรา</p>
-                  ) : conditionTypes.find((condition) => condition.key === values.conditionType)?.handlerRegistered ? (
-                    <p className="mt-2 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs font-medium text-blue-800">ระบบหลังบ้านรองรับเงื่อนไขนี้แล้ว แต่ต้องตั้งสถานะเป็นพร้อมใช้งานก่อนเปิดเหรียญตรา</p>
-                  ) : (
+                  ) : selectedConditionType?.handlerRegistered ? (
+                    selectedConditionType.implementationStatus === 'ready' ? (
+                      <p className="mt-2 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-800">ระบบหลังบ้านรองรับเงื่อนไขนี้และพร้อมใช้งานแล้ว</p>
+                    ) : (
+                      <p className="mt-2 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs font-medium text-blue-800">ระบบหลังบ้านรองรับเงื่อนไขนี้แล้ว แต่ต้องตั้งสถานะเป็นพร้อมใช้งานก่อนเปิดเหรียญตรา</p>
+                    )
+                  ) : selectedConditionType ? (
                     <p className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900">ต้องพัฒนาระบบหลังบ้านสำหรับเงื่อนไขนี้ก่อนเปิดใช้งาน</p>
-                  )}
+                  ) : null}
                   <button type="button" onClick={onManageConditionTypes} className="mt-2 min-h-10 rounded-pill border border-blue-200 bg-white px-3.5 text-xs font-semibold text-brand-blue hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-100">จัดการประเภทเงื่อนไข</button>
                 </Field>
 
