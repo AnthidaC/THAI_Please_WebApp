@@ -18,6 +18,7 @@ import { CitizenScanCopayPage } from '../pages/citizen/scan-copay/CitizenScanCop
 import { CitizenPaymentSlipPage } from '../pages/citizen/scan-copay/CitizenPaymentSlipPage';
 import { CitizenTransactionsPage } from '../pages/citizen/transactions/CitizenTransactionsPage';
 import { CitizenAchievementsPage } from '../pages/citizen/achievements/CitizenAchievementsPage';
+import { CitizenReviewPage } from '../pages/citizen/reviews/CitizenReviewPage';
 import { CitizenNearMePage } from '../pages/citizen/recommendations/CitizenNearMePage';
 import { CitizenMerchantDetailPage } from '../pages/citizen/merchants/CitizenMerchantDetailPage';
 import { CitizenProfilePage } from '../pages/citizen/profile/CitizenProfilePage';
@@ -60,6 +61,10 @@ export const router = createBrowserRouter([
       {
         path: APP_ROUTES.CITIZEN_ACHIEVEMENTS,
         element: <CitizenAchievementsPage />,
+      },
+      {
+        path: APP_ROUTES.CITIZEN_REVIEW,
+        element: <CitizenReviewPage />,
       },
       {
         path: APP_ROUTES.CITIZEN_NEAR_ME,
