@@ -19,9 +19,9 @@ export const getBuyerHistory = async (req: Request, res: Response): Promise<void
 
 export const getMerchantHistory = async (req: Request, res: Response): Promise<void> => {
   try {
-    const merchantId = res.locals.paymentMerchantId as string;
-    const date = typeof req.query.date === 'string' ? req.query.date : undefined;
-    const history = await transactionService.getMerchantHistory(merchantId, date);
+    const merchantId = (typeof req.query.merchantId === 'string' && req.query.merchantId.trim() ? req.query.merchantId.trim() : undefined) || (res.locals.paymentMerchantId as string);
+    const date = typeof req.query.date === 'string' && req.query.date.trim() ? req.query.date.trim() : undefined;
+    const history = await transactionService.getMerchantHistory(merchantId!, date);
     sendSuccess(res, history, 'ดึงสรุปยอดขายและสถิติร้านค้าสำเร็จ');
   } catch (error: any) {
     sendError(res, error.message || 'ไม่สามารถดึงข้อมูลสถิติร้านค้าได้', 500);

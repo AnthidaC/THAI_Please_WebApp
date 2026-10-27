@@ -326,6 +326,12 @@ export const setPaymentPin = async (payload: { pin: string; confirmPin: string; 
   return res.data.data;
 };
 
+/** Forgot PIN: server accepts only a freshly signed-in session (code REAUTH_REQUIRED otherwise). */
+export const resetPaymentPin = async (payload: { pin: string; confirmPin: string }) => {
+  const res = await axios.post('/wallet/pin/reset', payload);
+  return res.data.data;
+};
+
 export const topUpWallet = async (amount: number, paymentChannel = 'PROMPTPAY') => {
   const res = await axios.post('/wallet/top-up', { amount, paymentChannel });
   return res.data.data;

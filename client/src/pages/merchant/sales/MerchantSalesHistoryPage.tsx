@@ -9,7 +9,6 @@ import {
   Star,
   MapPin,
   Search,
-  AlertTriangle,
   CheckCircle2,
   XCircle,
   QrCode,
@@ -19,9 +18,9 @@ import { APP_ROUTES } from '../../../constants/routes';
 
 export const MerchantSalesHistoryPage: React.FC = () => {
   const navigate = useNavigate();
-  const [filterStatus, setFilterStatus] = useState<'ALL' | 'SUCCESS' | 'FLAGGED' | 'REJECTED'>('ALL');
+  const [filterStatus, setFilterStatus] = useState<'ALL' | 'SUCCESS' | 'REJECTED'>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [salesDate, setSalesDate] = useState(() => new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10));
+  const [salesDate, setSalesDate] = useState<string>('');
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['merchant-sales', salesDate],
@@ -31,21 +30,20 @@ export const MerchantSalesHistoryPage: React.FC = () => {
   const allTransactions = data?.transactions || [];
 
   const filteredTransactions = allTransactions.filter((tx) => {
-    if (filterStatus !== 'ALL' && tx.status !== filterStatus) return false;
+    if (filterStatus === 'SUCCESS' && tx.status !== 'SUCCESS' && tx.status !== 'FLAGGED') return false;
+    if (filterStatus === 'REJECTED' && tx.status !== 'REJECTED') return false;
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       return (
         tx.qrReference.toLowerCase().includes(q) ||
-        tx.customerName.toLowerCase().includes(q) ||
-        (tx.fraudReason && tx.fraudReason.toLowerCase().includes(q))
+        tx.customerName.toLowerCase().includes(q)
       );
     }
     return true;
   });
 
   const renderStatusBadge = (status: string) => {
-    const isSuccess = status === 'SUCCESS';
-    const isFlagged = status === 'FLAGGED';
+    const isSuccess = status === 'SUCCESS' || status === 'FLAGGED';
     const isRejected = status === 'REJECTED';
 
     return (
@@ -53,8 +51,6 @@ export const MerchantSalesHistoryPage: React.FC = () => {
         className={`inline-flex items-center space-x-1 rounded-pill px-2.5 py-0.5 text-[10px] font-semibold border whitespace-nowrap ${
           isSuccess
             ? 'bg-emerald-50 text-status-success border-emerald-200'
-            : isFlagged
-            ? 'bg-amber-50 text-status-warning border-amber-200'
             : isRejected
             ? 'bg-red-50 text-status-error border-red-200'
             : 'bg-gray-100 text-ink-muted border-gray-200'
@@ -64,11 +60,6 @@ export const MerchantSalesHistoryPage: React.FC = () => {
           <>
             <CheckCircle2 className="h-3 w-3 shrink-0" />
             <span>สำเร็จ</span>
-          </>
-        ) : isFlagged ? (
-          <>
-            <AlertTriangle className="h-3 w-3 shrink-0" />
-            <span>รอตรวจสอบ</span>
           </>
         ) : isRejected ? (
           <>
@@ -235,7 +226,6 @@ export const MerchantSalesHistoryPage: React.FC = () => {
               [
                 { key: 'ALL', label: 'ทั้งหมด' },
                 { key: 'SUCCESS', label: 'สำเร็จ' },
-                { key: 'FLAGGED', label: 'รอตรวจสอบรายการ' },
                 { key: 'REJECTED', label: 'ไม่สำเร็จ / ยกเลิก' },
               ] as const
             ).map((tab) => (
@@ -312,11 +302,7 @@ export const MerchantSalesHistoryPage: React.FC = () => {
                       </span>
                     </div>
 
-                    {tx.fraudReason && (
-                      <div className="rounded-xl bg-amber-50 border border-amber-200 px-2.5 py-1.5 text-[11px] text-amber-800">
-                        หมายเหตุ: {tx.fraudReason}
-                      </div>
-                    )}
+
                   </div>
                 ))}
               </div>
@@ -351,9 +337,6 @@ export const MerchantSalesHistoryPage: React.FC = () => {
                         </td>
                         <td className="py-3.5 px-3 font-medium text-ink">
                           <div>{tx.customerName}</div>
-                          {tx.fraudReason && (
-                            <div className="text-[10px] text-ink-muted mt-0.5">{tx.fraudReason}</div>
-                          )}
                         </td>
                         <td className="py-3.5 px-3 text-right font-mono font-bold text-ink whitespace-nowrap">
                           ฿{tx.totalAmount.toFixed(2)}

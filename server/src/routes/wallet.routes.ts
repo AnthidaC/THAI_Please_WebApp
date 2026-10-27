@@ -5,14 +5,16 @@ import {
   enrollInCampaign,
 } from '../controllers/wallet.controller';
 import { authenticatePaymentSession as authenticate } from '../middlewares/payment-access.middleware';
-import { getPaymentPinStatus, setPaymentPin } from '../controllers/payment-pin.controller';
+import { getPaymentPinStatus, setPaymentPin, resetPaymentPin } from '../controllers/payment-pin.controller';
 import { validate } from '../middlewares/validate.middleware';
-import { topUpWalletSchema, setPaymentPinSchema } from '../validations/payment.validation';
+import { topUpWalletSchema, setPaymentPinSchema, resetPaymentPinSchema } from '../validations/payment.validation';
 
 const router = Router();
 
 router.get('/pin/status', authenticate, getPaymentPinStatus);
 router.put('/pin', authenticate, validate(setPaymentPinSchema), setPaymentPin);
+// ลืม PIN: อนุญาตเฉพาะ session ที่เพิ่งเข้าสู่ระบบใหม่ (ตรวจใน service)
+router.post('/pin/reset', authenticate, validate(resetPaymentPinSchema), resetPaymentPin);
 
 // GET /api/wallet/balance
 router.get('/balance', authenticate, getWalletBalance);

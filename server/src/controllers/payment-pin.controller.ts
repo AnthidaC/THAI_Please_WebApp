@@ -21,3 +21,9 @@ export const setPaymentPin = async (req: Request, res: Response) => {
     sendSuccess(res, await paymentPinService.setPin(req.user!.userId, req.body.pin, req.body.currentPin), 'บันทึกรหัส PIN สำเร็จ');
   } catch (error) { handleError(res, error); }
 };
+
+export const resetPaymentPin = async (req: Request, res: Response) => {
+  try {
+    sendSuccess(res, await paymentPinService.resetPin(req.user!.userId, req.body.pin, req.user!), 'ตั้งรหัส PIN ใหม่สำเร็จ');
+  } catch (error) { handleError(res, error); }
+};

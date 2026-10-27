@@ -52,6 +52,13 @@ export const setPaymentPinSchema = z.object({
   message: 'รหัส PIN ทั้งสองช่องไม่ตรงกัน', path: ['confirmPin'],
 });
 
+export const resetPaymentPinSchema = z.object({
+  pin: z.string().regex(/^\d{6}$/, 'รหัส PIN ต้องเป็นตัวเลข 6 หลัก'),
+  confirmPin: z.string().regex(/^\d{6}$/, 'กรุณายืนยันรหัส PIN 6 หลัก'),
+}).refine(data => data.pin === data.confirmPin, {
+  message: 'รหัส PIN ทั้งสองช่องไม่ตรงกัน', path: ['confirmPin'],
+});
+
 export const validateDiscountSchema = z.object({
   code: z.string({ required_error: 'กรุณาระบุรหัสคูปองหรือโค้ดชวนเพื่อน' }).min(1),
   merchantId: z.string().optional(),

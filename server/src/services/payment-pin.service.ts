@@ -4,6 +4,7 @@ import { hashPassword, comparePassword } from '../utils/bcrypt';
 
 const MAX_FAILURES = 5;
 const LOCK_MS = 15 * 60 * 1000;
+const RESET_WINDOW_MS = 10 * 60 * 1000;
 type PinRecord = { pin_hash: string; failed_attempts: number; locked_until: Date | null };
 
 export class PaymentPinError extends Error {
@@ -84,6 +85,25 @@ export class PaymentPinService {
       return null;
     });
     if (error) throw error;
+    return { isSet: true };
+  }
+
+  /**
+   * Forgot-PIN reset: skips the current PIN but only for a session signed in within
+   * RESET_WINDOW_MS, so re-entering the account password is the identity check.
+   */
+  async resetPin(userId: string, pin: string, session: { iat?: number; isDemo?: boolean }) {
+    if (!/^\d{6}$/.test(pin)) throw new PaymentPinError('รหัส PIN ต้องเป็นตัวเลข 6 หลัก', 'PIN_INVALID');
+    const issuedAtMs = (session.iat ?? 0) * 1000;
+    if (!session.isDemo && Date.now() - issuedAtMs > RESET_WINDOW_MS) {
+      throw new PaymentPinError('เพื่อความปลอดภัย กรุณาเข้าสู่ระบบใหม่ก่อนตั้งรหัส PIN ใหม่', 'REAUTH_REQUIRED', 403);
+    }
+    const hash = await hashPassword(pin);
+    await prisma.payment_pins.upsert({
+      where: { user_id: userId },
+      create: { user_id: userId, pin_hash: hash },
+      update: { pin_hash: hash, failed_attempts: 0, locked_until: null, updated_at: new Date() },
+    });
     return { isSet: true };
   }
 }

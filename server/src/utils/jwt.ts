@@ -4,6 +4,10 @@ import { env } from '../config/env';
 export interface TokenPayload {
   userId: string;
   role: string;
+  /** Issued-at (seconds), set by jsonwebtoken; absent for dev demo sessions. */
+  iat?: number;
+  /** True only for the development-only demo citizen session. */
+  isDemo?: boolean;
 }
 
 export const signToken = (payload: TokenPayload): string => {
