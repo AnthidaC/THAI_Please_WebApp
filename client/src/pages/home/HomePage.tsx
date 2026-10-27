@@ -8,6 +8,7 @@ import {
   ArrowRight,
   Sparkles,
   ShieldCheck,
+  Gift,
 } from 'lucide-react';
 import { APP_ROUTES } from '../../constants/routes';
 import { useAuthStore } from '../../stores/authStore';
@@ -159,7 +160,13 @@ export const HomePage: React.FC = () => {
                 <div>
                   <span className="font-semibold text-ink">• Merchant Reviews:</span> รีวิว คะแนนดาว และความพึงพอใจของร้านค้า
                 </div>
-                <div>
+                <div
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(APP_ROUTES.CITIZEN_REFERRALS);
+                  }}
+                  className="hover:text-indigo-600 transition cursor-pointer"
+                >
                   <span className="font-semibold text-ink">• Referral:</span> แนะนำเพื่อนและสิทธิประโยชน์ร่วมจ่าย Co-pay
                 </div>
                 <div>
@@ -167,12 +174,36 @@ export const HomePage: React.FC = () => {
                 </div>
               </div>
             </div>
-            <div className="mt-5 pt-3 border-t border-hairline flex items-center justify-between text-xs font-semibold text-brand-blue">
-              <span>เปิดใช้งานระบบ AI แนะนำร้านค้าใกล้ฉัน</span>
-              <div className="flex items-center space-x-1 group-hover:translate-x-1 transition">
-                <span>เข้าสู่หน้าร้านค้าใกล้ฉัน</span>
-                <ArrowRight className="h-4 w-4" />
-              </div>
+            <div className="mt-5 pt-3 border-t border-hairline flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 text-xs font-semibold">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate(APP_ROUTES.CITIZEN_NEAR_ME);
+                }}
+                className="flex items-center justify-between sm:justify-start space-x-1.5 text-brand-blue hover:text-brand-blue-hover transition px-3.5 py-2 rounded-lg bg-brand-blue-light/60 hover:bg-brand-blue-light"
+              >
+                <div className="flex items-center space-x-1.5">
+                  <Sparkles className="h-3.5 w-3.5" />
+                  <span>ร้านค้าใกล้ฉัน (AI Near-Me)</span>
+                </div>
+                <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition" />
+              </button>
+
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate(APP_ROUTES.CITIZEN_REFERRALS);
+                }}
+                className="flex items-center justify-between sm:justify-start space-x-1.5 text-indigo-700 hover:text-indigo-800 transition px-3.5 py-2 rounded-lg bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 shadow-2xs"
+              >
+                <div className="flex items-center space-x-1.5">
+                  <Gift className="h-3.5 w-3.5 text-indigo-600" />
+                  <span>ระบบแนะนำเพื่อน (Referral)</span>
+                </div>
+                <ArrowRight className="h-3.5 w-3.5" />
+              </button>
             </div>
           </div>
         </div>

@@ -23,6 +23,11 @@ export const getMerchantReviewsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(10),
 });
 
+export const transactionIdParamSchema = z.object({
+  transactionId: z.string().uuid('รูปแบบรหัสธุรกรรมไม่ถูกต้อง (ต้องเป็น UUID)'),
+});
+
 export type CreateReviewInput = z.infer<typeof createReviewSchema>;
 export type MerchantIdParam = z.infer<typeof merchantIdParamSchema>;
+export type TransactionIdParam = z.infer<typeof transactionIdParamSchema>;
 export type GetMerchantReviewsQuery = z.infer<typeof getMerchantReviewsQuerySchema>;

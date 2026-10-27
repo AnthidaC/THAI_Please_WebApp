@@ -25,6 +25,8 @@ const AdminCampaignsPage = React.lazy(() => import('../pages/admin/campaigns/Adm
 // Developer 3: AI Discovery & Growth Pages
 import { CitizenNearMePage } from '../pages/citizen/recommendations/CitizenNearMePage';
 import { CitizenMerchantDetailPage } from '../pages/citizen/merchants/CitizenMerchantDetailPage';
+import { CitizenReferralPage } from '../pages/citizen/referrals/CitizenReferralPage';
+import { CitizenReviewPage } from '../pages/citizen/reviews/CitizenReviewPage';
 
 export const router = createBrowserRouter([
   // Main Application Routes
@@ -53,7 +55,7 @@ export const router = createBrowserRouter([
         path: APP_ROUTES.CITIZEN_TRANSACTIONS,
         element: <CitizenTransactionsPage />,
       },
-      // Developer 3: AI Near-Me Discovery & Merchant Detail
+      // Developer 3: AI Near-Me Discovery & Merchant Detail & Referral & Review
       {
         path: APP_ROUTES.CITIZEN_NEAR_ME,
         element: <CitizenNearMePage />,
@@ -61,6 +63,14 @@ export const router = createBrowserRouter([
       {
         path: APP_ROUTES.CITIZEN_MERCHANT_DETAIL,
         element: <CitizenMerchantDetailPage />,
+      },
+      {
+        path: APP_ROUTES.CITIZEN_REFERRALS,
+        element: <CitizenReferralPage />,
+      },
+      {
+        path: APP_ROUTES.CITIZEN_REVIEW,
+        element: <CitizenReviewPage />,
       },
 
       // Merchant Flow (Dev 2)

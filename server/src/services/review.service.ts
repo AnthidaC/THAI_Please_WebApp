@@ -270,6 +270,91 @@ export class ReviewService {
       })),
     };
   }
+
+  /**
+   * ดึงข้อมูลการประเมินรีวิวของธุรกรรมเฉพาะราย (Authenticated)
+   * ตรวจสอบสิทธิ์ความเป็นเจ้าของ ป้องกันการเข้าถึงรีวิวของผู้อื่น
+   */
+  public async getReviewByTransactionId(userId: string, transactionId: string) {
+    const review = await prisma.reviews.findUnique({
+      where: { transaction_id: transactionId },
+      include: {
+        merchants: {
+          select: {
+            merchant_id: true,
+            shop_name: true,
+          },
+        },
+      },
+    });
+
+    if (!review) {
+      return { reviewed: false, review: null };
+    }
+
+    // ป้องกันการเข้าถึงรีวิวของผู้อื่น
+    if (review.user_id !== userId) {
+      throw new ReviewError('ไม่มีสิทธิ์เข้าถึงข้อมูลรีวิวของธุรกรรมผู้อื่น', 403);
+    }
+
+    return {
+      reviewed: true,
+      review: {
+        reviewId: review.review_id,
+        transactionId: review.transaction_id,
+        merchantId: review.merchant_id,
+        merchantName: review.merchants.shop_name,
+        ratingStars: review.rating_stars,
+        reviewText: review.review_text,
+        isVerifiedPurchase: review.is_verified_purchase,
+        createdAt: review.created_at.toISOString(),
+      },
+    };
+  }
+
+  /**
+   * ดึงประวัติการประเมินรีวิวทั้งหมดของผู้ใช้งานปัจจุบัน (Authenticated)
+   * กรองเฉพาะรายการที่รีวิวแล้วจริงในฐานข้อมูล พร้อมข้อมูลร้านค้าและธุรกรรม
+   */
+  public async getUserReviews(userId: string) {
+    const reviews = await prisma.reviews.findMany({
+      where: { user_id: userId },
+      include: {
+        merchants: {
+          select: {
+            merchant_id: true,
+            shop_name: true,
+            average_rating_stars: true,
+          },
+        },
+        transactions: {
+          select: {
+            transaction_id: true,
+            total_amount: true,
+            citizen_paid_amount: true,
+            created_at: true,
+          },
+        },
+      },
+      orderBy: { created_at: 'desc' },
+    });
+
+    return reviews.map((r) => ({
+      reviewId: r.review_id,
+      transactionId: r.transaction_id,
+      merchantId: r.merchant_id,
+      merchantName: r.merchants.shop_name,
+      merchantAverageRating: Number(r.merchants.average_rating_stars),
+      ratingStars: r.rating_stars,
+      reviewText: r.review_text,
+      isVerifiedPurchase: r.is_verified_purchase,
+      totalAmount: r.transactions ? Number(r.transactions.total_amount) : undefined,
+      citizenPaidAmount: r.transactions ? Number(r.transactions.citizen_paid_amount) : undefined,
+      transactionDate: r.transactions ? r.transactions.created_at.toISOString() : undefined,
+      createdAt: r.created_at.toISOString(),
+    }));
+  }
 }
 
 export const reviewService = new ReviewService();
+

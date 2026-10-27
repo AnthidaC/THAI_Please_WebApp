@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { APP_ROUTES } from '../../../constants/routes';
@@ -12,12 +12,14 @@ import {
   ChevronRight,
   TrendingUp,
   AlertCircle,
+  AlertTriangle,
   MapPinOff,
   Store,
   CheckCircle2,
   WifiOff,
   ShieldAlert,
   Compass,
+  X,
 } from 'lucide-react';
 import {
   recommendationApi,
@@ -125,9 +127,16 @@ export const CitizenNearMePage: React.FC = () => {
   const [userCoords, setUserCoords] = useState<RealCoordinates | null>(null);
   const [readableAddress, setReadableAddress] = useState<string | null>(null);
   const [geoStatus, setGeoStatus] = useState<GeoStatus>('prompting');
+  // แถบแจ้งเตือนความผิดพลาดชั่วคราวขณะรีเฟรช GPS (โดยยังคงพิกัดเดิมไว้)
+  const [tempGpsWarning, setTempGpsWarning] = useState<string | null>(null);
+
+  // Sequence Ref เพื่อติดตามลำดับคำขอพิกัด ป้องกัน Stale Response ทับพิกัดใหม่
+  const requestSeqRef = useRef<number>(0);
 
   const navigate = useNavigate();
   const { isAuthenticated, token } = useAuthStore();
+
+
 
   // แปลงพิกัด GPS เป็นชื่อที่อยู่ภาษาไทยที่อ่านเข้าใจง่าย
   useEffect(() => {
@@ -146,49 +155,75 @@ export const CitizenNearMePage: React.FC = () => {
     };
   }, [userCoords]);
 
-  // ฟังก์ชันขอพิกัด GPS จริงจากเบราว์เซอร์
+  // ฟังก์ชันขอพิกัด GPS จริงจากเบราว์เซอร์ พร้อมป้องกัน Stale Responses และคงค่าพิกัดเดิมเมื่อเกิด Temporary Error
   const requestLocation = useCallback(() => {
     if (typeof window === 'undefined' || !navigator.geolocation) {
       setGeoStatus('unsupported');
-      setUserCoords(null);
       return;
     }
 
+    const currentReqId = ++requestSeqRef.current;
     setGeoStatus('locating');
+    setTempGpsWarning(null);
 
     navigator.geolocation.getCurrentPosition(
       (position) => {
+        // ป้องกัน Stale GPS Response จากคำขอก่อนหน้าที่ตอบกลับล่าช้า
+        if (currentReqId !== requestSeqRef.current) return;
+
         setUserCoords({
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
           accuracy: position.coords.accuracy,
         });
         setGeoStatus('granted');
+        setTempGpsWarning(null);
       },
       (error) => {
-        setUserCoords(null);
-        if (error.code === 1) {
-          // PERMISSION_DENIED
-          setGeoStatus('denied');
-        } else if (error.code === 2) {
-          // POSITION_UNAVAILABLE
-          setGeoStatus('unavailable');
-        } else if (error.code === 3) {
-          // TIMEOUT
-          setGeoStatus('timeout');
-        } else {
-          setGeoStatus('unavailable');
-        }
+        // ป้องกัน Stale GPS Response จากคำขอก่อนหน้า
+        if (currentReqId !== requestSeqRef.current) return;
+
+        setUserCoords((prevCoords) => {
+          if (prevCoords) {
+            // คงพิกัดเดิมที่ถูกต้องล่าสุดไว้เมื่อเกิด Temporary Error
+            let msg = 'ไม่สามารถอัปเดตพิกัดใหม่ได้ในขณะนี้';
+            if (error.code === 3) {
+              msg = 'หมดเวลาค้นหาสัญญาณพิกัดใหม่ (Timeout 20 วินาที) ยังคงใช้พิกัดเดิมที่ตรวจพบล่าสุด';
+            } else if (error.code === 2) {
+              msg = 'สัญญาณ GPS ขัดข้องชั่วคราว ยังคงใช้พิกัดเดิมที่ตรวจพบล่าสุด';
+            } else if (error.code === 1) {
+              msg = 'สิทธิ์พิกัดถูกปฏิเสธ ยังคงใช้พิกัดเดิมที่ตรวจพบล่าสุด';
+            }
+            setTempGpsWarning(msg);
+            setGeoStatus('granted'); // คงสถานะ granted เพื่อให้ UI ไม่ดับและแสดงรายการร้านค้าต่อไปได้
+            return prevCoords;
+          }
+
+          // กรณีไม่มีพิกัดเดิมมาก่อน
+          if (error.code === 1) {
+            // PERMISSION_DENIED
+            setGeoStatus('denied');
+          } else if (error.code === 2) {
+            // POSITION_UNAVAILABLE
+            setGeoStatus('unavailable');
+          } else if (error.code === 3) {
+            // TIMEOUT
+            setGeoStatus('timeout');
+          } else {
+            setGeoStatus('unavailable');
+          }
+          return null;
+        });
       },
       {
         enableHighAccuracy: true,
-        timeout: 10000,
+        timeout: 20000,
         maximumAge: 0,
       }
     );
   }, []);
 
-  // ขอสิทธิ์พิกัดอัตโนมัติเมื่อเข้าสู่หน้า Near-Me
+  // ขอสิทธิ์พิกัดอัตโนมัติเมื่อเข้าสู่หน้า Near-Me (Initial Mount เท่านั้น ไม่มีการ Auto-request ซ้ำ)
   useEffect(() => {
     requestLocation();
   }, [requestLocation]);
@@ -356,9 +391,9 @@ export const CitizenNearMePage: React.FC = () => {
               </p>
             </div>
 
-            {/* แสดงพิกัด GPS จริง หรือสถานะค้นหา พร้อมปุ่มรีเฟรช */}
-            <div className="flex items-center gap-2 self-start sm:self-auto bg-surface-soft border border-hairline px-3 py-1.5 rounded-pill">
-              <span className="relative flex h-2.5 w-2.5">
+            {/* แสดงพิกัด GPS จริง หรือสถานะค้นหา พร้อมปุ่มรีเฟรช และตัวบ่งชี้ความแม่นยำ */}
+            <div className="flex items-center gap-2 self-start sm:self-auto bg-surface-soft border border-hairline px-3 py-1.5 rounded-pill flex-wrap sm:flex-nowrap">
+              <span className="relative flex h-2.5 w-2.5 shrink-0">
                 <span
                   className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
                     geoStatus === 'granted'
@@ -393,7 +428,7 @@ export const CitizenNearMePage: React.FC = () => {
               <button
                 onClick={handleRefreshGps}
                 disabled={geoStatus === 'locating'}
-                className="p-1 hover:bg-white rounded-full transition text-ink-muted hover:text-ink disabled:opacity-50"
+                className="p-1 hover:bg-white rounded-full transition text-ink-muted hover:text-ink disabled:opacity-50 shrink-0"
                 title="รีเฟรชพิกัด GPS และดึงข้อมูลใหม่"
               >
                 <RefreshCw
@@ -496,6 +531,54 @@ export const CitizenNearMePage: React.FC = () => {
 
       {/* 3. MAIN CONTENT AREA (Distinct State Handlers) */}
       <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+
+        {/* แถบแจ้งเตือนความผิดพลาดชั่วคราวขณะรีเฟรช GPS (โดยยังคงพิกัดเดิมไว้) */}
+        {tempGpsWarning && (
+          <div className="mb-4 bg-blue-50 border border-blue-200 rounded-card p-3 sm:p-3.5 flex items-center justify-between gap-3 shadow-2xs text-xs">
+            <div className="flex items-center gap-2 text-brand-blue min-w-0">
+              <AlertCircle className="h-4 w-4 shrink-0 text-brand-blue" />
+              <span className="truncate font-medium">{tempGpsWarning}</span>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={handleRefreshGps}
+                disabled={geoStatus === 'locating'}
+                className="px-3 py-1 rounded-pill bg-brand-blue text-white font-semibold hover:bg-brand-blue-hover transition disabled:opacity-50 text-xs"
+              >
+                ลองใหม่
+              </button>
+              <button
+                onClick={() => setTempGpsWarning(null)}
+                className="p-1 text-ink-muted hover:text-ink rounded-full transition"
+                title="ปิดการแจ้งเตือน"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* กล่องแจ้งเตือนความแม่นยำต่ำเมื่อ accuracy > 1000m */}
+        {userCoords && typeof userCoords.accuracy === 'number' && userCoords.accuracy > 1000 && (
+          <div className="mb-4 bg-amber-50 border border-amber-200 rounded-card p-3.5 sm:p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xs">
+            <div className="flex items-center gap-3">
+              <div className="p-1.5 rounded-full bg-amber-100 text-amber-800 shrink-0">
+                <AlertTriangle className="h-4.5 w-4.5" />
+              </div>
+              <h4 className="text-xs sm:text-sm font-bold text-amber-900">
+                ความแม่นยำสัญญาณ GPS ค่อนข้างต่ำ
+              </h4>
+            </div>
+            <button
+              onClick={handleRefreshGps}
+              disabled={geoStatus === 'locating'}
+              className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-pill bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold shrink-0 transition disabled:opacity-50 shadow-xs self-stretch sm:self-auto justify-center"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${geoStatus === 'locating' ? 'animate-spin' : ''}`} />
+              <span>ค้นหาพิกัดใหม่</span>
+            </button>
+          </div>
+        )}
 
         {/* ============================================================== */}
         {/* STATE 1: กำลังขอสิทธิ์และค้นหาพิกัด GPS จริง (Detecting GPS) */}
