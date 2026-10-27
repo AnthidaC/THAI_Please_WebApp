@@ -1,4 +1,5 @@
 import prisma from '../utils/prisma';
+import { getBangkokDateKey, getDatabaseDateKey, toBangkokDatabaseDate } from '../utils/bangkok-date';
 
 export interface MonthlyCycleInfo {
   currentMonthName: string;
@@ -19,6 +20,25 @@ export interface AvailableCampaignInfo {
   endDate: string;
   status: string;
   isRegistrationOpen: boolean;
+  periodCount: number;
+  configuredPeriodQuota: number;
+}
+
+export interface CampaignPeriodQuotaInfo {
+  id: string;
+  name: string;
+  startDate: string;
+  endDate: string;
+  quotaLimit: number;
+  quotaUsed: number;
+  quotaRemaining: number;
+}
+
+export interface WalletPeriodQuotaInfo {
+  enabled: boolean;
+  status: 'ACTIVE' | 'BEFORE_FIRST' | 'BETWEEN_PERIODS' | 'AFTER_LAST' | 'ALLOCATION_MISSING' | 'INVALID_OVERLAP' | 'NOT_CONFIGURED';
+  currentPeriod: CampaignPeriodQuotaInfo | null;
+  nextPeriod: CampaignPeriodQuotaInfo | null;
 }
 
 export interface WalletDetails {
@@ -33,6 +53,7 @@ export interface WalletDetails {
   status: string;
   lastQuotaResetDate: string;
   monthlyCycle: MonthlyCycleInfo;
+  periodQuota: WalletPeriodQuotaInfo;
   campaignInfo?: {
     campaignId: string;
     campaignName: string;
@@ -87,17 +108,74 @@ export const getMonthlyCycleDetails = (
 };
 
 export class WalletService {
+  private async getPeriodQuotaInfo(walletId: string, campaignId: string | null, now: Date): Promise<WalletPeriodQuotaInfo> {
+    if (!campaignId) return { enabled: false, status: 'NOT_CONFIGURED', currentPeriod: null, nextPeriod: null };
+
+    const periods = await prisma.campaign_periods.findMany({
+      where: { campaign_id: campaignId },
+      orderBy: { start_date: 'asc' },
+    });
+    if (!periods.length) return { enabled: false, status: 'NOT_CONFIGURED', currentPeriod: null, nextPeriod: null };
+
+    await prisma.wallet_period_quotas.createMany({
+      data: periods.map((period) => ({
+        wallet_id: walletId,
+        period_id: period.period_id,
+        quota_limit: period.period_quota_limit,
+        quota_used: 0,
+        quota_remaining: period.period_quota_limit,
+      })),
+      skipDuplicates: true,
+    });
+
+    const activePeriods = periods.filter((period) => period.start_date <= now && now < period.end_date);
+    const toInfo = (period: typeof periods[number], quota?: { quota_limit: unknown; quota_used: unknown; quota_remaining: unknown }): CampaignPeriodQuotaInfo => ({
+      id: period.period_id,
+      name: period.period_name,
+      startDate: period.start_date.toISOString(),
+      endDate: period.end_date.toISOString(),
+      quotaLimit: Number(quota?.quota_limit ?? period.period_quota_limit),
+      quotaUsed: Number(quota?.quota_used ?? 0),
+      quotaRemaining: Number(quota?.quota_remaining ?? period.period_quota_limit),
+    });
+
+    if (activePeriods.length > 1) {
+      return { enabled: true, status: 'INVALID_OVERLAP', currentPeriod: null, nextPeriod: null };
+    }
+    if (activePeriods.length === 1) {
+      const active = activePeriods[0];
+      const quota = await prisma.wallet_period_quotas.findUnique({
+        where: { wallet_id_period_id: { wallet_id: walletId, period_id: active.period_id } },
+      });
+      return {
+        enabled: true,
+        status: quota ? 'ACTIVE' : 'ALLOCATION_MISSING',
+        currentPeriod: quota ? toInfo(active, quota) : null,
+        nextPeriod: null,
+      };
+    }
+
+    const next = periods.find((period) => period.start_date > now) ?? null;
+    const status: WalletPeriodQuotaInfo['status'] = now < periods[0].start_date
+      ? 'BEFORE_FIRST'
+      : now >= periods[periods.length - 1].end_date
+        ? 'AFTER_LAST'
+        : 'BETWEEN_PERIODS';
+    return { enabled: true, status, currentPeriod: null, nextPeriod: next ? toInfo(next) : null };
+  }
+
   /**
    * ดึงข้อมูลกระเป๋าเงินของผู้ใช้ พร้อมตรวจสอบสิทธิ์โครงการและวันเริ่มต้น-สิ้นสุดจาก DB
    */
   public async getWalletByUserId(userId: string): Promise<WalletDetails> {
     const now = new Date();
-    const todayStr = now.toISOString().split('T')[0];
+    const todayStr = getBangkokDateKey(now);
 
     // ดึงโครงการ Co-pay ที่เปิดใช้งานล่าสุดในระบบจาก DB
     const activeCampaign = await prisma.campaigns.findFirst({
       where: { status: 'ACTIVE' },
       orderBy: { created_at: 'desc' },
+      include: { campaign_periods: { select: { period_quota_limit: true } } },
     });
 
     let wallet = await prisma.wallets.findUnique({
@@ -122,23 +200,26 @@ export class WalletService {
           total_quota_remaining: hasActiveCampaign ? activeCampaign.total_quota_limit : 3000.0,
           eligibility_status: hasActiveCampaign ? 'ELIGIBLE' : 'INELIGIBLE',
           status: 'ACTIVE',
-          last_quota_reset_date: new Date(),
+          last_quota_reset_date: toBangkokDatabaseDate(now),
         },
         include: { campaigns: true },
       });
     } else {
-      // ตรวจสอบการข้ามวันเพื่อรีเซ็ต daily_quota_used
-      const lastResetStr = new Date(wallet.last_quota_reset_date).toISOString().split('T')[0];
-      if (lastResetStr !== todayStr) {
-        wallet = await prisma.wallets.update({
-          where: { wallet_id: wallet.wallet_id },
-          data: {
-            daily_quota_used: 0.0,
-            last_quota_reset_date: new Date(),
-          },
+      // Serialize day-boundary resets with checkout, which locks the same wallet row.
+      wallet = await prisma.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT wallet_id FROM public.wallets WHERE wallet_id = ${wallet!.wallet_id}::uuid FOR UPDATE`;
+        const current = await tx.wallets.findUnique({
+          where: { wallet_id: wallet!.wallet_id },
           include: { campaigns: true },
         });
-      }
+        if (!current || getDatabaseDateKey(current.last_quota_reset_date) === todayStr) return current;
+        return tx.wallets.update({
+          where: { wallet_id: current.wallet_id },
+          data: { daily_quota_used: 0, last_quota_reset_date: toBangkokDatabaseDate(now) },
+          include: { campaigns: true },
+        });
+      });
+      if (!wallet) throw new Error('ไม่พบข้อมูลกระเป๋าเงินของผู้ใช้');
     }
 
     // -------------------------------------------------------------------------
@@ -201,13 +282,19 @@ export class WalletService {
           endDate: activeCampaign.end_date.toISOString(),
           status: activeCampaign.status,
           isRegistrationOpen,
+          periodCount: activeCampaign.campaign_periods.length,
+          configuredPeriodQuota: activeCampaign.campaign_periods.reduce((total, period) => total + Number(period.period_quota_limit), 0),
         };
       }
     }
 
-    const dailyUsed = Number(wallet.daily_quota_used);
+    const periodQuota = await this.getPeriodQuotaInfo(wallet.wallet_id, wallet.campaign_id, now);
+    const dailyUsed = getDatabaseDateKey(wallet.last_quota_reset_date) === todayStr
+      ? Number(wallet.daily_quota_used)
+      : 0;
+    const periodCanBeSpent = !periodQuota.enabled || periodQuota.status === 'ACTIVE';
     const dailyRemaining =
-      effectiveEligibility === 'ELIGIBLE'
+      effectiveEligibility === 'ELIGIBLE' && periodCanBeSpent
         ? Math.max(0, Math.round((effectiveDailyLimit - dailyUsed) * 100) / 100)
         : 0;
 
@@ -224,6 +311,7 @@ export class WalletService {
       status: wallet.status,
       lastQuotaResetDate: wallet.last_quota_reset_date.toISOString(),
       monthlyCycle: getMonthlyCycleDetails(now, campaignEndDate),
+      periodQuota,
       campaignInfo,
       availableCampaignForRegistration,
     };
@@ -266,14 +354,34 @@ export class WalletService {
       throw new Error('ไม่พบข้อมูลกระเป๋าเงินของผู้ใช้');
     }
 
-    const updatedWallet = await prisma.wallets.update({
-      where: { wallet_id: wallet.wallet_id },
-      data: {
-        campaign_id: campaign.campaign_id,
-        eligibility_status: 'ELIGIBLE',
-        daily_quota_limit: campaign.daily_quota_limit,
-        total_quota_remaining: campaign.total_quota_limit,
-      },
+    const updatedWallet = await prisma.$transaction(async (tx: any) => {
+      await tx.$queryRaw`SELECT wallet_id FROM public.wallets WHERE wallet_id = ${wallet!.wallet_id}::uuid FOR UPDATE`;
+      const currentWallet = await tx.wallets.findUnique({ where: { wallet_id: wallet!.wallet_id } });
+      if (!currentWallet) throw new Error('ไม่พบข้อมูลกระเป๋าเงินของผู้ใช้');
+      const sameCampaign = currentWallet.campaign_id === campaign.campaign_id;
+      const updated = await tx.wallets.update({
+        where: { wallet_id: currentWallet.wallet_id },
+        data: {
+          campaign_id: campaign.campaign_id,
+          eligibility_status: 'ELIGIBLE',
+          daily_quota_limit: campaign.daily_quota_limit,
+          ...(!sameCampaign && { total_quota_remaining: campaign.total_quota_limit }),
+        },
+      });
+      const configuredPeriods = await tx.campaign_periods.findMany({ where: { campaign_id: campaign.campaign_id } });
+      if (configuredPeriods.length) {
+        await tx.wallet_period_quotas.createMany({
+          data: configuredPeriods.map((period: any) => ({
+            wallet_id: updated.wallet_id,
+            period_id: period.period_id,
+            quota_limit: period.period_quota_limit,
+            quota_used: 0,
+            quota_remaining: period.period_quota_limit,
+          })),
+          skipDuplicates: true,
+        });
+      }
+      return updated;
     });
 
     return {

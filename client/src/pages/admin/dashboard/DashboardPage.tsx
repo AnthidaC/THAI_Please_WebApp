@@ -11,7 +11,6 @@ import {
   ShieldCheck,
   LogOut,
   KeyRound,
-  Sparkles,
 } from 'lucide-react';
 import { useAuthStore } from '../../../stores/authStore';
 import { APP_ROUTES } from '../../../constants/routes';
@@ -187,36 +186,6 @@ export const DashboardPage: React.FC = () => {
                 </div>
               </Link>
             )}
-          </div>
-        </div>
-
-        {/* แถวใหม่ด้านล่าง: AI Near-Me Discovery (Developer 3) */}
-        <div
-          onClick={() => navigate(APP_ROUTES.CITIZEN_NEAR_ME)}
-          className="rounded-card border border-hairline hover:border-blue-300 bg-white p-5 sm:p-6 shadow-sm hover:shadow-md transition cursor-pointer group flex flex-col sm:flex-row sm:items-center justify-between gap-4"
-        >
-          <div className="flex items-start sm:items-center space-x-4 min-w-0">
-            <div className="h-12 w-12 rounded-2xl bg-brand-blue-light text-brand-blue flex items-center justify-center shrink-0 group-hover:scale-105 transition shadow-xs">
-              <Sparkles className="h-6 w-6" />
-            </div>
-            <div className="min-w-0">
-              <div className="flex items-center space-x-2 flex-wrap">
-                <h3 className="text-sm sm:text-base font-bold text-ink">
-                  AI Near-Me | ร้านค้าใกล้ฉัน
-                </h3>
-                <span className="inline-flex items-center rounded-pill bg-brand-blue-light px-2.5 py-0.5 text-[11px] font-semibold text-brand-blue border border-blue-200 shrink-0">
-                  Co-pay 60/40
-                </span>
-              </div>
-              <p className="text-xs text-ink-muted mt-1 leading-relaxed">
-                ค้นหาร้านอาหารและบริการร่วมโครงการ Co-pay 60/40 รอบตัวคุณด้วยระบบ AI และพิกัด GPS จริง
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center space-x-1.5 text-xs font-semibold text-brand-blue shrink-0 group-hover:translate-x-1 transition self-end sm:self-auto">
-            <span>ค้นหาร้านใกล้ฉัน</span>
-            <ArrowRight className="h-4 w-4" />
           </div>
         </div>
 

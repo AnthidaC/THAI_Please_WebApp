@@ -1,30 +1,52 @@
 import { Router } from 'express';
 import {
-  createBadge,
   createCampaign,
   createQuest,
   createReward,
-  listBadges,
   listCampaigns,
   listQuests,
   listRewards,
-  updateBadge,
   updateCampaign,
   updateQuest,
   updateReward,
 } from '../controllers/gamification.controller';
+import {
+  activateAdminBadge,
+  createAdminBadge,
+  deactivateAdminBadge,
+  getAdminBadge,
+  listAdminBadges,
+  listBadgeConditionTypes,
+  updateAdminBadge,
+  updateAdminBadgeImplementationStatus,
+} from '../controllers/adminBadge.controller';
 import { authenticateAdmin } from '../middlewares/admin.middleware';
+import { authenticate } from '../middlewares/auth.middleware';
+import { getMyBadge, listMyBadges } from '../controllers/badge.controller';
+import {
+  createAdminConditionType,
+  getAdminConditionType,
+  listAdminConditionTypes,
+  updateAdminConditionType,
+} from '../controllers/adminConditionType.controller';
 import { validate } from '../middlewares/validate.middleware';
 import {
-  createBadgeSchema,
   createCampaignSchema,
   createQuestSchema,
   createRewardSchema,
-  updateBadgeSchema,
   updateCampaignSchema,
   updateQuestSchema,
   updateRewardSchema,
 } from '../validations/gamification.validation';
+import {
+  badgeCreateSchema,
+  badgeImplementationStatusSchema,
+  badgeUpdateSchema,
+} from '../validations/badge-management.validation';
+import {
+  conditionTypeCreateSchema,
+  conditionTypeUpdateSchema,
+} from '../validations/condition-type.validation';
 
 const router = Router();
 
@@ -40,8 +62,21 @@ router.get('/rewards', authenticateAdmin, listRewards);
 router.post('/rewards', authenticateAdmin, validate(createRewardSchema), createReward);
 router.patch('/rewards/:id', authenticateAdmin, validate(updateRewardSchema), updateReward);
 
-router.get('/badges', authenticateAdmin, listBadges);
-router.post('/badges', authenticateAdmin, validate(createBadgeSchema), createBadge);
-router.patch('/badges/:id', authenticateAdmin, validate(updateBadgeSchema), updateBadge);
+router.get('/badge-condition-types', authenticateAdmin, listBadgeConditionTypes);
+router.get('/condition-types', authenticateAdmin, listAdminConditionTypes);
+router.post('/condition-types', authenticateAdmin, validate(conditionTypeCreateSchema), createAdminConditionType);
+router.get('/condition-types/:id', authenticateAdmin, getAdminConditionType);
+router.patch('/condition-types/:id', authenticateAdmin, validate(conditionTypeUpdateSchema), updateAdminConditionType);
+router.get('/badges', authenticateAdmin, listAdminBadges);
+router.post('/badges', authenticateAdmin, validate(badgeCreateSchema), createAdminBadge);
+router.get('/badges/:id', authenticateAdmin, getAdminBadge);
+router.patch('/badges/:id', authenticateAdmin, validate(badgeUpdateSchema), updateAdminBadge);
+router.patch('/badges/:id/implementation-status', authenticateAdmin, validate(badgeImplementationStatusSchema), updateAdminBadgeImplementationStatus);
+router.post('/badges/:id/activate', authenticateAdmin, activateAdminBadge);
+router.post('/badges/:id/deactivate', authenticateAdmin, deactivateAdminBadge);
+
+// Citizen Badge progress. The user comes from the authenticated request context.
+router.get('/me/badges', authenticate, listMyBadges);
+router.get('/me/badges/:badgeId', authenticate, getMyBadge);
 
 export default router;

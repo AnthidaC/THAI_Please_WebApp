@@ -17,16 +17,11 @@ import { CitizenWalletPage } from '../pages/citizen/wallet/CitizenWalletPage';
 import { CitizenScanCopayPage } from '../pages/citizen/scan-copay/CitizenScanCopayPage';
 import { CitizenPaymentSlipPage } from '../pages/citizen/scan-copay/CitizenPaymentSlipPage';
 import { CitizenTransactionsPage } from '../pages/citizen/transactions/CitizenTransactionsPage';
+import { CitizenAchievementsPage } from '../pages/citizen/achievements/CitizenAchievementsPage';
 import { MerchantPosQrPage } from '../pages/merchant/pos-qr/MerchantPosQrPage';
 import { MerchantSalesHistoryPage } from '../pages/merchant/sales/MerchantSalesHistoryPage';
 import { AdminFraudAlertsPage } from '../pages/admin/fraud-alerts/AdminFraudAlertsPage';
 const AdminCampaignsPage = React.lazy(() => import('../pages/admin/campaigns/AdminCampaignsPage').then((module) => ({ default: module.AdminCampaignsPage })));
-
-// Developer 3: AI Discovery & Growth Pages
-import { CitizenNearMePage } from '../pages/citizen/recommendations/CitizenNearMePage';
-import { CitizenMerchantDetailPage } from '../pages/citizen/merchants/CitizenMerchantDetailPage';
-import { CitizenReferralPage } from '../pages/citizen/referrals/CitizenReferralPage';
-import { CitizenReviewPage } from '../pages/citizen/reviews/CitizenReviewPage';
 
 export const router = createBrowserRouter([
   // Main Application Routes
@@ -55,22 +50,9 @@ export const router = createBrowserRouter([
         path: APP_ROUTES.CITIZEN_TRANSACTIONS,
         element: <CitizenTransactionsPage />,
       },
-      // Developer 3: AI Near-Me Discovery & Merchant Detail & Referral & Review
       {
-        path: APP_ROUTES.CITIZEN_NEAR_ME,
-        element: <CitizenNearMePage />,
-      },
-      {
-        path: APP_ROUTES.CITIZEN_MERCHANT_DETAIL,
-        element: <CitizenMerchantDetailPage />,
-      },
-      {
-        path: APP_ROUTES.CITIZEN_REFERRALS,
-        element: <CitizenReferralPage />,
-      },
-      {
-        path: APP_ROUTES.CITIZEN_REVIEW,
-        element: <CitizenReviewPage />,
+        path: APP_ROUTES.CITIZEN_ACHIEVEMENTS,
+        element: <CitizenAchievementsPage />,
       },
 
       // Merchant Flow (Dev 2)

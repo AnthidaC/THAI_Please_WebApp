@@ -14,6 +14,7 @@ export const APP_ROUTES = {
   CITIZEN_MERCHANT_DETAIL: '/citizen/merchant-detail',
   CITIZEN_REFERRALS: '/citizen/referrals',
   CITIZEN_REVIEW: '/citizen/review',
+  CITIZEN_ACHIEVEMENTS: '/citizen/achievements',
 
   // เส้นทางร้านค้า (Merchant Flow - Dev 2)
   MERCHANT_POS_QR: '/merchant/pos-qr',
