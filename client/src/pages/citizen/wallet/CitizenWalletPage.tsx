@@ -14,6 +14,7 @@ import {
   Calendar,
   CheckCircle2,
   Award,
+  Clock,
   UserCheck,
   Info,
 } from 'lucide-react';
@@ -107,14 +108,23 @@ export const CitizenWalletPage: React.FC = () => {
     };
   };
   const fallbackCycle = getFallbackCycleDates();
-  const currentPeriod = wallet?.currentPeriod;
-  const isOutsidePeriod = !!wallet?.isOutsidePeriod;
-  const currentCycleName = isOutsidePeriod
-    ? 'อยู่นอกรอบโครงการ'
-    : (currentPeriod?.periodName ?? wallet?.monthlyCycle?.currentMonthName ?? fallbackCycle.monthName);
-  const currentValidUntil = isOutsidePeriod
-    ? '-'
-    : (currentPeriod?.validUntilDate ?? wallet?.monthlyCycle?.validUntilDate ?? fallbackCycle.validUntil);
+  const formatThaiPeriodDate = (dateStr: string) => new Intl.DateTimeFormat('th-TH', {
+    timeZone: 'Asia/Bangkok', dateStyle: 'medium', timeStyle: 'short',
+  }).format(new Date(dateStr));
+  const formatBaht = (value: number) => `${value.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท`;
+  const periodStatusLabel: Record<string, string> = {
+    BEFORE_FIRST: 'ยังไม่เริ่มช่วงสิทธิ์',
+    BETWEEN_PERIODS: 'ไม่มีช่วงที่ใช้งานในขณะนี้',
+    AFTER_LAST: 'สิ้นสุดช่วงสิทธิ์แล้ว',
+    ALLOCATION_MISSING: 'กำลังจัดสรรวงเงินช่วงนี้',
+    INVALID_OVERLAP: 'ช่วงเวลาโครงการมีข้อมูลทับซ้อน',
+  };
+  const currentCycleName = wallet?.periodQuota.enabled
+    ? wallet.periodQuota.currentPeriod?.name ?? periodStatusLabel[wallet.periodQuota.status] ?? 'ไม่มีช่วงที่ใช้งาน'
+    : wallet?.monthlyCycle?.currentMonthName ?? fallbackCycle.monthName;
+  const currentValidUntil = wallet?.periodQuota.enabled && wallet.periodQuota.currentPeriod
+    ? formatThaiPeriodDate(wallet.periodQuota.currentPeriod.endDate)
+    : wallet?.monthlyCycle?.validUntilDate ?? fallbackCycle.validUntil;
 
   // แปลงวันที่แบบย่อภาษาไทย
   const formatThaiDate = (dateStr?: string) => {
@@ -129,6 +139,7 @@ export const CitizenWalletPage: React.FC = () => {
   };
 
   const isEligible = wallet?.eligibilityStatus === 'ELIGIBLE';
+  const periodCanBeSpent = !wallet?.periodQuota.enabled || wallet.periodQuota.status === 'ACTIVE';
   const availableReg = wallet?.availableCampaignForRegistration;
   const hasOpenRegistration = !isEligible && !!availableReg?.isRegistrationOpen;
 
@@ -218,8 +229,11 @@ export const CitizenWalletPage: React.FC = () => {
                     <span>เติมเงิน</span>
                   </button>
                   <button
+                    type="button"
+                    disabled={!periodCanBeSpent}
                     onClick={() => navigate(APP_ROUTES.CITIZEN_SCAN_COPAY)}
-                    className="flex-1 sm:flex-initial lg:hidden inline-flex items-center justify-center space-x-1.5 rounded-pill bg-brand-blue px-4 py-2.5 sm:py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-brand-blue-hover active:scale-95"
+                    title={!periodCanBeSpent ? 'ยังไม่มีช่วงโครงการที่เปิดใช้งาน' : undefined}
+                    className="flex-1 sm:flex-initial lg:hidden inline-flex items-center justify-center space-x-1.5 rounded-pill bg-brand-blue px-4 py-2.5 sm:py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-brand-blue-hover active:scale-95 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-200 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <QrCode className="h-4 w-4 shrink-0" />
                     <span>สแกนจ่าย</span>
@@ -232,72 +246,131 @@ export const CitizenWalletPage: React.FC = () => {
 
             {/* กรณีที่ 1: ผู้ใช้มีสิทธิ์รับเงินสมทบ (ELIGIBLE) */}
             {isEligible && (
-              <section className="rounded-card border border-blue-100 bg-gradient-to-br from-blue-50/80 to-white p-3.5 sm:p-4 shadow-sm">
+              <section className="rounded-card border border-blue-100 bg-gradient-to-br from-blue-50/80 to-white p-4 sm:p-5 md:p-6 shadow-sm">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex items-center space-x-1.5 min-w-0">
+                  <div className="flex items-center space-x-2">
                     <Sparkles className="h-4 w-4 text-brand-blue shrink-0" />
-                    <h2 className="text-xs sm:text-sm font-semibold text-ink truncate">
+                    <h2 className="text-sm sm:text-base font-semibold text-ink">
                       {wallet.campaignInfo?.campaignName || 'สิทธิรัฐช่วยจ่าย 60% (Co-pay)'}
                     </h2>
                   </div>
-                  <span className="inline-flex items-center rounded-pill bg-blue-100/70 px-2 py-0.5 text-[10px] sm:text-[11px] font-semibold text-brand-blue border border-blue-200 shrink-0">
-                    <Calendar className="mr-1 h-2.5 w-2.5 shrink-0" />
-                    <span>{currentCycleName}</span>
+                  <span className="inline-flex items-center rounded-pill bg-blue-100/70 px-2.5 py-0.5 text-[11px] sm:text-xs font-semibold text-brand-blue border border-blue-200">
+                    <Calendar className="mr-1 h-3 w-3 shrink-0" />
+                    <span>งวดปัจจุบัน: {currentCycleName}</span>
                   </span>
                 </div>
 
-                {/* แถบโควตา 2 คอลัมน์ติดกัน (แม้บนหน้าจอมือถือ เพื่อประหยัดพื้นที่แนวตั้ง) */}
-                <div className="mt-2.5 grid grid-cols-2 gap-2.5">
+                {wallet.periodQuota.enabled && (
+                  <section aria-labelledby="wallet-period-title" className="mt-4 rounded-2xl border border-blue-100 bg-white p-3.5 sm:p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div>
+                        <h3 id="wallet-period-title" className="text-sm font-bold text-ink">สิทธิ์ประจำช่วงโครงการ</h3>
+                        {wallet.periodQuota.currentPeriod && <p className="mt-1 text-xs text-ink-muted">{wallet.periodQuota.currentPeriod.name} · {formatThaiPeriodDate(wallet.periodQuota.currentPeriod.startDate)} – {formatThaiPeriodDate(wallet.periodQuota.currentPeriod.endDate)} (เวลาสิ้นสุดไม่นับรวม)</p>}
+                      </div>
+                      <span className="rounded-pill bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-brand-blue">
+                        {wallet.periodQuota.currentPeriod ? 'กำลังใช้งาน' : periodStatusLabel[wallet.periodQuota.status] ?? 'ไม่มีช่วงที่ใช้งาน'}
+                      </span>
+                    </div>
+                    {wallet.periodQuota.currentPeriod ? (
+                      <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                        <div className="rounded-xl bg-surface-soft p-3">
+                          <span className="block text-[11px] text-ink-muted">วงเงินรัฐช่วงนี้</span>
+                          <span className="mt-1 block font-mono text-base font-bold tabular-nums text-ink">{formatBaht(wallet.periodQuota.currentPeriod.quotaLimit)}</span>
+                        </div>
+                        <div className="rounded-xl bg-surface-soft p-3">
+                          <span className="block text-[11px] text-ink-muted">ใช้ไปแล้ว</span>
+                          <span className="mt-1 block font-mono text-base font-bold tabular-nums text-ink">{formatBaht(wallet.periodQuota.currentPeriod.quotaUsed)}</span>
+                        </div>
+                        <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-3">
+                          <span className="block text-[11px] text-emerald-800">คงเหลือช่วงนี้</span>
+                          <span className="mt-1 block font-mono text-base font-bold tabular-nums text-emerald-700">{formatBaht(wallet.periodQuota.currentPeriod.quotaRemaining)}</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <p role="status" className="mt-3 rounded-xl bg-amber-50 px-3 py-2.5 text-xs leading-5 text-amber-900">
+                        {wallet.periodQuota.status === 'BEFORE_FIRST' && wallet.periodQuota.nextPeriod
+                          ? `ช่วงถัดไปเริ่ม ${formatThaiPeriodDate(wallet.periodQuota.nextPeriod.startDate)} วงเงินช่วงก่อนหน้าและช่วงถัดไปแยกจากกัน`
+                          : wallet.periodQuota.status === 'BETWEEN_PERIODS' && wallet.periodQuota.nextPeriod
+                            ? `ช่วงถัดไปเริ่ม ${formatThaiPeriodDate(wallet.periodQuota.nextPeriod.startDate)} วงเงินที่เหลือจากช่วงก่อนหน้าหมดอายุและไม่ยกยอด`
+                            : wallet.periodQuota.status === 'AFTER_LAST'
+                              ? 'ไม่มีช่วงสิทธิ์ที่ยังเปิดอยู่ วงเงินที่เหลือจากช่วงก่อนหน้าหมดอายุแล้ว'
+                              : wallet.periodQuota.status === 'ALLOCATION_MISSING'
+                                ? 'ระบบยังจัดสรรวงเงินช่วงนี้ไม่สำเร็จ กรุณารีเฟรชข้อมูลอีกครั้ง'
+                                : wallet.periodQuota.status === 'INVALID_OVERLAP'
+                                  ? 'ไม่สามารถใช้สิทธิได้ เนื่องจากช่วงเวลาโครงการทับซ้อน กรุณาติดต่อผู้ดูแลระบบ'
+                                  : 'ไม่มีช่วงโครงการที่เปิดใช้งานในขณะนี้'}
+                      </p>
+                    )}
+                  </section>
+                )}
+
+                <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {/* การ์ดโควตารายวัน */}
-                  <div className="rounded-xl border border-hairline/60 bg-white p-2.5 sm:p-3 shadow-2xs flex flex-col justify-between">
+                  <div className="rounded-2xl border border-hairline/60 bg-white p-3.5 sm:p-4 shadow-2xs flex flex-col justify-between">
                     <div>
-                      <span className="text-[11px] font-medium text-ink-muted block truncate">โควตาวันนี้คงเหลือ</span>
-                      <div className="mt-0.5 font-mono text-base sm:text-xl font-bold text-brand-blue">
-                        ฿{isWalletLoading ? '---' : wallet.dailyQuotaRemaining.toFixed(2)}
+                      <span className="text-xs font-medium text-ink-muted block">โควตาวันนี้คงเหลือ</span>
+                      <div className="mt-1 font-mono text-xl sm:text-2xl font-bold text-brand-blue">
+                        {isWalletLoading ? '---' : formatBaht(wallet.dailyQuotaRemaining)}
                       </div>
                     </div>
-                    <div className="mt-1.5 pt-1.5 border-t border-hairline/50 flex items-center justify-between gap-1 text-[10px] text-ink-muted">
-                      <span>เพดาน</span>
+                    <div className="mt-2 pt-2 border-t border-hairline/60 flex items-center justify-between text-[11px] text-ink-muted">
+                      <span>เพดานรายวัน (จาก DB)</span>
                       <span className="font-mono font-semibold text-ink">
-                        ฿{wallet.dailyQuotaLimit.toFixed(0)}/วัน
+                        {formatBaht(wallet.dailyQuotaLimit)} / วัน
                       </span>
                     </div>
                   </div>
 
-                  {/* การ์ดโควตารอบย่อยปัจจุบัน */}
-                  <div className="rounded-xl border border-hairline/60 bg-white p-2.5 sm:p-3 shadow-2xs flex flex-col justify-between">
+                  {/* การ์ดโควตารวมสะสม */}
+                  <div className="rounded-2xl border border-hairline/60 bg-white p-3.5 sm:p-4 shadow-2xs flex flex-col justify-between">
                     <div>
-                      <span className="text-[11px] font-medium text-ink-muted block truncate">โควตารอบนี้คงเหลือ</span>
-                      <div className={`mt-0.5 font-mono text-base sm:text-xl font-bold ${isOutsidePeriod ? 'text-ink-muted' : 'text-emerald-600'}`}>
-                        ฿{isWalletLoading
-                          ? '---'
-                          : isOutsidePeriod
-                            ? '0.00'
-                            : (currentPeriod ? currentPeriod.quotaRemaining : wallet.totalQuotaRemaining).toLocaleString('th-TH', {
-                                minimumFractionDigits: 2,
-                              })}
+                      <div className="flex flex-wrap items-center justify-between gap-1">
+                        <span className="text-xs font-medium text-ink-muted">{wallet.periodQuota.enabled ? 'วงเงินรัฐคงเหลือทั้งโครงการ' : 'เงินสะสมคงเหลือปัจจุบัน'}</span>
+                        <span className="rounded-pill bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-200">
+                          {wallet.periodQuota.enabled ? 'เพดานรวม' : 'งวดนี้ (เดือนละ ฿1,000)'}
+                        </span>
+                      </div>
+                      <div className="mt-1 font-mono text-xl sm:text-2xl font-bold text-emerald-600">
+                        {isWalletLoading ? '---' : formatBaht(wallet.totalQuotaRemaining)}
                       </div>
                     </div>
-                    <div className="mt-1.5 pt-1.5 border-t border-hairline/50 flex items-center justify-between gap-1 text-[10px]">
-                      <span className="text-ink-muted">ใช้ได้ถึง</span>
-                      <span className="font-semibold text-brand-blue truncate">{currentValidUntil}</span>
+                    <div className="mt-2 pt-2 border-t border-hairline/60 flex items-center justify-between gap-2 text-[11px]">
+                      <span className="text-ink-muted">{wallet.periodQuota.enabled ? 'สิ้นสุดแคมเปญ:' : 'ใช้ได้ถึงวันที่:'}</span>
+                      <span className="font-semibold text-brand-blue">{wallet.periodQuota.enabled ? (wallet.campaignInfo?.endDate ? formatThaiPeriodDate(wallet.campaignInfo.endDate) : '-') : currentValidUntil}</span>
                     </div>
                   </div>
                 </div>
 
-                {/* แถบการใช้สิทธิรายวันแบบกระชับ */}
-                <div className="mt-2.5 flex items-center gap-2.5 text-[11px] text-ink-muted">
-                  <span className="shrink-0 font-medium text-ink">ใช้สิทธิวันนี้</span>
-                  <div className="h-1.5 flex-1 rounded-full bg-gray-200 overflow-hidden">
+                {/* แถบการใช้สิทธิรายวัน */}
+                <div className="mt-4 pt-3.5 border-t border-hairline/70">
+                  <div className="flex items-center justify-between gap-2 text-[11px] sm:text-xs text-ink-muted mb-1.5">
+                    <span className="font-medium text-ink truncate">
+                      การใช้สิทธิวันนี้ (รีเซ็ตทุกวัน 06:00 น.)
+                    </span>
+                    <span className="font-mono font-semibold text-brand-blue shrink-0">
+                      {dailyUsedPercent}%
+                    </span>
+                  </div>
+                  <div className="h-2.5 w-full rounded-full bg-gray-200 overflow-hidden">
                     <div
                       className="h-full rounded-full bg-brand-blue transition-all duration-500"
                       style={{ width: `${dailyUsedPercent}%` }}
                     />
                   </div>
-                  <span className="font-mono font-semibold text-brand-blue shrink-0">
-                    {dailyUsedPercent}%
-                  </span>
                 </div>
+
+                {/* ระยะเวลาของโครงการจาก DB */}
+                {wallet.campaignInfo && (
+                  <div className="mt-3 flex items-center justify-between text-[11px] text-ink-muted pt-2 border-t border-hairline/60">
+                    <span className="flex items-center space-x-1">
+                      <Clock className="h-3 w-3 text-brand-blue shrink-0" />
+                      <span>ระยะเวลาโครงการ:</span>
+                    </span>
+                    <span className="font-medium text-ink">
+                      {formatThaiDate(wallet.campaignInfo.startDate)} - {formatThaiDate(wallet.campaignInfo.endDate)}
+                    </span>
+                  </div>
+                )}
               </section>
             )}
 
@@ -324,7 +397,9 @@ export const CitizenWalletPage: React.FC = () => {
                   <p className="text-xs text-ink-muted mt-1 leading-relaxed">
                     รัฐช่วยจ่ายสมทบ {availableReg.governmentCopayRatePercent}% ประชาชนร่วมจ่าย {availableReg.citizenPaymentRatePercent}%
                     เพดานสูงสุด ฿{availableReg.dailyQuotaLimit.toFixed(0)} ต่อวัน ยอดรวมตลอดโครงการ ฿
-                    {availableReg.totalQuotaLimit.toLocaleString()} (เฉลี่ยเดือนละ ฿1,000)
+                    {availableReg.totalQuotaLimit.toLocaleString()} {availableReg.periodCount > 0
+                      ? `แบ่งเป็น ${availableReg.periodCount} ช่วง รวมวงเงินช่วงละ ฿${availableReg.configuredPeriodQuota.toLocaleString('th-TH')} โดยไม่ยกยอดวงเงินที่เหลือ`
+                      : 'โควตาตามการตั้งค่าของโครงการ'}
                   </p>
                 </div>
 
@@ -418,8 +493,11 @@ export const CitizenWalletPage: React.FC = () => {
             <section>
               <button
                 id="btn-scan-copay"
+                type="button"
+                disabled={!periodCanBeSpent}
                 onClick={() => navigate(APP_ROUTES.CITIZEN_SCAN_COPAY)}
-                className="group flex w-full items-center justify-between rounded-card bg-brand-blue p-4 sm:p-5 text-white shadow-lg shadow-blue-500/20 transition-all hover:bg-brand-blue-hover active:scale-98"
+                title={!periodCanBeSpent ? 'ยังไม่มีช่วงโครงการที่เปิดใช้งาน' : undefined}
+                className="group flex w-full items-center justify-between rounded-card bg-brand-blue p-4 sm:p-5 text-white shadow-lg shadow-blue-500/20 transition-all hover:bg-brand-blue-hover active:scale-98 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-200 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <div className="flex items-center space-x-3.5 min-w-0">
                   <div className="flex h-11 w-11 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-2xl bg-white/20 text-white backdrop-blur-sm group-hover:scale-105 transition shadow-xs">

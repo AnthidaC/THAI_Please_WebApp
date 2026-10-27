@@ -45,7 +45,7 @@ export const requirePaymentMerchant = async (req: Request, res: Response, next: 
   }
   try {
     // Dev1 may issue merchant sessions with either merchant_id or application_id.
-    const application = await prisma.merchant_applications.findFirst({
+    const application = await prisma.merchantApplication.findFirst({
       where: { OR: [{ application_id: req.user.userId }, { merchant_id: req.user.userId }] },
       select: { merchant_id: true },
     });

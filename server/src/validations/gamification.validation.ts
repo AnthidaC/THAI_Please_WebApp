@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { validateCampaignPeriodConfiguration } from '../services/campaign-periods';
 
 const description = z.string().trim().max(1000).nullable().optional();
 const positiveAmount = z.coerce.number().positive().max(9_999_999_999.99);
@@ -26,10 +27,41 @@ const campaignFields = {
   status: z.enum(['ACTIVE', 'PAUSED', 'COMPLETED']).default('ACTIVE'),
 };
 
-export const createCampaignSchema = dateRange(campaignFields).superRefine((value, context) => {
+const campaignPeriodSchema = z.object({
+  periodId: z.string().uuid().optional(),
+  periodName: z.string().trim().min(1).max(100),
+  periodQuotaLimit: z.coerce.number().min(0).max(9_999_999_999.99)
+    .refine((amount) => Math.abs(amount * 100 - Math.round(amount * 100)) < 0.000001, 'Use up to 2 decimal places'),
+  startDate: date,
+  endDate: date,
+}).strict();
+
+const periods = z.array(campaignPeriodSchema).optional();
+
+const addPeriodIssues = (
+  value: { periods?: z.infer<typeof periods>; startDate: Date; endDate: Date; totalQuotaLimit: number },
+  context: z.RefinementCtx
+) => {
+  if (!value.periods?.length) return;
+  for (const issue of validateCampaignPeriodConfiguration(
+    value.periods,
+    value.startDate,
+    value.endDate,
+    value.totalQuotaLimit
+  )) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: issue.index === null ? ['periods'] : ['periods', issue.index, ...(issue.field ? [issue.field] : [])],
+      message: issue.message,
+    });
+  }
+};
+
+export const createCampaignSchema = dateRange({ ...campaignFields, periods }).superRefine((value, context) => {
   if (value.governmentCopayRatePercent + value.citizenPaymentRatePercent !== 100) {
     context.addIssue({ code: z.ZodIssueCode.custom, path: ['citizenPaymentRatePercent'], message: 'Co-pay shares must total 100%' });
   }
+  addPeriodIssues(value, context);
 });
 
 export const updateCampaignSchema = z.object({
@@ -41,7 +73,14 @@ export const updateCampaignSchema = z.object({
   startDate: date.optional(),
   endDate: date.optional(),
   status: z.enum(['ACTIVE', 'PAUSED', 'COMPLETED']).optional(),
-}).strict().refine((value) => Object.keys(value).length > 0, 'Provide at least one field to update');
+  periods,
+}).strict()
+  .refine((value) => Object.keys(value).length > 0, 'Provide at least one field to update')
+  .superRefine((value, context) => {
+    if (value.periods && value.startDate && value.endDate && value.totalQuotaLimit !== undefined) {
+      addPeriodIssues(value as typeof value & { startDate: Date; endDate: Date; totalQuotaLimit: number }, context);
+    }
+  });
 
 const questFields = {
   campaignId: z.string().uuid().nullable().optional(),
@@ -94,25 +133,6 @@ export const updateRewardSchema = z.object({
   discountType: rewardFields.discountType,
   discountValue: rewardFields.discountValue,
   validDays: rewardFields.validDays.optional(),
-  status: z.enum(['active', 'paused', 'archived']).optional(),
-}).strict().refine((value) => Object.keys(value).length > 0, 'Provide at least one field to update');
-
-const badgeFields = {
-  badgeName: z.string().trim().min(2).max(100),
-  badgeLevel: z.enum(['Bronze', 'Silver', 'Gold', 'Rainbow']),
-  description,
-  conditionType: z.string().trim().min(2).max(50),
-  requiredCount: z.coerce.number().int().positive(),
-  status: z.enum(['active', 'paused', 'archived']).default('active'),
-};
-
-export const createBadgeSchema = z.object(badgeFields).strict();
-export const updateBadgeSchema = z.object({
-  badgeName: badgeFields.badgeName.optional(),
-  badgeLevel: badgeFields.badgeLevel.optional(),
-  description: badgeFields.description,
-  conditionType: badgeFields.conditionType.optional(),
-  requiredCount: badgeFields.requiredCount.optional(),
   status: z.enum(['active', 'paused', 'archived']).optional(),
 }).strict().refine((value) => Object.keys(value).length > 0, 'Provide at least one field to update');
 

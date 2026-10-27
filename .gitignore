@@ -149,3 +149,6 @@ vite.config.ts.timestamp-*
 .turbo
 
 artifacts/
+# Local agent files and archived reference materials
+/.agents/
+/.DUMP/

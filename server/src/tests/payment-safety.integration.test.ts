@@ -59,7 +59,7 @@ async function main() {
     const merchant = await db.merchants.create({ data: {
       tax_id: randomUUID().slice(0, 20), shop_name: 'Isolated Test Shop', latitude: 13.75, longitude: 100.5, is_approved: true,
     } });
-    const application = await db.merchant_applications.create({ data: {
+    const application = await db.merchantApplication.create({ data: {
       business_type: 'INDIVIDUAL', tax_id: merchant.tax_id, shop_name: merchant.shop_name,
       contact_name: 'Test', email: 'test@example.invalid', phone: '0000000000', password_hash: 'not-a-real-login',
       address: 'Isolated fixture', latitude: merchant.latitude, longitude: merchant.longitude,

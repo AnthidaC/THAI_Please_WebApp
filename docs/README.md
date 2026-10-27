@@ -16,6 +16,7 @@
 | [frontend-guide.md](./frontend-guide.md) | **คู่มือและมาตรฐานสำหรับทีม Frontend** (Routing, Zustand, TanStack Query, Tailwind) |
 | [backend-guide.md](./backend-guide.md) | **คู่มือและมาตรฐานสำหรับทีม Backend** (Express, Prisma, Zod, Redis Caching) |
 | [database-schema.md](./database-schema.md) | **การออกแบบฐานข้อมูล (Database Design)** การตั้งค่า Supabase และ Prisma Migration |
+| [badge-award-engine.md](./badge-award-engine.md) | **ระบบมอบตราความสำเร็จ** Handlers, Award Engine, Event Hooks, Progress API, Reconciliation |
 | [git-workflow.md](./git-workflow.md) | **ข้อตกลงการใช้งาน Git** (Branching Strategy, Commit Message, PR Rules) |
 
 ---

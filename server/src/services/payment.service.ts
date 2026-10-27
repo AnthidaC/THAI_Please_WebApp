@@ -3,8 +3,9 @@ import { randomUUID } from 'node:crypto';
 import prisma from '../utils/prisma';
 import { qrStore } from './payment-qr.store';
 import { paymentPinService } from './payment-pin.service';
-import { thaiDateKey } from '../utils/thai-date';
+import { getBangkokDateKey, getDatabaseDateKey, toBangkokDatabaseDate } from '../utils/bangkok-date';
 import { walletService } from './wallet.service';
+import { awardAfterActivity } from './achievements/badgeAwardEngine';
 import {
   fraudService,
   calculateHaversineDistance,
@@ -20,6 +21,7 @@ export interface DiscountValidationResult {
   discountSource: 'FRIEND_REFERRAL' | 'COUPON' | 'DEMO_PROMO';
   sourceDescription: string;
   referrerName?: string;
+  referrerUserId?: string;
   referralId?: string;
   userRewardId?: string;
 }
@@ -40,7 +42,8 @@ export interface CopayCalculationResult {
   dailyQuotaRemainingAfter: number;
   totalQuotaRemainingBefore: number;
   totalQuotaRemainingAfter: number;
-  quotaWarning?: string | null;
+  periodQuotaRemainingBefore?: number;
+  periodQuotaRemainingAfter?: number;
 }
 
 export interface DynamicQrData {
@@ -81,7 +84,8 @@ export class PaymentService {
     totalQuotaRemaining: number,
     discountAmount = 0,
     discountCode?: string,
-    discountDescription?: string
+    discountDescription?: string,
+    periodQuotaRemaining?: number
   ): CopayCalculationResult {
     // 1. คำนวณยอดสุทธิหลังหักส่วนลดคูปอง/โค้ดชวนเพื่อน (Net Amount)
     const netTotalAmount = Math.max(0, Math.round((totalAmount - discountAmount) * 100) / 100);
@@ -90,32 +94,17 @@ export class PaymentService {
     const tentativeGovCopay = Math.round(netTotalAmount * 0.6 * 100) / 100;
     const maxGovAllowable = Math.max(
       0,
-      Math.min(tentativeGovCopay, dailyQuotaRemaining, totalQuotaRemaining)
+      Math.min(tentativeGovCopay, dailyQuotaRemaining, totalQuotaRemaining, periodQuotaRemaining ?? Number.POSITIVE_INFINITY)
     );
     const governmentCopayAmount = Math.round(maxGovAllowable * 100) / 100;
 
-    // 3. ประชาชนจ่าย 40% ของยอดสุทธิ หรือส่วนที่เกินจากสิทธิรัฐ (จ่ายส่วนต่างเพิ่มเองอัตโนมัติ)
+    // 3. ประชาชนจ่าย 40% ของยอดสุทธิ หรือส่วนที่เกินจากสิทธิรัฐ
     const citizenPaidAmount = Math.round((netTotalAmount - governmentCopayAmount) * 100) / 100;
 
     const governmentPercentage =
       netTotalAmount > 0 ? Math.round((governmentCopayAmount / netTotalAmount) * 100) : 0;
     const citizenPercentage = 100 - governmentPercentage;
     const totalSavingsAmount = Math.round((discountAmount + governmentCopayAmount) * 100) / 100;
-
-    // ตรวจสอบแจ้งเตือนโควตาเต็มหรือเหลือน้อยกว่าสิทธิ์ 60%
-    let quotaWarning: string | null = null;
-    if (netTotalAmount > 0 && tentativeGovCopay > 0) {
-      if (dailyQuotaRemaining <= 0 && totalQuotaRemaining <= 0) {
-        quotaWarning = 'โควตารัฐช่วยจ่ายของคุณหมดแล้ว คุณต้องชำระยอดเต็มเอง';
-      } else if (dailyQuotaRemaining <= 0) {
-        quotaWarning = 'โควตาวันนี้หมดแล้ว คุณต้องชำระยอดเต็มเอง';
-      } else if (totalQuotaRemaining <= 0) {
-        quotaWarning = 'โควตารอบปัจจุบันหมดแล้ว คุณต้องชำระยอดเต็มเอง';
-      } else if (governmentCopayAmount < tentativeGovCopay) {
-        const shortQuota = tentativeGovCopay > dailyQuotaRemaining ? 'โควตารายวัน' : 'โควตารอบย่อย';
-        quotaWarning = `${shortQuota}ไม่พอรับสิทธิ์ 60% เต็มจำนวน คุณต้องจ่ายส่วนขาดเพิ่มเอง`;
-      }
-    }
 
     return {
       originalTotalAmount: totalAmount,
@@ -135,7 +124,10 @@ export class PaymentService {
       totalQuotaRemainingBefore: totalQuotaRemaining,
       totalQuotaRemainingAfter:
         Math.round((totalQuotaRemaining - governmentCopayAmount) * 100) / 100,
-      quotaWarning,
+      ...(periodQuotaRemaining !== undefined && {
+        periodQuotaRemainingBefore: periodQuotaRemaining,
+        periodQuotaRemainingAfter: Math.round((periodQuotaRemaining - governmentCopayAmount) * 100) / 100,
+      }),
     };
   }
 
@@ -189,6 +181,7 @@ export class PaymentService {
           discountSource: 'FRIEND_REFERRAL',
           sourceDescription: `ส่วนลด ฿${discountAmount.toFixed(0)} จากโค้ดคำชวนของเพื่อน (${referrerName})`,
           referrerName,
+          referrerUserId: referral.referrer_user_id,
           referralId: referral.referral_id,
         };
       }
@@ -540,32 +533,16 @@ export class PaymentService {
 
     if (userId) {
       walletInfo = await walletService.getWalletByUserId(userId);
-      const isEligible = walletInfo.eligibilityStatus === 'ELIGIBLE';
-      const isOutside = !!walletInfo.isOutsidePeriod;
-
-      const effectiveDailyQuota = (isEligible && !isOutside) ? walletInfo.dailyQuotaRemaining : 0;
-      const effectiveCap = (isEligible && !isOutside)
-        ? Math.min(walletInfo.totalQuotaRemaining, walletInfo.currentPeriod?.quotaRemaining ?? walletInfo.totalQuotaRemaining)
-        : 0;
 
       copaySplit = this.calculateCopay(
         qrData.totalAmount,
-        effectiveDailyQuota,
-        effectiveCap,
+        walletInfo.dailyQuotaRemaining,
+        walletInfo.totalQuotaRemaining,
         discountAmount,
         discountInfo?.code,
-        discountInfo?.sourceDescription
+        discountInfo?.sourceDescription,
+        walletInfo.periodQuota.enabled ? walletInfo.periodQuota.currentPeriod?.quotaRemaining ?? 0 : undefined
       );
-
-      if (!isEligible) {
-        if (walletInfo.eligibilityStatus === 'CAMPAIGN_EXPIRED') {
-          copaySplit.quotaWarning = 'โครงการสิ้นสุดระยะเวลาแล้ว คุณต้องชำระยอดเต็ม 100% เอง';
-        } else {
-          copaySplit.quotaWarning = 'คุณยังไม่ได้ลงทะเบียนเข้าร่วมโครงการ จึงไม่มีสิทธิ์รับเงินสมทบจากรัฐ (ต้องชำระยอดเต็ม 100%)';
-        }
-      } else if (isOutside) {
-        copaySplit.quotaWarning = 'ปัจจุบันอยู่นอกรอบโครงการ จึงไม่มีสิทธิ์รับเงินสมทบจากรัฐในขณะนี้ (ต้องชำระยอดเต็ม 100%)';
-      }
     }
 
     return {
@@ -641,27 +618,36 @@ export class PaymentService {
       );
     }
 
-    // ตรวจสอบสิทธิ์โครงการ: หากไม่มีสิทธิ์, หมดโครงการ, หรืออยู่นอกรอบโครงการ ให้ชำระเต็มจำนวน 100% (ไม่บล็อกการซื้อ)
-    const isEligible = wallet.eligibilityStatus === 'ELIGIBLE';
-    const isOutside = !!wallet.isOutsidePeriod;
-    const effectiveDailyQuota = (isEligible && !isOutside) ? wallet.dailyQuotaRemaining : 0;
-    const effectiveCap = (isEligible && !isOutside)
-      ? Math.min(wallet.totalQuotaRemaining, wallet.currentPeriod?.quotaRemaining ?? wallet.totalQuotaRemaining)
-      : 0;
+    if (wallet.eligibilityStatus === 'CAMPAIGN_EXPIRED') {
+      throw new Error(
+        'ไม่สามารถใช้สิทธิ์ร่วมจ่ายได้ เนื่องจากโครงการ Co-pay สิ้นสุดระยะเวลาตามที่กำหนดในระบบแล้ว'
+      );
+    }
 
-    const copay = this.calculateCopay(
+    if (wallet.eligibilityStatus !== 'ELIGIBLE') {
+      throw new Error(
+        'คุณไม่มีสิทธิเข้าร่วมโครงการ Co-pay ในขณะนี้ กรุณากดลงทะเบียนรับสิทธิที่หน้ากระเป๋าเงินก่อนทำรายการ'
+      );
+    }
+
+    if (wallet.periodQuota.enabled && wallet.periodQuota.status !== 'ACTIVE') {
+      throw new Error('ขณะนี้ไม่มีช่วงโครงการที่เปิดใช้งาน จึงไม่สามารถใช้สิทธิร่วมจ่ายได้');
+    }
+
+    const previewCopay = this.calculateCopay(
       qrData.totalAmount,
-      effectiveDailyQuota,
-      effectiveCap,
+      wallet.dailyQuotaRemaining,
+      wallet.totalQuotaRemaining,
       discountAmount,
       discountInfo?.code,
-      discountInfo?.sourceDescription
+      discountInfo?.sourceDescription,
+      wallet.periodQuota.enabled ? wallet.periodQuota.currentPeriod?.quotaRemaining ?? 0 : undefined
     );
 
     // ตรวจสอบยอดเงินคงเหลือในกระเป๋า
-    if (wallet.balance < copay.citizenPaidAmount) {
+    if (wallet.balance < previewCopay.citizenPaidAmount) {
       throw new Error(
-        `ยอดเงินคงเหลือในกระเป๋าไม่เพียงพอ (ต้องการ ฿${copay.citizenPaidAmount.toFixed(
+        `ยอดเงินคงเหลือในกระเป๋าไม่เพียงพอ (ต้องการ ฿${previewCopay.citizenPaidAmount.toFixed(
           2
         )} แต่มี ฿${wallet.balance.toFixed(2)}) กรุณาเติมเงินก่อนทำรายการ`
       );
@@ -689,7 +675,7 @@ export class PaymentService {
             qr_reference: params.qrReference,
             user_id: params.userId,
             merchant_id: merchantId,
-            total_amount: copay.netTotalAmount,
+            total_amount: previewCopay.netTotalAmount,
             government_copay_amount: 0,
             citizen_paid_amount: 0,
             status: 'REJECTED',
@@ -727,83 +713,87 @@ export class PaymentService {
     const completedAtDate = new Date();
 
     // 4. บันทึกและตัดยอดเงินใน Atomic Transaction
-    const transactionRecord = await prisma.$transaction(async (tx: any) => {
-      // Claim the QR in the same transaction as the debit; rollback releases the claim.
+    const paymentResult = await prisma.$transaction(async (tx: any) => {
       const claim = await tx.payment_qr_codes.updateMany({
         where: { qr_reference: params.qrReference, status: 'ACTIVE', expires_at: { gt: new Date() } },
         data: { status: 'USED' },
       });
       if (claim.count !== 1) throw new Error('QR นี้ถูกชำระแล้ว ถูกยกเลิก หรือหมดอายุ กรุณาตรวจสอบประวัติ');
-      await tx.$queryRaw`SELECT wallet_id FROM wallets WHERE wallet_id = ${wallet.walletId}::uuid FOR UPDATE`;
-      const latestWallet = await tx.wallets.findUnique({ where: { wallet_id: wallet.walletId } });
-      if (!latestWallet || latestWallet.status === 'SUSPENDED' ||
-          latestWallet.eligibility_status === 'SUSPENDED' ||
-          (copay.governmentCopayAmount > 0 && latestWallet.eligibility_status !== 'ELIGIBLE') ||
-          (latestWallet.campaign_id !== wallet.campaignInfo?.campaignId && latestWallet.campaign_id !== null) ||
-          thaiDateKey() !== wallet.lastQuotaResetDate.slice(0, 10) ||
-          Number(latestWallet.balance) !== wallet.balance ||
-          Number(latestWallet.daily_quota_used) !== wallet.dailyQuotaUsed ||
-          (wallet.eligibilityStatus === 'ELIGIBLE' && Number(latestWallet.total_quota_remaining) !== wallet.totalQuotaRemaining)) {
-        throw new Error('ข้อมูลกระเป๋าเงินเปลี่ยนแปลง กรุณาตรวจสอบยอดและลองชำระใหม่');
-      }
-      if (copay.governmentCopayAmount > 0 &&
-          (wallet.campaignInfo && new Date() > new Date(wallet.campaignInfo.endDate) ||
-           wallet.currentPeriod && new Date() > new Date(wallet.currentPeriod.endDate))) {
-        throw new Error('สิทธิ์โครงการเปลี่ยนแปลง กรุณาตรวจสอบยอดชำระใหม่');
-      }
-      // 4.1 ตัดยอดเงินในกระเป๋าประชาชน
-      const newWalletBalance =
-        Math.round((wallet.balance - copay.citizenPaidAmount) * 100) / 100;
-      const newDailyQuotaUsed =
-        Math.round((wallet.dailyQuotaUsed + copay.governmentCopayAmount) * 100) / 100;
-      const newTotalQuotaRemaining =
-        Math.round((Number(latestWallet.total_quota_remaining) - copay.governmentCopayAmount) * 100) / 100;
 
-      await tx.wallets.update({
+      await tx.$queryRaw`SELECT wallet_id FROM public.wallets WHERE wallet_id = ${wallet.walletId}::uuid FOR UPDATE`;
+      const currentWallet = await tx.wallets.findUnique({
         where: { wallet_id: wallet.walletId },
+        include: { campaigns: true },
+      });
+      if (!currentWallet || !currentWallet.campaigns) throw new Error('ไม่พบสิทธิ์โครงการสำหรับกระเป๋าเงินนี้');
+      if (currentWallet.status === 'SUSPENDED' || currentWallet.eligibility_status === 'SUSPENDED') {
+        throw new Error('สิทธิ์การใช้จ่ายโครงการของคุณถูกระงับชั่วคราว');
+      }
+      if (currentWallet.eligibility_status !== 'ELIGIBLE' || currentWallet.campaigns.status !== 'ACTIVE' ||
+        completedAtDate < currentWallet.campaigns.start_date || completedAtDate > currentWallet.campaigns.end_date) {
+        throw new Error('คุณไม่มีสิทธิ์เข้าร่วมโครงการ Co-pay ในขณะนี้');
+      }
+
+      const today = getBangkokDateKey(completedAtDate);
+      const lastReset = getDatabaseDateKey(currentWallet.last_quota_reset_date);
+      const dailyQuotaUsed = lastReset === today ? Number(currentWallet.daily_quota_used) : 0;
+      const dailyQuotaRemaining = Math.max(0, Number(currentWallet.campaigns.daily_quota_limit) - dailyQuotaUsed);
+      const configuredPeriods = await tx.campaign_periods.findMany({
+        where: { campaign_id: currentWallet.campaign_id! },
+        orderBy: { start_date: 'asc' },
+      });
+      const activePeriods = configuredPeriods.filter((period: any) => period.start_date <= completedAtDate && completedAtDate < period.end_date);
+      if (configuredPeriods.length && activePeriods.length !== 1) {
+        throw new Error('ขณะนี้ไม่มีช่วงโครงการที่เปิดใช้งาน จึงไม่สามารถใช้สิทธิร่วมจ่ายได้');
+      }
+
+      const activePeriod = activePeriods[0];
+      const periodAllocation = activePeriod ? await tx.wallet_period_quotas.upsert({
+        where: { wallet_id_period_id: { wallet_id: currentWallet.wallet_id, period_id: activePeriod.period_id } },
+        create: {
+          wallet_id: currentWallet.wallet_id,
+          period_id: activePeriod.period_id,
+          quota_limit: activePeriod.period_quota_limit,
+          quota_used: 0,
+          quota_remaining: activePeriod.period_quota_limit,
+        },
+        update: {},
+      }) : null;
+      const periodQuotaRemaining = periodAllocation ? Number(periodAllocation.quota_remaining) : undefined;
+      const totalQuotaRemaining = Number(currentWallet.total_quota_remaining);
+      const copay = this.calculateCopay(
+        qrData.totalAmount,
+        dailyQuotaRemaining,
+        totalQuotaRemaining,
+        discountAmount,
+        discountInfo?.code,
+        discountInfo?.sourceDescription,
+        periodQuotaRemaining
+      );
+      const balance = Number(currentWallet.balance);
+      if (balance < copay.citizenPaidAmount) {
+        throw new Error(`ยอดเงินคงเหลือในกระเป๋าไม่เพียงพอ (ต้องการ ฿${copay.citizenPaidAmount.toFixed(2)} แต่มี ฿${balance.toFixed(2)}) กรุณาเติมเงินก่อนทำรายการ`);
+      }
+
+      const newWalletBalance = Math.round((balance - copay.citizenPaidAmount) * 100) / 100;
+      const newDailyQuotaUsed = Math.round((dailyQuotaUsed + copay.governmentCopayAmount) * 100) / 100;
+      const newTotalQuotaRemaining = Math.round((totalQuotaRemaining - copay.governmentCopayAmount) * 100) / 100;
+      await tx.wallets.update({
+        where: { wallet_id: currentWallet.wallet_id },
         data: {
           balance: newWalletBalance,
           daily_quota_used: newDailyQuotaUsed,
+          last_quota_reset_date: toBangkokDatabaseDate(completedAtDate),
           total_quota_remaining: newTotalQuotaRemaining,
         },
       });
-
-      // 4.1.1 ตัดยอดในรอบโครงการปัจจุบัน (wallet_period_quotas) หากมีรอบที่กำลังดำเนินการ
-      if (wallet.currentPeriod && copay.governmentCopayAmount > 0) {
-        await tx.$queryRaw`SELECT wallet_period_quota_id FROM wallet_period_quotas
-          WHERE wallet_id = ${wallet.walletId}::uuid AND period_id = ${wallet.currentPeriod.periodId}::uuid FOR UPDATE`;
-        const periodQuota = await tx.wallet_period_quotas.findUnique({
-          where: {
-            wallet_id_period_id: {
-              wallet_id: wallet.walletId,
-              period_id: wallet.currentPeriod.periodId,
-            },
-          },
+      if (periodAllocation && activePeriod) {
+        const newPeriodQuotaUsed = Math.round((Number(periodAllocation.quota_used) + copay.governmentCopayAmount) * 100) / 100;
+        const newPeriodQuotaRemaining = Math.round((Number(periodAllocation.quota_remaining) - copay.governmentCopayAmount) * 100) / 100;
+        await tx.wallet_period_quotas.update({
+          where: { wallet_period_quota_id: periodAllocation.wallet_period_quota_id },
+          data: { quota_used: newPeriodQuotaUsed, quota_remaining: newPeriodQuotaRemaining },
         });
-
-        if (!periodQuota) throw new Error('ไม่พบโควตารอบปัจจุบัน กรุณาตรวจสอบยอดและลองใหม่');
-        if (periodQuota) {
-          if (Number(periodQuota.quota_remaining) < copay.governmentCopayAmount) {
-            throw new Error('โควตารอบปัจจุบันเปลี่ยนแปลง กรุณาตรวจสอบยอดและลองใหม่');
-          }
-          const newPeriodUsed =
-            Math.round((Number(periodQuota.quota_used) + copay.governmentCopayAmount) * 100) / 100;
-          const newPeriodRemaining =
-            Math.max(0, Math.round((Number(periodQuota.quota_remaining) - copay.governmentCopayAmount) * 100) / 100);
-
-          await tx.wallet_period_quotas.update({
-            where: {
-              wallet_id_period_id: {
-                wallet_id: wallet.walletId,
-                period_id: wallet.currentPeriod.periodId,
-              },
-            },
-            data: {
-              quota_used: newPeriodUsed,
-              quota_remaining: newPeriodRemaining,
-            },
-          });
-        }
       }
 
       // 4.2 สร้างรายการธุรกรรมหลัก
@@ -846,7 +836,7 @@ export class PaymentService {
       // 4.4 บันทึกประวัติการเคลื่อนไหวของกระเป๋าเงิน
       await tx.wallet_transactions.create({
         data: {
-          wallet_id: wallet.walletId,
+          wallet_id: currentWallet.wallet_id,
           transaction_id: newTx.transaction_id,
           transaction_type: 'COPAY_PAYMENT',
           amount: copay.citizenPaidAmount,
@@ -881,8 +871,11 @@ export class PaymentService {
         } })) },
       });
 
-      return newTx;
+      return { transaction: newTx, copay };
     });
+
+    const transactionRecord = paymentResult.transaction;
+    const copay = paymentResult.copay;
 
     // ปรับสถานะ QR Code เป็น USED พร้อมแนบข้อมูลการจ่ายเงินเพื่อให้หน้าจอ POS ร้านค้ารับรู้ได้ทันที
     qrData.status = 'USED';
@@ -896,6 +889,21 @@ export class PaymentService {
     };
     // ส่งสัญญาณ Real-time ผ่าน SSE ไปยังหน้าจอ POS ของร้านค้าทันที (0 ms Latency)
     this.qrPaymentEvents.emit(`payment:${params.qrReference}`, qrData.paidTransaction);
+
+    // หลัง commit เท่านั้น: ประเมิน Badge จากยอดที่บันทึกสำเร็จแล้ว
+    // ถ้า Badge ผิดพลาด ระบบจะ log และไม่กระทบผลการชำระเงิน
+    await awardAfterActivity(
+      params.userId,
+      ['transaction_count', 'total_spending'],
+      'co-pay checkout'
+    );
+    if (discountInfo?.referrerUserId) {
+      await awardAfterActivity(
+        discountInfo.referrerUserId,
+        ['referral_count'],
+        'referral conversion'
+      );
+    }
 
     return {
       transactionId: transactionRecord.transaction_id,
