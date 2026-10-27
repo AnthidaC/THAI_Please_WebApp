@@ -17,6 +17,7 @@ import { CitizenWalletPage } from '../pages/citizen/wallet/CitizenWalletPage';
 import { CitizenScanCopayPage } from '../pages/citizen/scan-copay/CitizenScanCopayPage';
 import { CitizenPaymentSlipPage } from '../pages/citizen/scan-copay/CitizenPaymentSlipPage';
 import { CitizenTransactionsPage } from '../pages/citizen/transactions/CitizenTransactionsPage';
+import { CitizenAchievementsPage } from '../pages/citizen/achievements/CitizenAchievementsPage';
 import { MerchantPosQrPage } from '../pages/merchant/pos-qr/MerchantPosQrPage';
 import { MerchantSalesHistoryPage } from '../pages/merchant/sales/MerchantSalesHistoryPage';
 import { AdminFraudAlertsPage } from '../pages/admin/fraud-alerts/AdminFraudAlertsPage';
@@ -48,6 +49,10 @@ export const router = createBrowserRouter([
       {
         path: APP_ROUTES.CITIZEN_TRANSACTIONS,
         element: <CitizenTransactionsPage />,
+      },
+      {
+        path: APP_ROUTES.CITIZEN_ACHIEVEMENTS,
+        element: <CitizenAchievementsPage />,
       },
 
       // Merchant Flow (Dev 2)

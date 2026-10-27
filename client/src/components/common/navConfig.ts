@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import { Wallet, QrCode, Store, ShieldAlert, TrendingUp, History, ScanLine } from 'lucide-react';
+import { Wallet, QrCode, Store, ShieldAlert, TrendingUp, History, ScanLine, Trophy } from 'lucide-react';
 import { APP_ROUTES } from '../../constants/routes';
 
 /**
@@ -28,6 +28,7 @@ export const NAV_BY_ROLE: Record<NavRole, NavItem[]> = {
     { to: APP_ROUTES.CITIZEN_WALLET, label: 'กระเป๋าเงิน', icon: Wallet },
     { to: APP_ROUTES.CITIZEN_SCAN_COPAY, label: 'สแกนจ่าย', fullLabel: 'สแกนจ่าย Co-pay', icon: ScanLine, primary: true },
     { to: APP_ROUTES.CITIZEN_TRANSACTIONS, label: 'ประวัติ', fullLabel: 'ประวัติการใช้จ่าย', icon: History },
+    { to: APP_ROUTES.CITIZEN_ACHIEVEMENTS, label: 'เหรียญตรา', fullLabel: 'เหรียญตราของฉัน', icon: Trophy },
   ],
   MERCHANT: [
     { to: APP_ROUTES.MERCHANT_POS_QR, label: 'สร้าง QR', fullLabel: 'สร้าง QR รับเงิน', icon: QrCode, primary: true },

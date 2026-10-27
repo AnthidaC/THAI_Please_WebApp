@@ -10,6 +10,7 @@ export const APP_ROUTES = {
   CITIZEN_SCAN_COPAY: '/citizen/scan-copay',
   CITIZEN_SLIP: '/citizen/slip/:id',
   CITIZEN_TRANSACTIONS: '/citizen/transactions',
+  CITIZEN_ACHIEVEMENTS: '/citizen/achievements',
 
   // เส้นทางร้านค้า (Merchant Flow - Dev 2)
   MERCHANT_POS_QR: '/merchant/pos-qr',

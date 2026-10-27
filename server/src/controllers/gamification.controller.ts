@@ -40,10 +40,3 @@ export const updateQuest = (req: Request, res: Response) => withId(req, res, (id
 export const listRewards = (_req: Request, res: Response) => run(res, gamificationService.listRewards, 'Rewards loaded');
 export const createReward = (req: Request, res: Response) => run(res, () => gamificationService.createReward(req.body), 'Reward created', 201);
 export const updateReward = (req: Request, res: Response) => withId(req, res, (id) => gamificationService.updateReward(id, req.body));
-
-export const listBadges = (_req: Request, res: Response) => run(res, gamificationService.listBadges, 'Badges loaded');
-export const createBadge = (req: Request, res: Response) => run(res, () => gamificationService.createBadge(req.body), 'Badge created', 201);
-export const updateBadge = (req: Request, res: Response) => withId(req, res, (id) => gamificationService.updateBadge(id, req.body));
-export const listBadgeConfigs = (_req: Request, res: Response) => run(res, gamificationService.listBadgeConfigs, 'Badge configurations loaded');
-export const createBadgeConfig = (req: Request, res: Response) => run(res, () => gamificationService.createBadgeConfig(req.body), 'Badge configuration created', 201);
-export const updateBadgeConfig = (req: Request, res: Response) => withId(req, res, (id) => gamificationService.updateBadgeConfig(id, req.body));

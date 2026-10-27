@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import QRCode from 'qrcode';
 import {
   CheckCircle2,
@@ -13,7 +13,7 @@ import {
   FileCheck2,
   X,
 } from 'lucide-react';
-import { getTransactionSlip, SlipData } from '../../../services/paymentApi';
+import { getTransactionSlip, createReview, SlipData } from '../../../services/paymentApi';
 import { APP_ROUTES } from '../../../constants/routes';
 
 const AUTOSAVE_PERMISSION_KEY = 'thai_please_slip_autosave_permission';
@@ -305,6 +305,7 @@ async function renderBankSlipCanvasPng(
 export const CitizenPaymentSlipPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
   const location = useLocation();
 
@@ -331,6 +332,8 @@ export const CitizenPaymentSlipPage: React.FC = () => {
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewSubmitted, setReviewSubmitted] = useState(false);
+  const [reviewSaving, setReviewSaving] = useState(false);
+  const [reviewError, setReviewError] = useState<string | null>(null);
 
   // ข้อมูลรูปภาพสลิปที่เรนเดอร์ล่วงหน้าไว้ในหน่วยความจำ
   const [cachedSlipDataUrl, setCachedSlipDataUrl] = useState<string>('');
@@ -346,6 +349,27 @@ export const CitizenPaymentSlipPage: React.FC = () => {
     queryFn: () => getTransactionSlip(id || ''),
     enabled: !!id,
   });
+
+  // ส่งคะแนนรีวิวไปบันทึกที่ Backend (ใช้ transactionId ของสลิปนี้เท่านั้น)
+  const handleSubmitReview = useCallback(async () => {
+    if (!slip?.transactionId || reviewSaving) return;
+    setReviewSaving(true);
+    setReviewError(null);
+    try {
+      await createReview({ transactionId: slip.transactionId, ratingStars: reviewRating });
+      setReviewSubmitted(true);
+      setShowReviewModal(false);
+      // รีเฟรชสถานะรีวิวและความคืบหน้าตราความสำเร็จที่อาจปลดล็อกใหม่
+      void queryClient.invalidateQueries({ queryKey: ['buyer-history'] });
+      void queryClient.invalidateQueries({ queryKey: ['my-badges'] });
+    } catch (error: any) {
+      setReviewError(
+        error?.response?.data?.message || 'ส่งผลการประเมินไม่สำเร็จ กรุณาลองใหม่อีกครั้ง'
+      );
+    } finally {
+      setReviewSaving(false);
+    }
+  }, [slip?.transactionId, reviewRating, reviewSaving, queryClient]);
 
   // ฟังก์ชันสั่งดาวน์โหลดไฟล์ PNG ที่เรนเดอร์เตรียมไว้แล้วลงเครื่องทันที (Instant Download)
   const triggerInstantDownload = useCallback(
@@ -606,10 +630,12 @@ export const CitizenPaymentSlipPage: React.FC = () => {
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-bold text-slate-900">ประเมินร้านค้า</h2>
               <button
+                type="button"
                 onClick={() => setShowReviewModal(false)}
-                className="text-slate-400 hover:text-slate-600 transition"
+                aria-label="ปิดหน้าต่างประเมินร้านค้า"
+                className="rounded-full p-1 text-slate-400 transition hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
               >
-                <X className="h-4 w-4" />
+                <X className="h-4 w-4" aria-hidden="true" />
               </button>
             </div>
 
@@ -623,9 +649,12 @@ export const CitizenPaymentSlipPage: React.FC = () => {
                   key={star}
                   type="button"
                   onClick={() => setReviewRating(star)}
-                  className="p-1 transition hover:scale-110"
+                  aria-label={`ให้ ${star} ดาว`}
+                  aria-pressed={reviewRating === star}
+                  className="rounded-full p-1 transition hover:scale-110 motion-reduce:transform-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
                 >
                   <Star
+                    aria-hidden="true"
                     className={`h-7 w-7 ${
                       star <= reviewRating
                         ? 'fill-amber-400 text-amber-400'
@@ -637,14 +666,17 @@ export const CitizenPaymentSlipPage: React.FC = () => {
             </div>
 
             <div className="pt-1">
+              {reviewError && (
+                <p role="alert" className="mb-2 text-center text-[11px] font-medium text-status-error">
+                  {reviewError}
+                </p>
+              )}
               <button
-                onClick={() => {
-                  setReviewSubmitted(true);
-                  setShowReviewModal(false);
-                }}
-                className="w-full rounded-full bg-blue-600 py-2.5 text-xs font-semibold text-white transition hover:bg-blue-700"
+                onClick={handleSubmitReview}
+                disabled={reviewSaving}
+                className="w-full rounded-full bg-blue-600 py-2.5 text-xs font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
               >
-                ส่งผลการประเมิน
+                {reviewSaving ? 'กำลังส่งผลการประเมิน…' : 'ส่งผลการประเมิน'}
               </button>
             </div>
           </div>
@@ -908,7 +940,7 @@ export const CitizenPaymentSlipPage: React.FC = () => {
               </span>
             </div>
             <button
-              onClick={() => setShowReviewModal(true)}
+              onClick={() => { setReviewError(null); setShowReviewModal(true); }}
               className="shrink-0 rounded-full bg-slate-100 hover:bg-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 transition"
             >
               ประเมินร้าน

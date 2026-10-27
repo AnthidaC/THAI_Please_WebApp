@@ -19,6 +19,25 @@ export interface AvailableCampaignInfo {
   endDate: string;
   status: string;
   isRegistrationOpen: boolean;
+  periodCount: number;
+  configuredPeriodQuota: number;
+}
+
+export interface WalletCampaignPeriod {
+  id: string;
+  name: string;
+  startDate: string;
+  endDate: string;
+  quotaLimit: number;
+  quotaUsed: number;
+  quotaRemaining: number;
+}
+
+export interface WalletPeriodQuotaInfo {
+  enabled: boolean;
+  status: 'ACTIVE' | 'BEFORE_FIRST' | 'BETWEEN_PERIODS' | 'AFTER_LAST' | 'ALLOCATION_MISSING' | 'INVALID_OVERLAP' | 'NOT_CONFIGURED';
+  currentPeriod: WalletCampaignPeriod | null;
+  nextPeriod: WalletCampaignPeriod | null;
 }
 
 export interface WalletData {
@@ -33,6 +52,7 @@ export interface WalletData {
   status: string;
   lastQuotaResetDate: string;
   monthlyCycle?: MonthlyCycleInfo;
+  periodQuota: WalletPeriodQuotaInfo;
   campaignInfo?: {
     campaignId: string;
     campaignName: string;
@@ -383,6 +403,15 @@ export const getMerchantHistory = async (merchantId?: string): Promise<MerchantS
 export const getTransactionSlip = async (id: string): Promise<SlipData> => {
   const res = await axios.get(`/transactions/${id}/slip`);
   return res.data.data;
+};
+
+// 3.1 รีวิวร้านค้าหลังชำระเงิน (บันทึกแล้วประเมินตราความสำเร็จฝั่งเซิร์ฟเวอร์)
+export const createReview = async (payload: {
+  transactionId: string;
+  ratingStars: number;
+  reviewText?: string;
+}): Promise<void> => {
+  await axios.post('/reviews', payload);
 };
 
 // 4. ระบบตรวจจับทุจริตสำหรับ Admin (Fraud Alerts & User Dossiers)
