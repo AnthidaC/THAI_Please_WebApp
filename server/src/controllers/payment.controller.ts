@@ -1,10 +1,12 @@
 import { Request, Response } from 'express';
 import { paymentService } from '../services/payment.service';
 import { sendSuccess, sendError } from '../utils/response';
+import { PaymentPinError } from '../services/payment-pin.service';
 
 export const generateDynamicQr = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { amount, latitude, longitude, shopName, merchantId } = req.body;
+    const { amount, latitude, longitude, shopName } = req.body;
+    const merchantId = res.locals.paymentMerchantId;
 
     const qrData = await paymentService.generateDynamicQr({
       merchantId,
@@ -48,7 +50,7 @@ export const getQrPaymentStatus = async (req: Request, res: Response): Promise<v
     const reference = Array.isArray(req.params.reference)
       ? req.params.reference[0]
       : req.params.reference;
-    const statusData = await paymentService.getQrPaymentStatus(reference);
+    const statusData = await paymentService.getQrPaymentStatus(reference, res.locals.paymentMerchantId);
     sendSuccess(res, statusData, 'ตรวจสอบสถานะ QR Code สำเร็จ');
   } catch (error: any) {
     sendError(res, error.message || 'ไม่สามารถตรวจสอบสถานะ QR Code ได้', 400);
@@ -65,6 +67,8 @@ export const streamQrPaymentStatus = async (req: Request, res: Response): Promis
       ? req.params.reference[0]
       : req.params.reference;
 
+    const currentStatus = await paymentService.getQrPaymentStatus(reference, res.locals.paymentMerchantId);
+
     // ตั้งค่า Header สำหรับ Server-Sent Events (SSE)
     res.writeHead(200, {
       'Content-Type': 'text/event-stream',
@@ -76,7 +80,6 @@ export const streamQrPaymentStatus = async (req: Request, res: Response): Promis
     res.write('retry: 3000\n\n');
 
     // ส่งสถานะปัจจุบันเริ่มต้นทันที
-    const currentStatus = await paymentService.getQrPaymentStatus(reference);
     res.write(`data: ${JSON.stringify(currentStatus)}\n\n`);
 
     // หากชำระเงินเรียบร้อยแล้ว ให้ปิดการเชื่อมต่อ
@@ -158,6 +161,10 @@ export const checkoutCopay = async (req: Request, res: Response): Promise<void> 
 
     sendSuccess(res, result, 'ชำระเงินร่วม (Co-pay 60/40) สำเร็จ');
   } catch (error: any) {
+    if (error instanceof PaymentPinError) {
+      res.status(error.statusCode).json({ status: 'error', code: error.code, message: error.message });
+      return;
+    }
     sendError(res, error.message || 'การชำระเงินล้มเหลว', 400);
   }
 };

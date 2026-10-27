@@ -1,5 +1,8 @@
 import { EventEmitter } from 'events';
+import { randomUUID } from 'node:crypto';
 import prisma from '../utils/prisma';
+import { qrStore } from './payment-qr.store';
+import { paymentPinService } from './payment-pin.service';
 import { getBangkokDateKey, getDatabaseDateKey, toBangkokDatabaseDate } from '../utils/bangkok-date';
 import { walletService } from './wallet.service';
 import { awardAfterActivity } from './achievements/badgeAwardEngine';
@@ -67,9 +70,6 @@ export interface DynamicQrData {
 
 // อายุของ Dynamic QR Code ทุกรายการในระบบกำหนดไว้ที่ 3 นาที (180,000 มิลลิวินาที)
 export const QR_EXPIRATION_MS = 3 * 60 * 1000;
-
-// In-memory cache สำหรับเก็บ Dynamic QR ชั่วคราว (มีอายุ 3 นาที) ควบคู่กับฐานข้อมูล
-const qrStore = new Map<string, DynamicQrData>();
 
 export class PaymentService {
   // Real-time Event Emitter สำหรับ Server-Sent Events (SSE) แจ้งเตือน POS ทันที
@@ -199,6 +199,9 @@ export class PaymentService {
       });
 
       if (userReward) {
+        if (params.userId && userReward.user_id !== params.userId) {
+          throw new Error('คูปองนี้ไม่ได้เป็นของบัญชีคุณ');
+        }
         if (userReward.status !== 'available') {
           throw new Error('คูปองนี้ถูกใช้งานไปแล้วหรือหมดสิทธิ์');
         }
@@ -260,7 +263,7 @@ export class PaymentService {
       },
     };
 
-    if (demoCodes[cleanCode]) {
+    if (process.env.NODE_ENV !== 'production' && demoCodes[cleanCode]) {
       const demo = demoCodes[cleanCode];
       const discount = Math.min(params.totalAmount, demo.amount);
       return {
@@ -287,30 +290,12 @@ export class PaymentService {
     longitude: number;
     shopName?: string;
   }): Promise<DynamicQrData> {
-    let merchantId = params.merchantId;
-    let shopName = params.shopName || 'ร้านค้าประชารัฐร่วมใจ';
-
-    if (!merchantId) {
-      const existingMerchant = await prisma.merchants.findFirst();
-      if (existingMerchant) {
-        merchantId = existingMerchant.merchant_id;
-        shopName = existingMerchant.shop_name;
-      } else {
-        const newMerchant = await prisma.merchants.create({
-          data: {
-            tax_id: `TAX-${Date.now().toString().slice(-10)}`,
-            shop_name: shopName,
-            latitude: params.latitude,
-            longitude: params.longitude,
-            average_rating_stars: 4.8,
-            is_approved: true,
-          },
-        });
-        merchantId = newMerchant.merchant_id;
-      }
-    }
-
-    const qrReference = `TP-QR-${Date.now()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
+    const merchantId = params.merchantId;
+    if (!merchantId) throw new Error('กรุณาระบุร้านค้าที่ผูกกับบัญชี');
+    const merchant = await prisma.merchants.findUnique({ where: { merchant_id: merchantId } });
+    if (!merchant?.is_approved) throw new Error('ร้านค้ายังไม่ได้รับอนุมัติหรือถูกระงับสิทธิ์');
+    const shopName = merchant.shop_name;
+    const qrReference = `TP-QR-${randomUUID()}`;
     const now = new Date();
     const expiresAt = new Date(now.getTime() + QR_EXPIRATION_MS);
 
@@ -327,11 +312,11 @@ export class PaymentService {
 
     const qrData: DynamicQrData = {
       qrReference,
-      merchantId: merchantId || 'sample-merchant-id',
+      merchantId,
       shopName,
       totalAmount: params.amount,
-      merchantLatitude: params.latitude,
-      merchantLongitude: params.longitude,
+      merchantLatitude: Number(merchant.latitude),
+      merchantLongitude: Number(merchant.longitude),
       createdAt: now.toISOString(),
       expiresAt: expiresAt.toISOString(),
       estimatedGovCopay: tentativeGov,
@@ -339,7 +324,7 @@ export class PaymentService {
       status: 'ACTIVE',
     };
 
-    qrStore.set(qrReference, qrData);
+    await qrStore.set(qrReference, qrData);
 
     return qrData;
   }
@@ -348,8 +333,11 @@ export class PaymentService {
    * ตรวจสอบสถานะ QR Code สำหรับฝั่งร้านค้า (POS Real-time Polling)
    * เพื่อให้หน้าจอร้านค้าเด้งแจ้งเตือนมาตรฐานและเล่นเสียงเมื่อลูกค้าจ่ายเงินสำเร็จ
    */
-  public async getQrPaymentStatus(qrReference: string) {
-    let qrData = qrStore.get(qrReference);
+  public async getQrPaymentStatus(qrReference: string, merchantId?: string) {
+    let qrData = await qrStore.get(qrReference);
+    if (merchantId && (!qrData || qrData.merchantId !== merchantId)) {
+      throw new Error('ไม่พบ QR Code ของร้านค้านี้');
+    }
 
     // ตรวจสอบในฐานข้อมูลเผื่อมีรายการชำระเงินสำเร็จแล้ว
     const completedTx = await prisma.transactions.findFirst({
@@ -374,12 +362,6 @@ export class PaymentService {
         completedAt: (completedTx.completed_at || completedTx.created_at).toISOString(),
       };
 
-      if (qrData) {
-        qrData.status = 'USED';
-        qrData.paidTransaction = paidInfo;
-        qrStore.set(qrReference, qrData);
-      }
-
       return {
         qrReference,
         status: 'USED' as const,
@@ -400,7 +382,7 @@ export class PaymentService {
     const isExpired = new Date() > new Date(qrData.expiresAt) || qrData.status === 'EXPIRED';
     if (isExpired && qrData.status !== 'USED') {
       qrData.status = 'EXPIRED';
-      qrStore.set(qrReference, qrData);
+      await qrStore.set(qrReference, qrData);
     }
 
     return {
@@ -422,7 +404,7 @@ export class PaymentService {
     discountCode?: string,
     userLocation?: { lat: number; lon: number }
   ) {
-    let qrData = qrStore.get(qrReference);
+    let qrData = await qrStore.get(qrReference);
 
     if (!qrData) {
       const tx = await prisma.transactions.findFirst({
@@ -453,7 +435,7 @@ export class PaymentService {
     const isExpired = new Date() > new Date(qrData.expiresAt) || qrData.status === 'EXPIRED';
     if (isExpired) {
       qrData.status = 'EXPIRED';
-      qrStore.set(qrReference, qrData);
+      await qrStore.set(qrReference, qrData);
       throw new Error('QR หมดอายุ กรุณาทำรายการใหม่');
     }
 
@@ -467,7 +449,7 @@ export class PaymentService {
     }
 
     // 3. ตรวจสอบพิกัดระยะทางตั้งแต่ขั้นตอนสแกน QR (อนุญาตให้ทำธุรกรรมในรัศมีไม่เกิน 2 กิโลเมตร = 2,000 เมตร)
-    if (userLocation && userLocation.lat && userLocation.lon) {
+    if (userLocation && Number.isFinite(userLocation.lat) && Number.isFinite(userLocation.lon)) {
       const distanceMeters = calculateHaversineDistance(
         userLocation.lat,
         userLocation.lon,
@@ -479,7 +461,7 @@ export class PaymentService {
       if (distanceMeters > MAX_ALLOWED_DISTANCE_METERS) {
         // 1. ระงับ QR Code โดยปรับสถานะเป็น REJECTED (ไม่ลบข้อมูลออกจากระบบหรือ DB เพื่อเก็บประวัติไว้ตรวจสอบ)
         qrData.status = 'REJECTED';
-        qrStore.set(qrReference, qrData);
+        await qrStore.set(qrReference, qrData);
 
         // 2. จด log เก็บไว้เงียบๆ ในฐานข้อมูล เพื่อให้ Admin ตรวจสอบกรณีมีความน่าสงสัยซ้ำๆ
         try {
@@ -551,6 +533,7 @@ export class PaymentService {
 
     if (userId) {
       walletInfo = await walletService.getWalletByUserId(userId);
+
       copaySplit = this.calculateCopay(
         qrData.totalAmount,
         walletInfo.dailyQuotaRemaining,
@@ -582,15 +565,16 @@ export class PaymentService {
     userLongitude: number;
     merchantId?: string;
     discountCode?: string;
-    pin?: string;
+    pin: string;
   }) {
-    if (params.pin !== undefined && !/^\d{6}$/.test(params.pin)) {
-      throw new Error('กรุณาระบุรหัส PIN ยืนยันการชำระเงิน 6 หลักให้ถูกต้อง');
-    }
+    await paymentPinService.verify(params.userId, params.pin);
 
     const { qrData } = await this.getQrDetails(params.qrReference);
 
-    const merchantId = params.merchantId || qrData.merchantId;
+    if (params.merchantId && params.merchantId !== qrData.merchantId) {
+      throw new Error('ร้านค้าไม่ตรงกับ QR Code');
+    }
+    const merchantId = qrData.merchantId;
     const [merchant, buyerUser] = await Promise.all([
       prisma.merchants.findUnique({
         where: { merchant_id: merchantId },
@@ -683,7 +667,7 @@ export class PaymentService {
     // บล็อกเฉพาะกรณีอยู่นอกรัศมี 2 กิโลเมตร (2,000 เมตร) เท่านั้น — AI ไม่บล็อกผู้ใช้หรือร้านค้าทันที
     if (fraudAssessment.distanceMeters > MAX_ALLOWED_DISTANCE_METERS) {
       qrData.status = 'REJECTED';
-      qrStore.set(params.qrReference, qrData);
+      await qrStore.set(params.qrReference, qrData);
 
       try {
         const rejectedTx = await prisma.transactions.create({
@@ -730,6 +714,12 @@ export class PaymentService {
 
     // 4. บันทึกและตัดยอดเงินใน Atomic Transaction
     const paymentResult = await prisma.$transaction(async (tx: any) => {
+      const claim = await tx.payment_qr_codes.updateMany({
+        where: { qr_reference: params.qrReference, status: 'ACTIVE', expires_at: { gt: new Date() } },
+        data: { status: 'USED' },
+      });
+      if (claim.count !== 1) throw new Error('QR นี้ถูกชำระแล้ว ถูกยกเลิก หรือหมดอายุ กรุณาตรวจสอบประวัติ');
+
       await tx.$queryRaw`SELECT wallet_id FROM public.wallets WHERE wallet_id = ${wallet.walletId}::uuid FOR UPDATE`;
       const currentWallet = await tx.wallets.findUnique({
         where: { wallet_id: wallet.walletId },
@@ -822,23 +812,25 @@ export class PaymentService {
 
       // 4.3 ตัดสิทธิ์โค้ดชวนเพื่อน หรือ คูปอง หากมีการใช้งาน
       if (discountInfo?.referralId) {
-        await tx.referrals.update({
-          where: { referral_id: discountInfo.referralId },
+        const redeemed = await tx.referrals.updateMany({
+          where: { referral_id: discountInfo.referralId, status: { not: 'redeemed' } },
           data: {
             status: 'redeemed',
             transaction_id: newTx.transaction_id,
             converted_at: completedAtDate,
           },
         });
+        if (redeemed.count !== 1) throw new Error('โค้ดคำชวนถูกใช้งานแล้ว กรุณาตรวจสอบใหม่');
       } else if (discountInfo?.userRewardId) {
-        await tx.user_rewards.update({
-          where: { user_reward_id: discountInfo.userRewardId },
+        const redeemed = await tx.user_rewards.updateMany({
+          where: { user_reward_id: discountInfo.userRewardId, user_id: params.userId, status: 'available' },
           data: {
             status: 'used',
             transaction_id: newTx.transaction_id,
             used_at: completedAtDate,
           },
         });
+        if (redeemed.count !== 1) throw new Error('คูปองถูกใช้งานแล้ว กรุณาตรวจสอบใหม่');
       }
 
       // 4.4 บันทึกประวัติการเคลื่อนไหวของกระเป๋าเงิน
@@ -870,6 +862,15 @@ export class PaymentService {
         },
       });
 
+      await tx.payment_qr_codes.update({
+        where: { qr_reference: params.qrReference },
+        data: { payload: JSON.parse(JSON.stringify({ ...qrData, status: 'USED', paidTransaction: {
+          transactionId: newTx.transaction_id, customerName, totalAmount: copay.netTotalAmount,
+          governmentCopayAmount: copay.governmentCopayAmount, citizenPaidAmount: copay.citizenPaidAmount,
+          completedAt: completedAtDate.toISOString(),
+        } })) },
+      });
+
       return { transaction: newTx, copay };
     });
 
@@ -886,8 +887,6 @@ export class PaymentService {
       citizenPaidAmount: copay.citizenPaidAmount,
       completedAt: completedAtDate.toISOString(),
     };
-    qrStore.set(params.qrReference, qrData);
-
     // ส่งสัญญาณ Real-time ผ่าน SSE ไปยังหน้าจอ POS ของร้านค้าทันที (0 ms Latency)
     this.qrPaymentEvents.emit(`payment:${params.qrReference}`, qrData.paidTransaction);
 
@@ -933,12 +932,11 @@ export class PaymentService {
   /**
    * สำหรับใช้ในการทดสอบ Unit Test หรือจำลองสถานะ QR Code หมดอายุ (ตั้งเวลาถอยหลังเป็นอดีต)
    */
-  public _simulateExpireQr(qrReference: string): void {
-    const qrData = qrStore.get(qrReference);
-    if (qrData) {
-      qrData.expiresAt = new Date(Date.now() - 5000).toISOString();
-      qrStore.set(qrReference, qrData);
-    }
+  public async _simulateExpireQr(qrReference: string): Promise<void> {
+    await prisma.payment_qr_codes.updateMany({
+      where: { qr_reference: qrReference, status: 'ACTIVE' },
+      data: { expires_at: new Date(Date.now() - 5000), status: 'EXPIRED' },
+    });
   }
 }
 

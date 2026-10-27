@@ -28,10 +28,10 @@ export const LoginPage: React.FC = () => {
       };
     } else if (roleType === 'MERCHANT') {
       mockUser = {
-        id: '6d293778-8264-475d-a40e-448e78d7a861',
-        email: 'noodle.shop@thaiplease.go.th',
+        id: '4ebb77a7-2248-4c67-a56e-d5cdfcbb210b',
+        email: 'chickenrice.shop@thaiplease.go.th',
         name: 'ร้านข้าวมันไก่ป้าณี (วิสาหกิจชุมชน)',
-        role: 'USER',
+        role: 'MERCHANT',
         createdAt: new Date().toISOString(),
       };
     } else {
