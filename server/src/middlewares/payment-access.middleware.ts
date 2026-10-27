@@ -20,6 +20,9 @@ export const authenticatePaymentSession = async (req: Request, res: Response, ne
       }
       if (token === 'demo-token-merchant' || token === 'demo-token') {
         const demoMerchant = await prisma.merchants.findFirst({
+          where: { shop_name: { contains: 'ข้าวมันไก่' } },
+          select: { merchant_id: true },
+        }) || await prisma.merchants.findFirst({
           where: { transactions: { some: {} } },
           select: { merchant_id: true },
         }) || await prisma.merchants.findFirst({ select: { merchant_id: true } });
@@ -59,6 +62,9 @@ export const requirePaymentMerchant = async (req: Request, res: Response, next: 
     }
     if (!resolvedMerchantId && env.NODE_ENV === 'development') {
       const fallback = await prisma.merchants.findFirst({
+        where: { shop_name: { contains: 'ข้าวมันไก่' } },
+        select: { merchant_id: true },
+      }) || await prisma.merchants.findFirst({
         where: { transactions: { some: {} } },
         select: { merchant_id: true },
       }) || await prisma.merchants.findFirst({ select: { merchant_id: true } });

@@ -12,14 +12,21 @@ import { RegisterPage } from '../pages/auth/RegisterPage';
 import { DashboardPage } from '../pages/admin/dashboard/DashboardPage';
 import { NotFoundPage } from '../pages/notFound/NotFoundPage';
 
-// Developer 2: Payment & Fraud Engine Pages
+// Citizen Flow Pages
 import { CitizenWalletPage } from '../pages/citizen/wallet/CitizenWalletPage';
 import { CitizenScanCopayPage } from '../pages/citizen/scan-copay/CitizenScanCopayPage';
 import { CitizenPaymentSlipPage } from '../pages/citizen/scan-copay/CitizenPaymentSlipPage';
 import { CitizenTransactionsPage } from '../pages/citizen/transactions/CitizenTransactionsPage';
 import { CitizenAchievementsPage } from '../pages/citizen/achievements/CitizenAchievementsPage';
+import { CitizenNearMePage } from '../pages/citizen/recommendations/CitizenNearMePage';
+import { CitizenMerchantDetailPage } from '../pages/citizen/merchants/CitizenMerchantDetailPage';
+import { CitizenProfilePage } from '../pages/citizen/profile/CitizenProfilePage';
+
+// Merchant Flow Pages
 import { MerchantPosQrPage } from '../pages/merchant/pos-qr/MerchantPosQrPage';
 import { MerchantSalesHistoryPage } from '../pages/merchant/sales/MerchantSalesHistoryPage';
+
+// Admin Flow Pages
 import { AdminFraudAlertsPage } from '../pages/admin/fraud-alerts/AdminFraudAlertsPage';
 const AdminCampaignsPage = React.lazy(() => import('../pages/admin/campaigns/AdminCampaignsPage').then((module) => ({ default: module.AdminCampaignsPage })));
 
@@ -33,7 +40,7 @@ export const router = createBrowserRouter([
         index: true,
         element: <HomePage />,
       },
-      // Citizen Flow (Dev 2)
+      // Citizen Flow
       {
         path: APP_ROUTES.CITIZEN_WALLET,
         element: <CitizenWalletPage />,
@@ -54,8 +61,20 @@ export const router = createBrowserRouter([
         path: APP_ROUTES.CITIZEN_ACHIEVEMENTS,
         element: <CitizenAchievementsPage />,
       },
+      {
+        path: APP_ROUTES.CITIZEN_NEAR_ME,
+        element: <CitizenNearMePage />,
+      },
+      {
+        path: APP_ROUTES.CITIZEN_MERCHANT_DETAIL,
+        element: <CitizenMerchantDetailPage />,
+      },
+      {
+        path: APP_ROUTES.PROFILE,
+        element: <CitizenProfilePage />,
+      },
 
-      // Merchant Flow (Dev 2)
+      // Merchant Flow
       {
         path: APP_ROUTES.MERCHANT_POS_QR,
         element: <MerchantPosQrPage />,
