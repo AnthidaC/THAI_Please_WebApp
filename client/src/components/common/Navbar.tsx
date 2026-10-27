@@ -17,11 +17,9 @@ export const Navbar: React.FC = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [registerOpen, setRegisterOpen] = useState(false);
-  const [roleMenuOpen, setRoleMenuOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const desktopMenuRef = useRef<HTMLDivElement>(null);
-  const roleMenuRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -29,7 +27,6 @@ export const Navbar: React.FC = () => {
     setMobileOpen(false);
     setAccountOpen(false);
     setRegisterOpen(false);
-    setRoleMenuOpen(false);
   }, [location.pathname, location.hash]);
 
   useEffect(() => {
@@ -108,12 +105,7 @@ export const Navbar: React.FC = () => {
           </Link>
 
           <nav aria-label="เมนูหลัก" className="hidden items-center gap-2 lg:flex">
-            {role === 'ADMIN' ? <div ref={roleMenuRef} className="relative">
-              <button type="button" aria-expanded={roleMenuOpen} aria-haspopup="menu" onClick={() => setRoleMenuOpen((open) => !open)} className="inline-flex min-h-11 items-center gap-2 whitespace-nowrap rounded-pill px-4 text-base font-semibold text-ink-body hover:bg-surface-soft focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-blue">
-                เมนูผู้ดูแล<ChevronDown aria-hidden="true" className={`h-4 w-4 transition-transform ${roleMenuOpen ? 'rotate-180' : ''}`} />
-              </button>
-              {roleMenuOpen && <div role="menu" className="absolute left-0 top-full z-50 mt-2 min-w-max rounded-2xl border border-hairline bg-white p-2 shadow-lg [&_a]:w-full [&_a]:justify-start [&_a]:whitespace-nowrap">{visibleItems.map((item) => <div role="none" key={item.to}>{renderItem(item)}</div>)}</div>}
-            </div> : visibleItems.map((item) => renderItem(item))}
+            {visibleItems.map((item) => renderItem(item))}
             {isPendingMerchant && <span className="rounded-pill border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900">รอตรวจสอบ</span>}
           </nav>
 

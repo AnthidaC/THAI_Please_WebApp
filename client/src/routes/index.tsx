@@ -99,7 +99,7 @@ export const router = createBrowserRouter([
       },
 
       {
-        element: <ProtectedRoute allowedRoles={['GOVERNMENT_EXECUTIVE']} loginPath={APP_ROUTES.LOGIN} />,
+        element: <ProtectedRoute allowedRoles={['ADMIN', 'STAFF', 'GOVERNMENT_EXECUTIVE']} loginPath={APP_ROUTES.LOGIN} />,
         children: [{ path: APP_ROUTES.ADMIN_SOCIAL_IMPACT, element: <Suspense fallback={<main className="p-8 text-center">กำลังโหลด Dashboard…</main>}><AdminSocialImpactPage /></Suspense> }],
       },
 

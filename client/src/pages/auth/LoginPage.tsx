@@ -13,7 +13,6 @@ type AuthPrincipal = Partial<User> & {
   merchant_approval_status?: string;
   merchant_rejection_reason?: string | null; rejection_reason?: string | null;
   merchant_application_submitted_at?: string | null; role: string;
-  merchant_application_summary?: User['merchantApplicationSummary'];
 };
 type LoginPayload = { user?: AuthPrincipal; token: string };
 
@@ -41,7 +40,6 @@ const normalizeUser = (payload: LoginPayload): User => {
     merchantApprovalStatus: rawApprovalStatus === 'PENDING' || rawApprovalStatus === 'APPROVED' || rawApprovalStatus === 'REJECTED' ? rawApprovalStatus : undefined,
     merchantRejectionReason: source.merchantRejectionReason ?? source.merchant_rejection_reason ?? source.rejection_reason ?? null,
     merchantApplicationSubmittedAt: source.merchantApplicationSubmittedAt ?? source.merchant_application_submitted_at ?? null,
-    merchantApplicationSummary: source.merchantApplicationSummary ?? source.merchant_application_summary ?? null,
     createdAt: source.createdAt || new Date().toISOString(),
   };
 };

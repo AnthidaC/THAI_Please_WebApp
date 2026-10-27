@@ -48,6 +48,7 @@ export const NAV_BY_ROLE: Record<Exclude<NavRole, 'PUBLIC'>, NavItem[]> = {
     { label: 'จัดการร้านค้า', to: APP_ROUTES.ADMIN_MERCHANTS, icon: Store },
     { label: 'คำขอเปลี่ยนพิกัด', to: APP_ROUTES.ADMIN_MERCHANT_LOCATION_REQUESTS, icon: MapPin },
     { label: 'ตรวจสอบทุจริต', to: APP_ROUTES.ADMIN_FRAUD_ALERTS, icon: ShieldAlert },
+    { label: 'Dashboard ผลกระทบทางสังคม', to: APP_ROUTES.ADMIN_SOCIAL_IMPACT, icon: Activity },
   ],
   GOVERNMENT_EXECUTIVE: [
     { label: 'Dashboard ผลกระทบทางสังคม', to: APP_ROUTES.ADMIN_SOCIAL_IMPACT, icon: Activity },
