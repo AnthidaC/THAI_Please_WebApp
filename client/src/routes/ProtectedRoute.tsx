@@ -24,7 +24,11 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   }
 
   if (allowedRoles && (!user || !allowedRoles.includes(user.role))) {
-    return <Navigate to={loginPath} replace />;
+    return <Navigate to={user ? APP_ROUTES.DASHBOARD : loginPath} replace />;
+  }
+
+  if (user?.role === 'MERCHANT' && user.merchantApprovalStatus === 'PENDING' && location.pathname !== APP_ROUTES.MERCHANT_PROFILE && location.pathname !== APP_ROUTES.MERCHANT_HOME) {
+    return <Navigate to={APP_ROUTES.MERCHANT_PROFILE} replace />;
   }
 
   return <Outlet />;

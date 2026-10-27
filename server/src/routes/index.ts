@@ -7,6 +7,8 @@ import fraudRoutes from './fraud.routes';
 import merchantApplicationRoutes from './merchant-application.routes';
 import staffRoutes from './staff.routes';
 import socialImpactRoutes from './social-impact.routes';
+import { getSocialImpactDashboard } from '../controllers/socialImpact.controller';
+import { authenticate, requireGovernmentExecutive } from '../middlewares/auth.middleware';
 
 const router = Router();
 
@@ -24,5 +26,6 @@ router.use('/fraud', fraudRoutes);
 router.use('/merchant', merchantApplicationRoutes);
 router.use('/staff', staffRoutes);
 router.use('/admin/social-impact', socialImpactRoutes);
+router.get('/v1/dashboard', authenticate, requireGovernmentExecutive, getSocialImpactDashboard);
 
 export default router;

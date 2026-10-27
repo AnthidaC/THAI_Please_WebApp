@@ -4,6 +4,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, CheckCircle2, MapPin, Save, Store } from 'lucide-react';
 import { MerchantLocationPicker } from '../../../components/common/MerchantLocationPicker';
+import { ThaiAddressSelect, ThaiAddressValue } from '../../../components/common/ThaiAddressSelect';
+import { MerchantStoreOnboarding } from '../../../components/merchant/MerchantStoreOnboarding';
 import { APP_ROUTES } from '../../../constants/routes';
 import { useAuthStore } from '../../../stores/authStore';
 import {
@@ -43,6 +45,7 @@ export const MerchantProfilePage: React.FC = () => {
   const queryClient = useQueryClient();
   const [form, setForm] = useState<ProfileForm | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [addressSelection, setAddressSelection] = useState<ThaiAddressValue | null>(null);
   const queryKey = isStaff ? ['staff-merchant-profile', merchantId] : ['own-merchant-profile'];
   const profileQuery = useQuery({
     queryKey,
@@ -83,9 +86,20 @@ export const MerchantProfilePage: React.FC = () => {
     setForm((current) => current ? { ...current, [key]: value } : current);
   };
 
+  const applyAddressSelection = (selected: ThaiAddressValue) => {
+    setAddressSelection(selected);
+    if (selected.subdistrictCode) {
+      setField('address', `${selected.subdistrictName} ${selected.districtName} ${selected.provinceName}${selected.postalCode ? ` ${selected.postalCode}` : ''}`);
+    }
+  };
+
   const submit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setFeedback(null);
+    if (addressSelection && !addressSelection.subdistrictCode) {
+      setFeedback('กรุณาเลือกจังหวัด อำเภอ/เขต และตำบล/แขวงให้ครบ หรือยกเลิกการเลือกพื้นที่');
+      return;
+    }
     if (form) updateMutation.mutate(form);
   };
 
@@ -93,6 +107,15 @@ export const MerchantProfilePage: React.FC = () => {
   const mapUrl = form
     ? `https://www.google.com/maps/search/?api=1&query=${form.latitude},${form.longitude}`
     : '';
+
+  if (!isStaff && user?.role === 'MERCHANT' && user.merchantApprovalStatus === 'PENDING') {
+    return <main className="mx-auto min-h-[60vh] max-w-3xl px-4 py-10 font-sans text-ink">
+      <section role="status" className="rounded-2xl border border-amber-300 bg-amber-50 p-6">
+        <h1 className="text-xl font-bold">ร้านค้าของคุณอยู่ระหว่างตรวจสอบ</h1>
+        <p className="mt-2 text-base leading-relaxed">เมื่อเจ้าหน้าที่อนุมัติแล้ว คุณจะกลับมาเติมรูปและข้อมูลหน้าร้านได้ที่หน้านี้</p>
+      </section>
+    </main>;
+  }
 
   return (
     <div className="min-h-screen bg-surface-soft pb-24 font-sans text-ink">
@@ -111,6 +134,7 @@ export const MerchantProfilePage: React.FC = () => {
       </header>
 
       <main className="mx-auto max-w-4xl space-y-5 px-4 py-5 sm:px-6">
+        {!isStaff && user?.role === 'MERCHANT' && <MerchantStoreOnboarding merchantId={profile?.merchantId ?? user.id} />}
         <Link
           to={isStaff ? APP_ROUTES.ADMIN_MERCHANTS : APP_ROUTES.MERCHANT_POS_QR}
           className="inline-flex items-center gap-2 text-xs font-semibold text-brand-blue hover:underline"
@@ -156,12 +180,14 @@ export const MerchantProfilePage: React.FC = () => {
                     onChange={(event) => setField('phone', event.target.value)}
                     className="w-full rounded-xl border border-hairline px-3 py-2.5 text-sm font-normal focus:border-brand-blue focus:outline-none focus:ring-2 focus:ring-blue-100" />
                 </label>
-                <label className="space-y-1.5 text-xs font-semibold sm:col-span-2">
+                <div className="space-y-1.5 text-xs font-semibold sm:col-span-2">
                   ที่อยู่ร้าน
-                  <textarea required minLength={8} maxLength={500} rows={3} value={form.address}
+                  <ThaiAddressSelect onChange={applyAddressSelection} />
+                  <label htmlFor="merchant-profile-address" className="block">ที่อยู่สำหรับจัดส่ง/ติดต่อ</label>
+                  <textarea id="merchant-profile-address" required minLength={8} maxLength={500} rows={3} value={form.address}
                     onChange={(event) => setField('address', event.target.value)}
                     className="w-full rounded-xl border border-hairline px-3 py-2.5 text-sm font-normal focus:border-brand-blue focus:outline-none focus:ring-2 focus:ring-blue-100" />
-                </label>
+                </div>
                 <div className="space-y-1.5 text-xs font-semibold">
                   เลขประจำตัวผู้เสียภาษี
                   <p className="rounded-xl border border-hairline bg-surface-soft px-3 py-2.5 text-sm font-normal">{profile.taxId}</p>

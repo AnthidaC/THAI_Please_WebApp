@@ -1,293 +1,157 @@
 import React, { useState } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { isAxiosError } from 'axios';
-import { LogIn, User, Store, ShieldAlert, Lock, Mail, AlertCircle, ArrowRight } from 'lucide-react';
-import { useAuthStore } from '../../stores/authStore';
+import { Eye, EyeOff, LogIn, ShieldCheck, UserRound } from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { APP_ROUTES } from '../../constants/routes';
-import type { User as AuthUser } from '../../types';
 import { authApi } from '../../services/authApi';
+import { mockQuickLogin, mockThaiDLogin } from '../../services/authMock';
+import { useAuthStore } from '../../stores/authStore';
+import type { User } from '../../types';
 
-type LoginAudience = 'CITIZEN' | 'MERCHANT' | 'ADMIN';
+type AuthPrincipal = Partial<User> & {
+  user_id?: string; full_name?: string; approval_status?: string;
+  merchant_approval_status?: string;
+  merchant_rejection_reason?: string | null; rejection_reason?: string | null;
+  merchant_application_submitted_at?: string | null; role: string;
+  merchant_application_summary?: User['merchantApplicationSummary'];
+};
+type LoginPayload = { user?: AuthPrincipal; token: string };
 
-interface LoginPageProps {
-  audience?: LoginAudience;
-}
-
-const DEFAULT_ROUTE_BY_AUDIENCE: Record<LoginAudience, string> = {
-  CITIZEN: APP_ROUTES.DASHBOARD,
-  MERCHANT: APP_ROUTES.MERCHANT_POS_QR,
-  ADMIN: APP_ROUTES.ADMIN_MERCHANT_APPLICATIONS,
+const destinationFor = (user: User): string => {
+  if (user.role === 'MERCHANT') {
+    return APP_ROUTES.MERCHANT_HOME;
+  }
+  if (user.role === 'ADMIN' || user.role === 'STAFF') return APP_ROUTES.ADMIN_MERCHANT_APPLICATIONS;
+  if (user.role === 'GOVERNMENT_EXECUTIVE') return APP_ROUTES.ADMIN_SOCIAL_IMPACT;
+  return APP_ROUTES.DASHBOARD;
 };
 
-const LOGIN_COPY: Record<LoginAudience, { title: string; description: string }> = {
-  CITIZEN: {
-    title: 'เข้าสู่ระบบประชาชน',
-    description: 'ระบบกระเป๋าเงินดิจิทัล & ชำระเงินร่วม Co-pay 60/40',
-  },
-  MERCHANT: {
-    title: 'เข้าสู่ระบบร้านค้า',
-    description: 'ระบบรับชำระเงินและจัดการยอดขายหน้าร้าน',
-  },
-  ADMIN: {
-    title: 'เข้าสู่ระบบเจ้าหน้าที่',
-    description: 'สำหรับเจ้าหน้าที่รัฐและผู้ดูแลระบบ',
-  },
+const normalizeUser = (payload: LoginPayload): User => {
+  const source = (payload.user ?? payload) as AuthPrincipal;
+  const rawRole = source.role.toUpperCase();
+  const role: User['role'] = rawRole === 'CITIZEN' ? 'USER'
+    : rawRole === 'GOV_EXECUTIVE' || rawRole === 'EXECUTIVE' ? 'GOVERNMENT_EXECUTIVE'
+      : rawRole as User['role'];
+  const rawApprovalStatus = (source.merchantApprovalStatus ?? source.merchant_approval_status ?? source.approval_status)?.toUpperCase();
+  return {
+    id: source.id || source.user_id || '',
+    email: source.email || '',
+    name: source.name || source.full_name || '',
+    role,
+    merchantApprovalStatus: rawApprovalStatus === 'PENDING' || rawApprovalStatus === 'APPROVED' || rawApprovalStatus === 'REJECTED' ? rawApprovalStatus : undefined,
+    merchantRejectionReason: source.merchantRejectionReason ?? source.merchant_rejection_reason ?? source.rejection_reason ?? null,
+    merchantApplicationSubmittedAt: source.merchantApplicationSubmittedAt ?? source.merchant_application_submitted_at ?? null,
+    merchantApplicationSummary: source.merchantApplicationSummary ?? source.merchant_application_summary ?? null,
+    createdAt: source.createdAt || new Date().toISOString(),
+  };
 };
 
-export const LoginPage: React.FC<LoginPageProps> = ({ audience = 'CITIZEN' }) => {
+export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const setAuth = useAuthStore((state) => state.setAuth);
-
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // ดึงหน้าปลายทางที่ต้องการไปหลังล็อกอิน (ถ้ามี redirect มา)
-  const from = (location.state as { from?: { pathname: string } } | null)?.from?.pathname || DEFAULT_ROUTE_BY_AUDIENCE[audience];
+  const finishLogin = (response: { data: LoginPayload }) => {
+    const user = normalizeUser(response.data);
+    setAuth(user, response.data.token);
+    const requested = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname;
+    navigate(requested || destinationFor(user), { replace: true });
+  };
 
-  const handleRealDemoLogin = async (roleType: LoginAudience) => {
-    setErrorMsg(null);
+  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setError(null);
+    if (!username.trim() || !password) {
+      setError('กรุณากรอกชื่อผู้ใช้และรหัสผ่าน');
+      return;
+    }
     setIsSubmitting(true);
     try {
-      const response = roleType === 'CITIZEN'
-        ? await authApi.login({ citizenId: '1101700203456' })
-        : roleType === 'MERCHANT'
-          ? await authApi.loginMerchant({ email: 'noodle.shop@thaiplease.go.th', password: 'DemoMerchant123!' })
-          : await authApi.loginStaff({ email: 'admin.super@thaiplease.go.th', password: 'DemoAdmin123!' });
-      const apiUser = response.data.user as AuthUser & { user_id?: string; full_name?: string };
-      const user: AuthUser = {
-        id: apiUser.id || apiUser.user_id || '',
-        email: apiUser.email || (roleType === 'CITIZEN' ? 'somchai.citizen@thaiplease.go.th' : ''),
-        name: apiUser.name || apiUser.full_name,
-        role: roleType === 'CITIZEN' ? 'USER' : apiUser.role,
-        createdAt: apiUser.createdAt || new Date().toISOString(),
-      };
-      setAuth(user, response.data.token);
-      navigate(roleType === audience ? from : DEFAULT_ROUTE_BY_AUDIENCE[roleType], { replace: true });
-    } catch (error) {
-      const message = isAxiosError<{ message?: string }>(error) ? error.response?.data?.message : undefined;
-      setErrorMsg(message || 'ไม่สามารถเข้าสู่ระบบ Demo ได้ กรุณาตรวจสอบข้อมูล seed และ server');
+      const response = await authApi.loginWithUsername({ username: username.trim(), password });
+      finishLogin(response as { data: LoginPayload });
+    } catch (cause) {
+      const message = isAxiosError<{ message?: string }>(cause) ? cause.response?.data?.message : undefined;
+      const timedOut = isAxiosError(cause) && cause.code === 'ECONNABORTED';
+      setError(message || (timedOut
+        ? 'ระบบยังไม่ตอบสนอง กรุณาลองอีกครั้ง หรือเปิดโหมดจำลองสำหรับทดสอบ'
+        : 'เข้าสู่ระบบไม่สำเร็จ กรุณาตรวจสอบข้อมูลแล้วลองอีกครั้ง'));
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleDemoLogin = (roleType: LoginAudience) => {
-    let mockUser: AuthUser;
-    if (roleType === 'CITIZEN') {
-      mockUser = {
-        id: '62a51dec-39a0-4193-9ddc-20fe354f0d27',
-        email: 'somchai.citizen@thaiplease.go.th',
-        name: 'นายสมชาย ประชาชนผู้รับสิทธิ',
-        role: 'USER',
-        createdAt: new Date().toISOString(),
-      };
-    } else if (roleType === 'MERCHANT') {
-      mockUser = {
-        id: '6d293778-8264-475d-a40e-448e78d7a861',
-        email: 'noodle.shop@thaiplease.go.th',
-        name: 'ร้านข้าวมันไก่ป้าณี (วิสาหกิจชุมชน)',
-        role: 'MERCHANT',
-        createdAt: new Date().toISOString(),
-      };
-    } else {
-      mockUser = {
-        id: 'admin-001',
-        email: 'admin.super@thaiplease.go.th',
-        name: 'ผู้ดูแลระบบส่วนกลาง (Admin Inspector)',
-        role: 'ADMIN',
-        createdAt: new Date().toISOString(),
-      };
-    }
-
-    setAuth(mockUser, 'demo-token-' + roleType.toLowerCase());
-    navigate(roleType === audience ? from : DEFAULT_ROUTE_BY_AUDIENCE[roleType], { replace: true });
-  };
-
-  // Kept only for backwards compatibility with the old demo helper; all UI demo buttons use the real API flow above.
-  void handleDemoLogin;
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email || !password) {
-      setErrorMsg('กรุณากรอกอีเมล/เลขบัตรประชาชน และรหัสผ่าน');
-      return;
-    }
-    if (audience === 'CITIZEN') {
-      void handleRealDemoLogin(audience);
-      return;
-    }
-
-    setErrorMsg(null);
+  const loginWithThaiDMock = async () => {
+    setError(null);
     setIsSubmitting(true);
     try {
-      const response = audience === 'MERCHANT'
-        ? await authApi.loginMerchant({ email, password })
-        : await authApi.loginStaff({ email, password });
-      setAuth(response.data.user, response.data.token);
-      navigate(from, { replace: true });
-    } catch (error) {
-      const message = isAxiosError<{ message?: string }>(error)
-        ? error.response?.data?.message
-        : undefined;
-      setErrorMsg(message || 'ไม่สามารถเข้าสู่ระบบได้ กรุณาตรวจสอบข้อมูลแล้วลองอีกครั้ง');
+      finishLogin(await mockThaiDLogin() as { data: LoginPayload });
     } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const quickLogin = async (role: 'citizen' | 'merchant' | 'admin') => {
+    setError(null);
+    setIsSubmitting(true);
+    try {
+      finishLogin(await mockQuickLogin(role) as { data: LoginPayload });
+    } catch {
+      setError('ไม่สามารถเข้าสู่ระบบด่วนได้ กรุณาลองอีกครั้ง');
       setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="space-y-5 font-sans">
-      <div className="text-center">
-        <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-blue text-white shadow-md shadow-blue-500/20 mb-3">
-          <LogIn className="h-6 w-6" />
-        </div>
-        <h2 className="text-xl sm:text-2xl font-bold text-ink tracking-tight">
-          {LOGIN_COPY[audience].title}
-        </h2>
-        <p className="text-xs text-ink-muted mt-1">
-          {LOGIN_COPY[audience].description}
-        </p>
-      </div>
+    <div className="space-y-6 font-sans">
+      <header className="text-center">
+        <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-blue text-white"><LogIn aria-hidden="true" className="h-7 w-7" /></span>
+        <h1 className="mt-4 text-2xl font-bold text-ink">เข้าสู่ระบบ</h1>
+        <p className="mt-2 text-base text-ink-muted">กรอกชื่อผู้ใช้และรหัสผ่านเพื่อเข้าใช้งาน</p>
+        {import.meta.env.VITE_AUTH_MOCK === 'true' && <p className="mt-2 text-sm text-amber-800">โหมดจำลอง: citizen, merchant, pending-merchant, admin หรือ executive · รหัสผ่าน demo123</p>}
+      </header>
 
-      {errorMsg && (
-        <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-status-error flex items-center space-x-2">
-          <AlertCircle className="h-4 w-4 shrink-0" />
-          <span>{errorMsg}</span>
-        </div>
-      )}
-
-      {/* ฟอร์มเข้าสู่ระบบ */}
-      <form onSubmit={handleSubmit} className="space-y-3.5">
+      <form onSubmit={submit} className="space-y-4" noValidate>
         <div>
-          <label className="block text-xs font-semibold text-ink mb-1">
-            {audience === 'CITIZEN' ? 'อีเมล หรือ เลขบัตรประชาชน 13 หลัก' : 'อีเมล'}
-          </label>
-          <div className="relative">
-            <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-ink-muted" />
-            <input
-              type="text"
-              id="input-login-email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder={audience === 'CITIZEN' ? 'example@thaiplease.go.th' : 'อีเมลที่ลงทะเบียน'}
-              className="w-full rounded-pill border border-hairline bg-surface-soft/40 pl-10 pr-4 py-2.5 text-xs text-ink focus:bg-white focus:border-brand-blue focus:outline-none focus:ring-2 focus:ring-blue-100 transition"
-            />
-          </div>
+          <label htmlFor="login-username" className="mb-1 block text-base font-semibold text-ink">ชื่อผู้ใช้</label>
+          <input id="login-username" name="username" autoComplete="username" value={username} onChange={(event) => setUsername(event.target.value)} className="min-h-12 w-full rounded-xl border border-hairline bg-white px-4 text-base text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-blue" />
         </div>
-
         <div>
-          <div className="flex items-center justify-between mb-1">
-            <label className="text-xs font-semibold text-ink">รหัสผ่าน</label>
-            <a href="#" className="text-[11px] text-brand-blue hover:underline">
-              ลืมรหัสผ่าน?
-            </a>
-          </div>
+          <label htmlFor="login-password" className="mb-1 block text-base font-semibold text-ink">รหัสผ่าน</label>
           <div className="relative">
-            <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-ink-muted" />
-            <input
-              type="password"
-              id="input-login-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              className="w-full rounded-pill border border-hairline bg-surface-soft/40 pl-10 pr-4 py-2.5 text-xs text-ink focus:bg-white focus:border-brand-blue focus:outline-none focus:ring-2 focus:ring-blue-100 transition"
-            />
+            <input id="login-password" name="password" type={showPassword ? 'text' : 'password'} autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} className="min-h-12 w-full rounded-xl border border-hairline bg-white py-2 pl-4 pr-14 text-base text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-blue" />
+            <button type="button" className="absolute right-1 top-1 flex h-10 w-10 items-center justify-center rounded-lg text-ink-muted hover:bg-surface-soft focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-blue" aria-label={showPassword ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'} aria-pressed={showPassword} onClick={() => setShowPassword((visible) => !visible)}>
+              {showPassword ? <EyeOff aria-hidden="true" className="h-5 w-5" /> : <Eye aria-hidden="true" className="h-5 w-5" />}
+            </button>
           </div>
         </div>
-
-        <button
-          type="submit"
-          id="btn-login-submit"
-          disabled={isSubmitting}
-          className="w-full rounded-pill bg-brand-blue py-3 text-xs sm:text-sm font-semibold text-white shadow-md shadow-blue-500/20 hover:bg-brand-blue-hover transition active:scale-98"
-        >
-          {isSubmitting ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบ'}
+        {error && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-base text-status-error">{error}</p>}
+        <button type="submit" disabled={isSubmitting} className="flex min-h-12 w-full items-center justify-center gap-2 rounded-pill bg-brand-blue px-5 text-base font-semibold text-white hover:bg-brand-blue-hover disabled:cursor-wait disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-blue">
+          {isSubmitting ? 'กำลังเข้าสู่ระบบ…' : 'เข้าสู่ระบบ'}
         </button>
       </form>
 
-      {/* ทางลัดทดสอบระบบ (Demo Fast Login สำหรับตรวจเช็คทุกสถานการณ์) */}
-      <div className="pt-2 border-t border-hairline">
-        <span className="block text-[11px] font-semibold text-ink-muted text-center mb-2.5">
-          เข้าสู่ระบบด่วนเพื่อตรวจสอบสถานะตามบทบาท (Demo Test Accounts):
-        </span>
-        <p className="mb-2 text-center text-[10px] text-amber-700">
-          บัญชี Demo ใช้ทดสอบหน้าจอเท่านั้น ไม่สามารถเรียก API ของระบบได้
-        </p>
-        <div className="space-y-1.5">
-          <button
-            type="button"
-            id="btn-demo-citizen"
-            onClick={() => void handleRealDemoLogin('CITIZEN')}
-            className="w-full flex items-center justify-between rounded-xl border border-hairline bg-surface-soft/60 hover:bg-blue-50 hover:border-blue-200 p-2.5 text-xs font-medium text-ink transition group"
-          >
-            <div className="flex items-center space-x-2">
-              <div className="h-6 w-6 rounded-lg bg-blue-100 text-brand-blue flex items-center justify-center">
-                <User className="h-3.5 w-3.5" />
-              </div>
-              <div className="text-left">
-                <span className="font-bold block">1. ประชาชน (Citizen)</span>
-                <span className="text-[10px] text-ink-muted">กระเป๋าเงินดิจิทัล &amp; สแกน Co-pay 60/40</span>
-              </div>
-            </div>
-            <ArrowRight className="h-3.5 w-3.5 text-ink-muted group-hover:text-brand-blue group-hover:translate-x-1 transition" />
-          </button>
-
-          <button
-            type="button"
-            id="btn-demo-merchant"
-            onClick={() => void handleRealDemoLogin('MERCHANT')}
-            className="w-full flex items-center justify-between rounded-xl border border-hairline bg-surface-soft/60 hover:bg-emerald-50 hover:border-emerald-200 p-2.5 text-xs font-medium text-ink transition group"
-          >
-            <div className="flex items-center space-x-2">
-              <div className="h-6 w-6 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center">
-                <Store className="h-3.5 w-3.5" />
-              </div>
-              <div className="text-left">
-                <span className="font-bold block">2. ร้านค้า (Merchant)</span>
-                <span className="text-[10px] text-ink-muted">สร้าง Dynamic QR &amp; ยอดขายหน้าร้าน</span>
-              </div>
-            </div>
-            <ArrowRight className="h-3.5 w-3.5 text-ink-muted group-hover:text-emerald-700 group-hover:translate-x-1 transition" />
-          </button>
-
-          <button
-            type="button"
-            id="btn-demo-admin"
-            onClick={() => void handleRealDemoLogin('ADMIN')}
-            className="w-full flex items-center justify-between rounded-xl border border-hairline bg-surface-soft/60 hover:bg-red-50 hover:border-red-200 p-2.5 text-xs font-medium text-ink transition group"
-          >
-            <div className="flex items-center space-x-2">
-              <div className="h-6 w-6 rounded-lg bg-red-100 text-status-error flex items-center justify-center">
-                <ShieldAlert className="h-3.5 w-3.5" />
-              </div>
-              <div className="text-left">
-                <span className="font-bold block">3. ผู้ดูแลระบบ (Admin)</span>
-                <span className="text-[10px] text-ink-muted">ตรวจสอบความผิดปกติ &amp; GPS Geofence</span>
-              </div>
-            </div>
-            <ArrowRight className="h-3.5 w-3.5 text-ink-muted group-hover:text-status-error group-hover:translate-x-1 transition" />
-          </button>
+      <section className="border-t border-hairline pt-5" aria-labelledby="identity-mock-title">
+        <h2 id="identity-mock-title" className="text-center text-base font-semibold text-ink">ทดลองยืนยันตัวตนประชาชน</h2>
+        <p className="mt-1 text-center text-sm text-ink-muted">โหมดจำลองเท่านั้น ยังไม่เชื่อมต่อ ThaiD หรือ NDID จริง</p>
+        <button type="button" disabled={isSubmitting} onClick={() => void loginWithThaiDMock()} className="mt-3 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-brand-blue px-4 text-base font-semibold text-brand-blue hover:bg-brand-blue-light disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-blue">
+          <UserRound aria-hidden="true" className="h-5 w-5" /> ยืนยันผ่าน ThaiD / NDID (จำลอง)
+        </button>
+      </section>
+      <section className="border-t border-hairline pt-5" aria-labelledby="quick-login-title">
+        <h2 id="quick-login-title" className="text-center text-base font-semibold text-ink">เข้าสู่ระบบด่วนเพื่อทดสอบแต่ละบทบาท</h2>
+        <p className="mt-1 text-center text-sm text-ink-muted">บัญชีจำลองสำหรับตรวจสอบเมนูและหน้าจอเท่านั้น</p>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          {([
+            ['citizen', 'ประชาชน'], ['merchant', 'ร้านค้า'], ['admin', 'ผู้ดูแลระบบ / ผู้บริหาร'],
+          ] as const).map(([role, label]) => <button key={role} type="button" disabled={isSubmitting} onClick={() => void quickLogin(role)} className="min-h-11 rounded-xl border border-hairline bg-white px-3 text-base font-semibold text-ink hover:border-brand-blue hover:bg-brand-blue-light disabled:cursor-wait disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-blue">{label}</button>)}
         </div>
-      </div>
-
-      {audience === 'MERCHANT' ? (
-        <div className="text-xs text-center text-ink-muted pt-2 border-t border-hairline">
-          ยังไม่ได้ลงทะเบียนร้านค้า?{' '}
-          <Link to={APP_ROUTES.MERCHANT_REGISTER} className="text-brand-blue font-semibold hover:underline">
-            สมัครเป็นร้านค้า
-          </Link>
-        </div>
-      ) : audience === 'CITIZEN' ? (
-        <div className="text-xs text-center text-ink-muted pt-2 border-t border-hairline">
-          ยังไม่มีบัญชีผู้ใช้งาน?{' '}
-          <Link to={APP_ROUTES.REGISTER} className="text-brand-blue font-semibold hover:underline">
-            ลงทะเบียนรับสิทธิ์
-          </Link>
-        </div>
-      ) : null}
+      </section>
+      <p className="flex items-start gap-2 text-sm text-ink-muted"><ShieldCheck aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />ข้อมูลเข้าสู่ระบบจะใช้เพื่อกำหนดสิทธิ์ตามบทบาทของบัญชี</p>
     </div>
   );
 };

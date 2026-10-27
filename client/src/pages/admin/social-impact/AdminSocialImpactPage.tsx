@@ -1,228 +1,139 @@
-import React, { useState } from 'react';
-import { isAxiosError } from 'axios';
-import { useQuery } from '@tanstack/react-query';
+import React, { Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react';
+import { Activity, ArrowLeft, Banknote, MapPinned, Store } from 'lucide-react';
 import {
-  Activity,
-  AlertCircle,
-  Banknote,
-  Clock3,
-  MapPinned,
-  RefreshCw,
-  Users,
-} from 'lucide-react';
-import { SocialImpactHeatmap } from '../../../components/admin/SocialImpactHeatmap';
-import {
-  getSocialImpactHeatmap,
-  getSocialImpactSummary,
-  SocialImpactRange,
-  SocialImpactTimelinePoint,
-} from '../../../services/socialImpactApi';
+  BoundaryCollection, BoundaryFeature, getImpactDashboard, ImpactDashboardData,
+  ImpactLevel, loadThailandBoundaries,
+} from '../../../services/socialImpactDashboardService';
 
-const RANGES: Array<{ days: SocialImpactRange; label: string }> = [
-  { days: 7, label: '7 วัน' },
-  { days: 30, label: '30 วัน' },
-  { days: 90, label: '90 วัน' },
-  { days: 365, label: '1 ปี' },
-];
+const BoundaryMap = lazy(() => import('../../../components/admin/SocialImpactBoundaryMap').then((module) => ({ default: module.SocialImpactBoundaryMap })));
+const money = new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB', maximumFractionDigits: 0 });
+const today = new Date();
+const toInputDate = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+const initialTo = toInputDate(today);
+const initialFromDate = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 29);
 
-const money = new Intl.NumberFormat('th-TH', {
-  style: 'currency',
-  currency: 'THB',
-  maximumFractionDigits: 0,
-});
+const nameFor = (feature: BoundaryFeature, level: ImpactLevel) => String(level === 'province' ? feature.properties.pro_th : level === 'district' ? feature.properties.amp_th : feature.properties.tam_th ?? '');
 
-const dateLabel = (date: string, days: number): string =>
-  new Intl.DateTimeFormat('th-TH', days <= 7
-    ? { weekday: 'short', day: 'numeric', month: 'short' }
-    : { day: 'numeric', month: 'short' }).format(new Date(date));
-
-const errorMessage = (error: unknown): string => {
-  if (isAxiosError<{ message?: string }>(error)) {
-    return error.response?.data?.message ?? 'ไม่สามารถเชื่อมต่อระบบได้';
-  }
-  return error instanceof Error ? error.message : 'เกิดข้อผิดพลาดที่ไม่ทราบสาเหตุ';
-};
-
-const ImpactChart: React.FC<{ points: SocialImpactTimelinePoint[]; days: number }> = ({ points, days }) => {
-  if (points.length === 0) {
-    return <div className="flex h-64 items-center justify-center text-sm text-ink-muted">ยังไม่มีธุรกรรมที่ชำระสำเร็จในช่วงเวลานี้</div>;
-  }
-
-  const width = 760;
-  const height = 260;
-  const padding = { top: 18, right: 18, bottom: 42, left: 68 };
-  const chartWidth = width - padding.left - padding.right;
-  const chartHeight = height - padding.top - padding.bottom;
-  const maxValue = Math.max(...points.map((point) => point.totalCirculation), 1);
-  const coordinates = points.map((point, index) => ({
-    x: padding.left + (points.length === 1 ? chartWidth / 2 : (index / (points.length - 1)) * chartWidth),
-    y: padding.top + chartHeight - (point.totalCirculation / maxValue) * chartHeight,
-    point,
+const ImpactChart: React.FC<{ points: Array<{ date: string; totalCirculation: number }> }> = ({ points }) => {
+  if (!points.length) return <p className="flex min-h-56 items-center justify-center text-base text-ink-muted">ไม่มีข้อมูลในช่วงวันที่เลือก</p>;
+  const width = 800; const height = 260; const pad = { left: 76, right: 16, top: 18, bottom: 40 };
+  const max = Math.max(1, ...points.map((point) => point.totalCirculation));
+  const coords = points.map((point, index) => ({
+    x: pad.left + (points.length === 1 ? (width - pad.left - pad.right) / 2 : index * (width - pad.left - pad.right) / (points.length - 1)),
+    y: pad.top + (height - pad.top - pad.bottom) * (1 - point.totalCirculation / max), point,
   }));
-  const line = coordinates.map(({ x, y }) => `${x},${y}`).join(' ');
-  const area = `${padding.left},${padding.top + chartHeight} ${line} ${padding.left + chartWidth},${padding.top + chartHeight}`;
-  const labelIndexes = points.length <= 7
-    ? points.map((_, index) => index)
-    : [0, Math.floor((points.length - 1) / 3), Math.floor(((points.length - 1) * 2) / 3), points.length - 1];
-
-  return (
-    <div className="overflow-x-auto">
-      <svg viewBox={`0 0 ${width} ${height}`} className="h-auto min-w-[600px] w-full" role="img" aria-label="กราฟยอดเงินหมุนเวียนรายวัน">
-        {[0, 1, 2, 3, 4].map((tick) => {
-          const y = padding.top + chartHeight - (tick / 4) * chartHeight;
-          const value = (maxValue * tick) / 4;
-          return (
-            <g key={tick}>
-              <line x1={padding.left} x2={width - padding.right} y1={y} y2={y} stroke="#e5e7eb" strokeDasharray="4 4" />
-              <text x={padding.left - 10} y={y + 4} textAnchor="end" fill="#64748b" fontSize="10">
-                {value >= 1000 ? `${(value / 1000).toFixed(0)}k` : Math.round(value)}
-              </text>
-            </g>
-          );
-        })}
-        <polygon points={area} fill="url(#impact-area)" />
-        <defs>
-          <linearGradient id="impact-area" x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0%" stopColor="#0052ff" stopOpacity="0.22" />
-            <stop offset="100%" stopColor="#0052ff" stopOpacity="0.01" />
-          </linearGradient>
-        </defs>
-        <polyline points={line} fill="none" stroke="#0052ff" strokeWidth="3" strokeLinejoin="round" strokeLinecap="round" />
-        {coordinates.map(({ x, y, point }) => (
-          <circle key={point.date} cx={x} cy={y} r="4" fill="#ffffff" stroke="#0052ff" strokeWidth="2">
-            <title>{`${dateLabel(point.date, days)}: ${money.format(point.totalCirculation)} · ${point.transactionCount} รายการ`}</title>
-          </circle>
-        ))}
-        {labelIndexes.map((index) => {
-          const { x, point } = coordinates[index];
-          return (
-            <text key={point.date} x={x} y={height - 14} textAnchor="middle" fill="#64748b" fontSize="10">
-              {dateLabel(point.date, days)}
-            </text>
-          );
-        })}
-      </svg>
-      <div className="mt-2 flex items-center justify-center gap-2 text-xs text-ink-muted">
-        <span className="h-2.5 w-2.5 rounded-full bg-brand-blue" /> เงินหมุนเวียนจากธุรกรรมชำระแล้ว
-      </div>
-    </div>
-  );
+  const dateFormat = new Intl.DateTimeFormat('th-TH', { day: 'numeric', month: 'short' });
+  return <div className="overflow-x-auto"><svg viewBox={`0 0 ${width} ${height}`} className="h-auto min-w-[560px] w-full" role="img" aria-label="กราฟยอดเงินหมุนเวียนรายวัน">
+    {[0, 1, 2, 3].map((step) => { const y = pad.top + step * (height - pad.top - pad.bottom) / 3; return <g key={step}><line x1={pad.left} x2={width - pad.right} y1={y} y2={y} stroke="#cbd5e1" strokeDasharray="4 4" /><text x={pad.left - 8} y={y + 4} textAnchor="end" fill="#475569" fontSize="12">{money.format(max * (1 - step / 3))}</text></g>; })}
+    <polyline fill="none" stroke="#0052ff" strokeWidth="3" points={coords.map(({ x, y }) => `${x},${y}`).join(' ')} />
+    {coords.filter((_, index) => index === 0 || index === coords.length - 1 || points.length <= 7).map(({ x, y, point }) => <g key={point.date}><circle cx={x} cy={y} r="4" fill="white" stroke="#0052ff" strokeWidth="2"><title>{`${dateFormat.format(new Date(`${point.date}T00:00:00`))}: ${money.format(point.totalCirculation)}`}</title></circle><text x={x} y={height - 12} textAnchor="middle" fill="#475569" fontSize="12">{dateFormat.format(new Date(`${point.date}T00:00:00`))}</text></g>)}
+  </svg></div>;
 };
 
 export const AdminSocialImpactPage: React.FC = () => {
-  const [days, setDays] = useState<SocialImpactRange>(30);
-  const summaryQuery = useQuery({
-    queryKey: ['admin-social-impact-summary', days],
-    queryFn: () => getSocialImpactSummary(days),
-    refetchInterval: 15000,
-  });
-  const heatmapQuery = useQuery({
-    queryKey: ['admin-social-impact-heatmap', days],
-    queryFn: () => getSocialImpactHeatmap(days),
-    refetchInterval: 15000,
-  });
-  const summary = summaryQuery.data?.summary;
-  const lastUpdated = summaryQuery.data?.refreshedAt
-    ? new Intl.DateTimeFormat('th-TH', { dateStyle: 'medium', timeStyle: 'medium' }).format(new Date(summaryQuery.data.refreshedAt))
-    : null;
+  const [level, setLevel] = useState<ImpactLevel>('province');
+  const [provinceFeature, setProvinceFeature] = useState<BoundaryFeature | null>(null);
+  const [districtFeature, setDistrictFeature] = useState<BoundaryFeature | null>(null);
+  const [boundaries, setBoundaries] = useState<BoundaryCollection | null>(null);
+  const [dashboard, setDashboard] = useState<ImpactDashboardData | null>(null);
+  const [from, setFrom] = useState(toInputDate(initialFromDate));
+  const [to, setTo] = useState(initialTo);
+  const [busy, setBusy] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const cards = [
-    { label: 'เงินหมุนเวียนรวม', value: money.format(summary?.totalCirculation ?? 0), detail: 'ยอดชำระรวมจากธุรกรรมที่สำเร็จ', icon: Banknote, color: 'bg-blue-50 text-brand-blue' },
-    { label: 'ภาครัฐร่วมจ่าย', value: money.format(summary?.governmentContribution ?? 0), detail: 'เงินสนับสนุนจากภาครัฐ', icon: Activity, color: 'bg-emerald-50 text-emerald-700' },
-    { label: 'ประชาชนร่วมจ่าย', value: money.format(summary?.citizenContribution ?? 0), detail: 'ยอดชำระจากประชาชน', icon: Users, color: 'bg-violet-50 text-violet-700' },
-    { label: 'ธุรกรรมที่ชำระแล้ว', value: (summary?.transactionCount ?? 0).toLocaleString('th-TH'), detail: 'รวมรายการที่อยู่ระหว่างตรวจสอบ', icon: Clock3, color: 'bg-amber-50 text-amber-700' },
+  useEffect(() => {
+    let active = true;
+    setBusy(true); setBoundaries(null); setError(null);
+    void loadThailandBoundaries(level).then((result) => { if (active) setBoundaries(result); }).catch(() => { if (active) setError('โหลดขอบเขตแผนที่ไม่สำเร็จ'); }).finally(() => { if (active) setBusy(false); });
+    return () => { active = false; };
+  }, [level]);
+
+  const features = useMemo(() => {
+    if (!boundaries) return [];
+    return boundaries.features.filter((feature) => {
+      if (level === 'district' && provinceFeature) return feature.properties.pro_code === provinceFeature.properties.pro_code;
+      if (level === 'subdistrict' && districtFeature) return feature.properties.amp_code === districtFeature.properties.amp_code;
+      return true;
+    });
+  }, [boundaries, districtFeature, level, provinceFeature]);
+
+  useEffect(() => {
+    if (!boundaries || !from || !to || from > to) return;
+    let active = true;
+    setError(null);
+    void getImpactDashboard({ level, from, to,
+      parentProvinceCode: provinceFeature?.properties.pro_code,
+      parentDistrictCode: districtFeature?.properties.amp_code,
+      features,
+    }).then((result) => { if (active) setDashboard(result); }).catch(() => { if (active) setError('โหลดข้อมูลสรุปไม่สำเร็จ กรุณาลองอีกครั้ง'); });
+    return () => { active = false; };
+  }, [boundaries, districtFeature, features, from, level, provinceFeature, to]);
+
+  const drillDown = useCallback((feature: BoundaryFeature) => {
+    if (level === 'province') { setProvinceFeature(feature); setDistrictFeature(null); setLevel('district'); }
+    else if (level === 'district') { setDistrictFeature(feature); setLevel('subdistrict'); }
+  }, [level]);
+
+  const goTo = (target: ImpactLevel) => {
+    if (target === 'province') { setProvinceFeature(null); setDistrictFeature(null); setLevel('province'); }
+    else if (target === 'district' && provinceFeature) { setDistrictFeature(null); setLevel('district'); }
+    else if (target === 'subdistrict' && provinceFeature && districtFeature) setLevel('subdistrict');
+  };
+
+  const areas = dashboard?.areas ?? [];
+  const sourceNote = dashboard?.source === 'mock' ? 'ข้อมูลตัวอย่างจำลอง' : 'ข้อมูลจาก daily_social_impact_metrics';
+  const summaryCards = [
+    { title: 'ยอดเงินหมุนเวียนรวม', value: dashboard ? money.format(dashboard.totalCirculation) : '—', icon: Banknote },
+    { title: 'จำนวนร้านค้าที่ได้รับประโยชน์ (รวมรายวัน)', value: dashboard?.benefitedMerchantDays.toLocaleString('th-TH') ?? '—', icon: Store },
+    { title: 'สัดส่วนเมืองรอง', value: dashboard?.secondaryCityShare == null ? 'ไม่มีข้อมูลจำแนก' : `${dashboard.secondaryCityShare}%`, icon: Activity },
   ];
+  const earliestAllowed = new Date(`${to}T00:00:00`);
+  earliestAllowed.setDate(earliestAllowed.getDate() - 364);
 
-  return (
-    <div className="min-h-screen bg-surface-soft pb-24 font-sans text-ink">
-      <header className="border-b border-hairline bg-white px-4 py-4 shadow-sm sm:px-6">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="text-lg font-bold sm:text-xl">แดชบอร์ดผลกระทบทางสังคม</h1>
-            <p className="mt-1 text-xs text-ink-muted">ติดตามเงินหมุนเวียนและการกระจายเม็ดเงินจากธุรกรรม Co-pay</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <label htmlFor="impact-range" className="text-xs font-semibold text-ink-muted">ช่วงเวลา</label>
-            <select id="impact-range" value={days} onChange={(event) => setDays(Number(event.target.value) as SocialImpactRange)}
-              className="rounded-xl border border-hairline bg-white px-3 py-2 text-xs font-semibold focus:border-brand-blue focus:outline-none focus:ring-2 focus:ring-blue-100">
-              {RANGES.map((range) => <option key={range.days} value={range.days}>{range.label}</option>)}
-            </select>
-            <button type="button" onClick={() => { void summaryQuery.refetch(); void heatmapQuery.refetch(); }}
-              className="inline-flex items-center gap-2 rounded-pill border border-hairline px-3 py-2 text-xs font-semibold hover:bg-surface-soft">
-              <RefreshCw className="h-4 w-4 text-brand-blue" /><span className="hidden sm:inline">รีเฟรช</span>
-            </button>
-          </div>
+  return <div className="min-h-screen bg-surface-soft pb-12 font-sans text-ink">
+    <header className="border-b border-hairline bg-white px-4 py-5 sm:px-6">
+      <div className="mx-auto flex max-w-7xl flex-wrap items-end justify-between gap-4">
+        <div><h1 className="text-2xl font-bold">Dashboard ผลกระทบทางสังคม</h1><p className="mt-1 text-base text-ink-muted">ติดตามการกระจายรายได้ตามพื้นที่ · {sourceNote}</p></div>
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="text-sm font-semibold">ตั้งแต่<input aria-label="วันที่เริ่มต้น" type="date" value={from} min={toInputDate(earliestAllowed)} max={to} onChange={(event) => setFrom(event.target.value)} className="mt-1 block min-h-11 rounded-xl border border-hairline bg-white px-3 text-base" /></label>
+          <label className="text-sm font-semibold">ถึงวันที่<input aria-label="วันที่สิ้นสุด" type="date" value={to} min={from} max={initialTo} onChange={(event) => setTo(event.target.value)} className="mt-1 block min-h-11 rounded-xl border border-hairline bg-white px-3 text-base" /></label>
         </div>
-      </header>
+      </div>
+    </header>
 
-      <main className="mx-auto max-w-7xl space-y-5 px-4 py-5 sm:px-6">
-        {summaryQuery.isLoading ? (
-          <p className="rounded-2xl border border-hairline bg-white p-5 text-sm text-ink-muted">กำลังโหลดสรุปผล...</p>
-        ) : summaryQuery.error ? (
-          <p role="alert" className="flex items-center gap-2 rounded-2xl border border-red-200 bg-white p-5 text-sm text-status-error">
-            <AlertCircle className="h-5 w-5 shrink-0" /> {errorMessage(summaryQuery.error)}
-          </p>
-        ) : (
-          <>
-            <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              {cards.map(({ label, value, detail, icon: Icon, color }) => (
-                <article key={label} className="rounded-2xl border border-hairline bg-white p-4 shadow-sm">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <p className="text-xs font-medium text-ink-muted">{label}</p>
-                      <p className="mt-2 text-xl font-bold tracking-tight">{value}</p>
-                    </div>
-                    <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${color}`}><Icon className="h-5 w-5" /></span>
-                  </div>
-                  <p className="mt-2 text-[11px] text-ink-muted">{detail}</p>
-                </article>
-              ))}
-            </section>
+    <main className="mx-auto max-w-7xl space-y-5 px-4 py-5 sm:px-6">
+      {error && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-base text-status-error">{error}</p>}
+      {from > to && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-base text-status-error">วันที่เริ่มต้นต้องไม่อยู่หลังวันที่สิ้นสุด</p>}
+      <nav aria-label="ตำแหน่งในแผนที่" className="flex flex-wrap items-center gap-2 text-base">
+        <button type="button" onClick={() => goTo('province')} className="min-h-11 rounded-lg px-3 font-semibold text-brand-blue hover:bg-brand-blue-light">ประเทศไทย</button>
+        {provinceFeature && <><span aria-hidden="true">›</span>{level === 'province' ? <span aria-current="location">{nameFor(provinceFeature, 'province')}</span> : <button type="button" onClick={() => goTo('district')} className="min-h-11 rounded-lg px-3 font-semibold text-brand-blue hover:bg-brand-blue-light">{nameFor(provinceFeature, 'province')}</button>}</>}
+        {districtFeature && <><span aria-hidden="true">›</span><span aria-current="location">{nameFor(districtFeature, 'district')}</span></>}
+      </nav>
 
-            <section className="rounded-2xl border border-hairline bg-white p-4 shadow-sm sm:p-6">
-              <div className="mb-4 flex flex-wrap items-start justify-between gap-2">
-                <div>
-                  <h2 className="text-sm font-bold">ยอดเงินหมุนเวียนตามวัน</h2>
-                  <p className="mt-1 text-xs text-ink-muted">ยอดธุรกรรมที่เสร็จสมบูรณ์ในช่วง {days} วันล่าสุด</p>
-                </div>
-                {lastUpdated && <span className="text-[11px] text-ink-muted">อัปเดต {lastUpdated}</span>}
-              </div>
-              <ImpactChart points={summaryQuery.data?.timeline ?? []} days={days} />
-            </section>
+      <section className="grid gap-3 md:grid-cols-3" aria-label="สรุปผลกระทบในพื้นที่">
+        {summaryCards.map(({ title, value, icon: Icon }) => <article key={title} className="rounded-2xl border border-hairline bg-white p-5 shadow-sm"><div className="flex items-center gap-3"><span className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-blue-light text-brand-blue"><Icon aria-hidden="true" className="h-5 w-5" /></span><div><p className="text-sm font-semibold text-ink-muted">{title}</p><p className="mt-1 text-xl font-bold">{value}</p></div></div></article>)}
+      </section>
 
-            <section className="overflow-hidden rounded-2xl border border-hairline bg-white shadow-sm">
-              <div className="flex flex-wrap items-start justify-between gap-3 p-4 sm:p-6">
-                <div>
-                  <h2 className="flex items-center gap-2 text-sm font-bold"><MapPinned className="h-4 w-4 text-brand-blue" /> แผนที่การกระจายเม็ดเงิน</h2>
-                  <p className="mt-1 text-xs text-ink-muted">แสดงยอดธุรกรรมแยกตามพื้นที่โดยประมาณ ไม่แสดงตำแหน่งประชาชน</p>
-                </div>
-                <span className="text-[11px] text-ink-muted">พิกัดถูกรวมเป็นช่องประมาณ 1 กม.</span>
-              </div>
-              {heatmapQuery.isLoading ? (
-                <div className="flex h-72 items-center justify-center text-sm text-ink-muted">กำลังโหลดข้อมูลแผนที่...</div>
-              ) : heatmapQuery.error ? (
-                <p role="alert" className="m-4 rounded-xl bg-red-50 p-4 text-sm text-status-error">{errorMessage(heatmapQuery.error)}</p>
-              ) : (
-                <>
-                  <SocialImpactHeatmap locations={heatmapQuery.data?.locations ?? []} />
-                  <div className="flex flex-wrap items-center justify-center gap-4 border-t border-hairline px-4 py-3 text-[11px] text-ink-muted">
-                    <span className="flex items-center gap-1.5"><i className="h-3 w-3 rounded-full bg-emerald-500" /> เม็ดเงินน้อย</span>
-                    <span className="flex items-center gap-1.5"><i className="h-3 w-3 rounded-full bg-amber-500" /> ปานกลาง</span>
-                    <span className="flex items-center gap-1.5"><i className="h-3 w-3 rounded-full bg-red-500" /> เม็ดเงินสูง</span>
-                    <span className="ml-auto inline-flex items-center gap-1"><RefreshCw className="h-3 w-3" /> อัปเดตทุก 15 วินาที</span>
-                  </div>
-                  {heatmapQuery.data?.locations.length === 0 && (
-                    <p className="px-4 pb-4 text-center text-xs text-ink-muted">ยังไม่มีธุรกรรมที่ชำระสำเร็จในช่วงเวลาที่เลือก</p>
-                  )}
-                </>
-              )}
-            </section>
-            <p className="text-center text-[11px] text-ink-muted">
-              ยอดรวมคิดจากรายการ SUCCESS และ FLAGGED ที่มียอดชำระแล้ว โดยรวมรายการที่รอตรวจทุจริตไว้ด้วย
-            </p>
-          </>
-        )}
-      </main>
-    </div>
-  );
+      {dashboard?.detailUnavailable && <p role="status" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-base text-amber-950">ฐานข้อมูลปัจจุบันมีข้อมูลระดับจังหวัดเท่านั้น ระดับอำเภอและตำบลจึงแสดงแผนที่แต่ยังไม่มีตัวเลขจริง</p>}
+
+      <section className="overflow-hidden rounded-2xl border border-hairline bg-white shadow-sm" aria-labelledby="impact-map-heading">
+        <div className="flex flex-wrap items-start justify-between gap-3 p-4 sm:p-5"><div><h2 id="impact-map-heading" className="flex items-center gap-2 text-lg font-bold"><MapPinned aria-hidden="true" className="h-5 w-5 text-brand-blue" />แผนที่{level === 'province' ? 'จังหวัด' : level === 'district' ? 'อำเภอ' : 'ตำบล'}</h2><p className="mt-1 text-sm text-ink-muted">เลือกพื้นที่เพื่อดูระดับย่อย · สีเข้มแสดงยอดเงินที่สูงกว่า</p></div>{level !== 'province' && <button type="button" onClick={() => goTo(level === 'subdistrict' ? 'district' : 'province')} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-hairline px-4 text-base font-semibold hover:bg-surface-soft"><ArrowLeft aria-hidden="true" className="h-4 w-4" />ย้อนระดับ</button>}</div>
+        {busy ? <p className="p-8 text-center text-base text-ink-muted">กำลังโหลดขอบเขตแผนที่…</p> : boundaries && <Suspense fallback={<p className="p-8 text-center text-base text-ink-muted">กำลังเปิดแผนที่…</p>}><BoundaryMap level={level} features={features} areas={areas} onSelect={drillDown} /></Suspense>}
+        <div className="flex flex-wrap items-center justify-center gap-3 border-t border-hairline px-4 py-3 text-sm text-ink-body"><span>ยอดต่ำ</span><span aria-hidden="true" className="h-4 w-36 rounded-full" style={{ background: 'linear-gradient(90deg, hsl(210 72% 46%), hsl(45 72% 46%))' }} /><span>ยอดสูง</span><span className="ml-2 inline-flex items-center gap-2"><i aria-hidden="true" className="h-4 w-4 rounded-sm bg-slate-300" />ไม่มีข้อมูล</span></div>
+      </section>
+
+      <section className="rounded-2xl border border-hairline bg-white p-4 shadow-sm sm:p-5" aria-labelledby="impact-chart-heading">
+        <h2 id="impact-chart-heading" className="text-lg font-bold">ยอดเงินหมุนเวียนรายวัน</h2><p className="mb-4 mt-1 text-sm text-ink-muted">{from} ถึง {to}</p><ImpactChart points={dashboard?.timeline ?? []} />
+      </section>
+
+      <section className="overflow-hidden rounded-2xl border border-hairline bg-white shadow-sm" aria-labelledby="impact-table-heading">
+        <div className="p-4 sm:p-5"><h2 id="impact-table-heading" className="text-lg font-bold">ตารางสรุปพื้นที่</h2><p className="mt-1 text-sm text-ink-muted">เลือกแถวเพื่อเปิดดูระดับถัดไป</p></div>
+        <div className="overflow-x-auto"><table className="w-full min-w-[640px] border-collapse text-left text-sm"><thead className="bg-surface-soft text-ink"><tr><th scope="col" className="px-4 py-3">พื้นที่</th><th scope="col" className="px-4 py-3">ยอดเงินหมุนเวียน</th><th scope="col" className="px-4 py-3">ร้านค้าที่ได้รับประโยชน์ (รวมรายวัน)</th><th scope="col" className="px-4 py-3">ดูรายละเอียด</th></tr></thead><tbody>
+          {areas.map((area) => <tr key={area.code} className="border-t border-hairline"><th scope="row" className="px-4 py-3 font-semibold">{level === 'province' ? area.name : <button type="button" onClick={() => { const feature = features.find((item) => String(level === 'district' ? item.properties.amp_code : item.properties.tam_code) === area.code); if (feature) drillDown(feature); }} className="min-h-11 text-left font-semibold text-brand-blue underline">{area.name}</button>}</th><td className="px-4 py-3">{money.format(area.totalCirculation)}</td><td className="px-4 py-3">{area.benefitedMerchantDays.toLocaleString('th-TH')}</td><td className="px-4 py-3">{level === 'subdistrict' ? '—' : <button type="button" onClick={() => { const feature = features.find((item) => String(level === 'province' ? item.properties.pro_code : item.properties.amp_code) === area.code); if (feature) drillDown(feature); }} className="min-h-11 rounded-lg px-3 font-semibold text-brand-blue hover:bg-brand-blue-light">เปิดดู</button>}</td></tr>)}
+          {(!areas.length || dashboard?.detailUnavailable) && <tr><td colSpan={4} className="px-4 py-8 text-center text-ink-muted">{dashboard?.detailUnavailable ? 'ยังไม่มีข้อมูลระดับพื้นที่นี้' : 'ไม่มีข้อมูลในช่วงวันที่เลือก'}</td></tr>}
+        </tbody></table></div>
+      </section>
+      <p className="text-center text-sm text-ink-muted">{dashboard?.source === 'mock' ? 'ตัวเลขทั้งหมดเป็นข้อมูลจำลองเพื่อแสดงรูปแบบการใช้งาน' : 'จำนวนร้านค้าเป็นยอดรวมรายวัน ไม่ใช่จำนวนร้านค้าไม่ซ้ำ'}</p>
+    </main>
+  </div>;
 };

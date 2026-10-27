@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { isAxiosError } from 'axios';
 import { ArrowLeft, CheckCircle2, FileText, MapPin, Store, Upload, UserRound } from 'lucide-react';
 import { APP_ROUTES } from '../../constants/routes';
+import { ThaiAddressSelect, ThaiAddressValue } from '../../components/common/ThaiAddressSelect';
 import { submitMerchantApplication } from '../../services/merchantApplicationApi';
 
 type BusinessType = 'INDIVIDUAL' | 'JURISTIC';
@@ -27,6 +28,13 @@ export const MerchantRegisterPage: React.FC = () => {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [applicationId, setApplicationId] = useState<string | null>(null);
+  const [addressSelection, setAddressSelection] = useState<ThaiAddressValue | null>(null);
+
+  const applyAddressSelection = (selected: ThaiAddressValue) => {
+    setAddressSelection(selected);
+    if (!selected.subdistrictCode) return;
+    setAddress(`${selected.subdistrictName} ${selected.districtName} ${selected.provinceName}${selected.postalCode ? ` ${selected.postalCode}` : ''}`);
+  };
 
   const selectDocument = (key: DocumentKey, file?: File) => {
     setErrorMessage(null);
@@ -64,10 +72,12 @@ export const MerchantRegisterPage: React.FC = () => {
     const missingCommonDocuments = !documents.storePhoto || !documents.bankProof;
     const missingCompanyCertificate = businessType === 'JURISTIC' && !documents.companyCertificate;
 
-    if (missingCommonDocuments || missingCompanyCertificate || !taxId.match(/^\d{13}$/)) {
-      setErrorMessage(!taxId.match(/^\d{13}$/)
-        ? 'กรุณากรอกเลขประจำตัวผู้เสียภาษี 13 หลัก'
-        : 'กรุณาแนบรูปหน้าร้านและหลักฐานบัญชีธนาคาร' +
+    if (missingCommonDocuments || missingCompanyCertificate || !taxId.match(/^\d{13}$/) || !addressSelection?.subdistrictCode) {
+      setErrorMessage(!addressSelection?.subdistrictCode
+        ? 'กรุณาเลือกจังหวัด อำเภอ/เขต และตำบล/แขวงให้ครบ'
+        : !taxId.match(/^\d{13}$/)
+          ? 'กรุณากรอกเลขประจำตัวผู้เสียภาษี 13 หลัก'
+          : 'กรุณาแนบรูปหน้าร้านและหลักฐานบัญชีธนาคาร' +
           (missingCompanyCertificate ? ' รวมถึงหนังสือรับรองนิติบุคคล' : ''));
       return;
     }
@@ -225,6 +235,7 @@ export const MerchantRegisterPage: React.FC = () => {
         <section className="space-y-3 border-t border-hairline pt-4">
           <h3 className="text-sm font-bold text-ink">ที่ตั้งร้านค้า</h3>
           <div>
+            <ThaiAddressSelect onChange={applyAddressSelection} />
             <label htmlFor="merchant-address" className="mb-1 flex items-center gap-1 text-xs font-semibold text-ink">
               <MapPin className="h-3.5 w-3.5" /> ที่อยู่ร้าน
             </label>

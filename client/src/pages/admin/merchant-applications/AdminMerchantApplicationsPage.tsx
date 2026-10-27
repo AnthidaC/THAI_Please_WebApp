@@ -13,6 +13,7 @@ import {
   Store,
   XCircle,
 } from 'lucide-react';
+import { getApprovedMerchants, getMerchantLocationChangeRequests } from '../../../services/merchantProfileApi';
 import {
   decideMerchantApplication,
   getMerchantApplication,
@@ -49,6 +50,9 @@ export const AdminMerchantApplicationsPage: React.FC = () => {
     queryFn: () => getMerchantApplications(status),
     refetchInterval: status === 'PENDING' ? 30000 : false,
   });
+  const pendingCountQuery = useQuery({ queryKey: ['merchant-applications-summary', 'PENDING'], queryFn: () => getMerchantApplications('PENDING') });
+  const locationCountQuery = useQuery({ queryKey: ['merchant-location-change-requests'], queryFn: getMerchantLocationChangeRequests });
+  const approvedCountQuery = useQuery({ queryKey: ['approved-merchants'], queryFn: getApprovedMerchants });
 
   const detailsQuery = useQuery({
     queryKey: ['merchant-application', selectedId],
@@ -64,6 +68,7 @@ export const AdminMerchantApplicationsPage: React.FC = () => {
       setRejectionNote('');
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['merchant-applications'] }),
+        queryClient.invalidateQueries({ queryKey: ['merchant-applications-summary'] }),
         queryClient.invalidateQueries({ queryKey: ['merchant-application', selectedId] }),
       ]);
       if (decision.action === 'APPROVE') setStatus('APPROVED');
@@ -98,6 +103,21 @@ export const AdminMerchantApplicationsPage: React.FC = () => {
           </button>
         </div>
       </header>
+
+      <section aria-label="สรุปภาพรวมร้านค้า" className="mx-auto mb-5 grid max-w-7xl gap-3 px-4 sm:grid-cols-3 sm:px-6">
+        {[
+          { label: 'คำขอร้านค้ารอตรวจ', query: pendingCountQuery, count: pendingCountQuery.data?.length, to: APP_ROUTES.ADMIN_MERCHANT_APPLICATIONS },
+          { label: 'คำขอเปลี่ยนพิกัดรอตรวจ', query: locationCountQuery, count: locationCountQuery.data?.length, to: APP_ROUTES.ADMIN_MERCHANT_LOCATION_REQUESTS },
+          { label: 'ร้านที่อนุมัติแล้ว', query: approvedCountQuery, count: approvedCountQuery.data?.length, to: APP_ROUTES.ADMIN_MERCHANTS },
+        ].map((card) => <Link key={card.label} to={card.to} className="block min-h-28 rounded-2xl border border-hairline bg-white p-4 shadow-sm hover:border-brand-blue focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-blue">
+          <span className="block text-sm text-ink-muted">{card.label}</span>
+          {card.query.isLoading ? <span className="mt-2 block text-sm text-ink-muted">กำลังโหลด...</span>
+            : card.query.error ? <span role="alert" className="mt-2 block text-sm text-status-error">โหลดข้อมูลไม่สำเร็จ</span>
+              : card.count === 0 ? <span className="mt-2 block text-base font-semibold text-ink-muted">ไม่มีรายการ</span>
+                : <span className="mt-1 block text-2xl font-bold text-ink">{card.count?.toLocaleString('th-TH')} รายการ</span>}
+          <span className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold text-brand-blue">ดูรายการ <ExternalLink aria-hidden="true" className="ml-1 h-4 w-4" /></span>
+        </Link>)}
+      </section>
 
       <main className="mx-auto grid max-w-7xl gap-5 px-4 sm:px-6 lg:grid-cols-[minmax(280px,0.85fr)_minmax(0,1.5fr)]">
         <section className="min-w-0 rounded-2xl border border-hairline bg-white shadow-sm">

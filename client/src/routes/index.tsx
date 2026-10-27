@@ -1,5 +1,5 @@
-import React from 'react';
-import { createBrowserRouter, RouterProvider } from 'react-router-dom';
+import React, { lazy, Suspense } from 'react';
+import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom';
 import { APP_ROUTES } from '../constants/routes';
 import { RootLayout } from '../layouts/RootLayout';
 import { AuthLayout } from '../layouts/AuthLayout';
@@ -12,6 +12,8 @@ import { RegisterPage } from '../pages/auth/RegisterPage';
 import { MerchantRegisterPage } from '../pages/auth/MerchantRegisterPage';
 import { DashboardPage } from '../pages/dashboard/DashboardPage';
 import { NotFoundPage } from '../pages/notFound/NotFoundPage';
+import { MerchantHomePage } from '../pages/merchant/home/MerchantHomePage';
+import { CitizenBenefitsRegisterPage } from '../pages/citizen/CitizenBenefitsRegisterPage';
 
 // Developer 2: Payment & Fraud Engine Pages
 import { CitizenWalletPage } from '../pages/citizen/wallet/CitizenWalletPage';
@@ -25,7 +27,7 @@ import { AdminMerchantApplicationsPage } from '../pages/admin/merchant-applicati
 import { AdminMerchantsPage } from '../pages/admin/merchants/AdminMerchantsPage';
 import { AdminMerchantLocationRequestsPage } from '../pages/admin/merchant-location-requests/AdminMerchantLocationRequestsPage';
 import { MerchantProfilePage } from '../pages/merchant/profile/MerchantProfilePage';
-import { AdminSocialImpactPage } from '../pages/admin/social-impact/AdminSocialImpactPage';
+const AdminSocialImpactPage = lazy(() => import('../pages/admin/social-impact/AdminSocialImpactPage').then((module) => ({ default: module.AdminSocialImpactPage })));
 
 export const router = createBrowserRouter([
   // Main Application Routes
@@ -39,26 +41,21 @@ export const router = createBrowserRouter([
       },
       // Citizen Flow (Dev 2)
       {
-        path: APP_ROUTES.CITIZEN_WALLET,
-        element: <CitizenWalletPage />,
-      },
-      {
-        path: APP_ROUTES.CITIZEN_SCAN_COPAY,
-        element: <CitizenScanCopayPage />,
-      },
-      {
-        path: APP_ROUTES.CITIZEN_SLIP,
-        element: <CitizenPaymentSlipPage />,
-      },
-      {
-        path: APP_ROUTES.CITIZEN_TRANSACTIONS,
-        element: <CitizenTransactionsPage />,
+        element: <ProtectedRoute allowedRoles={['USER', 'CITIZEN']} />,
+        children: [
+          { path: APP_ROUTES.CITIZEN_BENEFITS_REGISTER, element: <CitizenBenefitsRegisterPage /> },
+          { path: APP_ROUTES.CITIZEN_WALLET, element: <CitizenWalletPage /> },
+          { path: APP_ROUTES.CITIZEN_SCAN_COPAY, element: <CitizenScanCopayPage /> },
+          { path: APP_ROUTES.CITIZEN_SLIP, element: <CitizenPaymentSlipPage /> },
+          { path: APP_ROUTES.CITIZEN_TRANSACTIONS, element: <CitizenTransactionsPage /> },
+        ],
       },
 
       // Merchant Flow (Dev 2)
       {
         element: <ProtectedRoute allowedRoles={['MERCHANT']} loginPath={APP_ROUTES.MERCHANT_LOGIN} />,
         children: [
+          { path: APP_ROUTES.MERCHANT_HOME, element: <MerchantHomePage /> },
           {
             path: APP_ROUTES.MERCHANT_POS_QR,
             element: <MerchantPosQrPage />,
@@ -98,16 +95,12 @@ export const router = createBrowserRouter([
             path: APP_ROUTES.ADMIN_MERCHANT_LOCATION_REQUESTS,
             element: <AdminMerchantLocationRequestsPage />,
           },
-          {
-            element: <ProtectedRoute allowedRoles={['ADMIN']} loginPath={APP_ROUTES.STAFF_LOGIN} />,
-            children: [
-              {
-                path: APP_ROUTES.ADMIN_SOCIAL_IMPACT,
-                element: <AdminSocialImpactPage />,
-              },
-            ],
-          },
         ],
+      },
+
+      {
+        element: <ProtectedRoute allowedRoles={['GOVERNMENT_EXECUTIVE']} loginPath={APP_ROUTES.LOGIN} />,
+        children: [{ path: APP_ROUTES.ADMIN_SOCIAL_IMPACT, element: <Suspense fallback={<main className="p-8 text-center">กำลังโหลด Dashboard…</main>}><AdminSocialImpactPage /></Suspense> }],
       },
 
       // General authenticated routes.
@@ -119,6 +112,10 @@ export const router = createBrowserRouter([
             element: <DashboardPage />,
           },
         ],
+      },
+      {
+        path: '*',
+        element: <NotFoundPage />,
       },
     ],
   },
@@ -136,7 +133,7 @@ export const router = createBrowserRouter([
           },
           {
             path: APP_ROUTES.MERCHANT_LOGIN,
-            element: <LoginPage audience="MERCHANT" />,
+            element: <Navigate to={APP_ROUTES.LOGIN} replace />,
           },
           {
             path: APP_ROUTES.MERCHANT_REGISTER,
@@ -144,7 +141,7 @@ export const router = createBrowserRouter([
           },
           {
             path: APP_ROUTES.STAFF_LOGIN,
-            element: <LoginPage audience="ADMIN" />,
+            element: <Navigate to={APP_ROUTES.LOGIN} replace />,
           },
           {
             path: APP_ROUTES.REGISTER,
@@ -155,11 +152,6 @@ export const router = createBrowserRouter([
     ],
   },
 
-  // Catch-all 404 Route
-  {
-    path: '*',
-    element: <NotFoundPage />,
-  },
 ]);
 
 export const AppRouter: React.FC = () => {

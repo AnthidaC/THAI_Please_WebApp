@@ -1,60 +1,70 @@
 import type { LucideIcon } from 'lucide-react';
-import { Wallet, QrCode, Store, ShieldAlert, TrendingUp, History, ScanLine, ClipboardCheck, MapPin, UserRound, Activity } from 'lucide-react';
+import { Activity, ClipboardCheck, Home, MapPin, Store, Wallet, ReceiptText, QrCode, ChartNoAxesCombined, ShieldAlert } from 'lucide-react';
 import { APP_ROUTES } from '../../constants/routes';
 
-/**
- * การตั้งค่าเมนูนำทางแยกตามบทบาทผู้ใช้ (Role-based Navigation)
- *
- * แถบเมนู (โดยเฉพาะแถบล่างบนมือถือ) จะเปลี่ยนไปตามบทบาทของผู้ใช้งาน
- * ห้ามรวมเมนูของหลายบทบาทไว้ในแถบเดียวกัน
- *
- * หมายเหตุสำหรับตอนรวมงาน (Merge):
- * - ถ้าระบบ Auth ของทีมมี role จริง (เช่น CITIZEN / MERCHANT / ADMIN)
- *   ให้แก้เฉพาะฟังก์ชัน `resolveNavRole` ให้คืนค่าตาม role นั้น
- * - ถ้าเพื่อนเพิ่มหน้าใหม่ ให้เพิ่ม item ลงใน array ของ role นั้น ๆ ที่นี่ที่เดียว
- */
-export type NavRole = 'CITIZEN' | 'MERCHANT' | 'ADMIN';
-
+export type NavRole = 'PUBLIC' | 'CITIZEN' | 'MERCHANT' | 'ADMIN' | 'GOVERNMENT_EXECUTIVE';
 export interface NavItem {
-  to: string;
-  label: string; // ชื่อสั้น (มือถือ / แท็บเล็ต)
-  fullLabel?: string; // ชื่อเต็ม (จอใหญ่)
-  icon: LucideIcon;
-  primary?: boolean; // ปุ่มเด่นตรงกลางแถบล่าง (ธุรกรรมที่ใช้บ่อยที่สุด)
+  label: string;
+  to?: string;
+  href?: string;
+  icon?: LucideIcon;
+  comingSoon?: boolean;
 }
 
-export const NAV_BY_ROLE: Record<NavRole, NavItem[]> = {
+export const CITIZEN_HOME_CARDS: NavItem[] = [
+  { label: 'กระเป๋าเงิน', to: APP_ROUTES.CITIZEN_WALLET, icon: Wallet },
+  { label: 'สแกนจ่าย', to: APP_ROUTES.CITIZEN_SCAN_COPAY, icon: QrCode },
+  { label: 'ร้านค้าใกล้ตัว', icon: Store, comingSoon: true },
+  { label: 'ภารกิจ', icon: ClipboardCheck, comingSoon: true },
+];
+
+export const PUBLIC_NAV: NavItem[] = [
+  { label: 'หน้าแรก', to: APP_ROUTES.HOME },
+  { label: 'จุดเด่นโครงการ', href: '/#highlights' },
+  { label: 'คำถามที่พบบ่อย', href: '/#faq' },
+];
+
+export const PUBLIC_ACTIONS = {
+  login: { label: 'เข้าสู่ระบบ', to: APP_ROUTES.LOGIN },
+  register: { label: 'สมัครเข้าร่วม', to: APP_ROUTES.REGISTER },
+  citizenRegister: { label: 'ประชาชน', to: APP_ROUTES.REGISTER },
+  merchantRegister: { label: 'ร้านค้า', to: APP_ROUTES.MERCHANT_REGISTER },
+} as const;
+
+export const NAV_BY_ROLE: Record<Exclude<NavRole, 'PUBLIC'>, NavItem[]> = {
   CITIZEN: [
-    { to: APP_ROUTES.CITIZEN_WALLET, label: 'กระเป๋าเงิน', icon: Wallet },
-    { to: APP_ROUTES.CITIZEN_SCAN_COPAY, label: 'สแกนจ่าย', fullLabel: 'สแกนจ่าย Co-pay', icon: ScanLine, primary: true },
-    { to: APP_ROUTES.CITIZEN_TRANSACTIONS, label: 'ประวัติ', fullLabel: 'ประวัติการใช้จ่าย', icon: History },
+    { label: 'หน้าหลัก', to: APP_ROUTES.DASHBOARD, icon: Home },
+    { label: 'กระเป๋าเงิน', to: APP_ROUTES.CITIZEN_WALLET, icon: Wallet },
+    { label: 'ประวัติธุรกรรม', to: APP_ROUTES.CITIZEN_TRANSACTIONS, icon: ReceiptText },
   ],
   MERCHANT: [
-    { to: APP_ROUTES.MERCHANT_POS_QR, label: 'สร้าง QR', fullLabel: 'สร้าง QR รับเงิน', icon: QrCode, primary: true },
-    { to: APP_ROUTES.MERCHANT_SALES, label: 'ยอดขาย', fullLabel: 'สถิติยอดขาย', icon: TrendingUp },
-    { to: APP_ROUTES.MERCHANT_PROFILE, label: 'ข้อมูลร้าน', fullLabel: 'แก้ไขข้อมูลร้านค้า', icon: UserRound },
+    { label: 'หน้าหลัก', to: APP_ROUTES.MERCHANT_HOME, icon: Home },
+    { label: 'รับชำระเงิน / QR', to: APP_ROUTES.MERCHANT_POS_QR, icon: QrCode },
+    { label: 'ยอดขาย', to: APP_ROUTES.MERCHANT_SALES, icon: ChartNoAxesCombined },
+    { label: 'ข้อมูลร้านค้า', to: APP_ROUTES.MERCHANT_PROFILE, icon: Store },
   ],
   ADMIN: [
-    { to: APP_ROUTES.ADMIN_MERCHANT_APPLICATIONS, label: 'คำขอร้านค้า', fullLabel: 'ตรวจสอบคำขอร้านค้า', icon: ClipboardCheck },
-    { to: APP_ROUTES.ADMIN_MERCHANTS, label: 'จัดการร้านค้า', fullLabel: 'จัดการข้อมูลร้านค้า', icon: Store },
-    { to: APP_ROUTES.ADMIN_MERCHANT_LOCATION_REQUESTS, label: 'อนุมัติพิกัด', fullLabel: 'คำขอเปลี่ยนพิกัด', icon: MapPin },
-    { to: APP_ROUTES.ADMIN_SOCIAL_IMPACT, label: 'ผลกระทบ', fullLabel: 'ผลกระทบทางสังคม', icon: Activity },
-    { to: APP_ROUTES.ADMIN_FRAUD_ALERTS, label: 'ตรวจทุจริต', fullLabel: 'ตรวจจับทุจริต', icon: ShieldAlert },
+    { label: 'ตรวจคำขอร้านค้า', to: APP_ROUTES.ADMIN_MERCHANT_APPLICATIONS, icon: ClipboardCheck },
+    { label: 'จัดการร้านค้า', to: APP_ROUTES.ADMIN_MERCHANTS, icon: Store },
+    { label: 'คำขอเปลี่ยนพิกัด', to: APP_ROUTES.ADMIN_MERCHANT_LOCATION_REQUESTS, icon: MapPin },
+    { label: 'ตรวจสอบทุจริต', to: APP_ROUTES.ADMIN_FRAUD_ALERTS, icon: ShieldAlert },
+  ],
+  GOVERNMENT_EXECUTIVE: [
+    { label: 'Dashboard ผลกระทบทางสังคม', to: APP_ROUTES.ADMIN_SOCIAL_IMPACT, icon: Activity },
   ],
 };
 
-export const ROLE_LABEL: Record<NavRole, { label: string; icon: LucideIcon }> = {
-  CITIZEN: { label: 'ประชาชน', icon: Wallet },
-  MERCHANT: { label: 'ร้านค้า', icon: Store },
-  ADMIN: { label: 'ผู้ดูแลระบบ', icon: ShieldAlert },
+export const ROLE_LABEL: Record<NavRole, string> = {
+  PUBLIC: 'โครงการไทยช่วยไทยพลัส',
+  CITIZEN: 'ประชาชน',
+  MERCHANT: 'ร้านค้า',
+  ADMIN: 'ผู้ดูแลระบบ / ผู้บริหาร',
+  GOVERNMENT_EXECUTIVE: 'ผู้บริหารภาครัฐ',
 };
 
-/**
- * ระบุบทบาทที่ใช้แสดงเมนู
- * ปัจจุบัน User type มีแค่ 'USER' | 'ADMIN' จึงอนุมานบทบาทร้านค้า/ประชาชนจากโซนของหน้า (path)
- */
-export const resolveNavRole = (userRole: string | undefined, pathname: string): NavRole => {
-  if (userRole === 'ADMIN' || userRole === 'STAFF' || pathname.startsWith('/admin')) return 'ADMIN';
-  if (userRole === 'MERCHANT' || pathname.startsWith('/merchant')) return 'MERCHANT';
-  return 'CITIZEN';
-};
+export function resolveNavRole(userRole?: string): NavRole {
+  if (userRole === 'MERCHANT') return 'MERCHANT';
+  if (userRole === 'ADMIN' || userRole === 'STAFF') return 'ADMIN';
+  if (userRole === 'GOVERNMENT_EXECUTIVE' || userRole === 'GOV_EXECUTIVE' || userRole === 'EXECUTIVE') return 'GOVERNMENT_EXECUTIVE';
+  return userRole ? 'CITIZEN' : 'PUBLIC';
+}

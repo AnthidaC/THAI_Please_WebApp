@@ -78,6 +78,34 @@ export const requireAdmin = async (
   }
 };
 
+/** Grants access only to active government-executive staff accounts. */
+export const requireGovernmentExecutive = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  const staffId = req.user?.userId;
+  const role = req.user?.role.toUpperCase();
+  const acceptedRoles = ['GOVERNMENT_EXECUTIVE', 'GOV_EXECUTIVE', 'EXECUTIVE'];
+  if (!staffId || !role || !acceptedRoles.includes(role)) {
+    res.status(403).json({ status: 'error', message: 'ต้องใช้สิทธิ์ผู้บริหารภาครัฐ' });
+    return;
+  }
+  try {
+    const staff = await prisma.staff_accounts.findUnique({
+      where: { staff_id: staffId },
+      select: { role: true, is_active: true },
+    });
+    if (!staff || !staff.is_active || staff.role.toUpperCase() !== role) {
+      res.status(403).json({ status: 'error', message: 'บัญชีผู้บริหารภาครัฐถูกระงับหรือไม่มีสิทธิ์' });
+      return;
+    }
+    next();
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const requireApprovedMerchant = async (
   req: Request,
   res: Response,

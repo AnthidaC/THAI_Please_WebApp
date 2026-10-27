@@ -30,6 +30,15 @@ model User {
   @@map("users")
 }
 
+model auth_identities {
+  email        String   @id @db.VarChar(254)
+  account_type String   @db.VarChar(30)
+  account_id   String   @db.Uuid
+  created_at   DateTime @default(now()) @db.Timestamptz(6)
+
+  @@unique([account_type, account_id], map: "auth_identities_account_unique")
+}
+
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model badges {

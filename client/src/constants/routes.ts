@@ -6,6 +6,8 @@ export const APP_ROUTES = {
   STAFF_LOGIN: '/staff/login',
   REGISTER: '/register',
   DASHBOARD: '/dashboard',
+  MERCHANT_HOME: '/merchant/home',
+  CITIZEN_BENEFITS_REGISTER: '/citizen/register-benefits',
   PROFILE: '/profile',
 
   // เส้นทางประชาชน (Citizen Flow - Dev 2)

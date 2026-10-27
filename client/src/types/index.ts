@@ -2,7 +2,16 @@ export interface User {
   id: string;
   email: string;
   name?: string | null;
-  role: 'USER' | 'ADMIN' | 'STAFF' | 'MERCHANT';
+  role: 'USER' | 'ADMIN' | 'STAFF' | 'MERCHANT' | 'GOVERNMENT_EXECUTIVE';
+  merchantApprovalStatus?: 'PENDING' | 'APPROVED' | 'REJECTED';
+  merchantRejectionReason?: string | null;
+  merchantApplicationSubmittedAt?: string | null;
+  merchantApplicationSummary?: {
+    businessName?: string;
+    contactName?: string;
+    phone?: string;
+    address?: string;
+  } | null;
   createdAt: string;
 }
 
