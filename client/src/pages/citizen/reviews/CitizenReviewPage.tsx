@@ -17,6 +17,7 @@ import {
   reviewApi,
   CreateReviewPayload,
   ReviewSubmissionResult,
+  UserReviewHistoryItem,
 } from '../../../services/reviewApi';
 import { APP_ROUTES } from '../../../constants/routes';
 
@@ -102,7 +103,7 @@ export const CitizenReviewPage: React.FC = () => {
     error: myReviewsError,
     refetch: refetchMyReviews,
     isFetching: isFetchingMyReviews,
-  } = useQuery({
+  } = useQuery<UserReviewHistoryItem[]>({
     queryKey: ['my-reviews'],
     queryFn: () => reviewApi.getMyReviews(),
     enabled: !transactionId,
@@ -374,7 +375,7 @@ export const CitizenReviewPage: React.FC = () => {
           {/* 5. Success State: List of Real Reviewed Transactions Only */}
           {!isLoadingMyReviews && !isMyReviewsError && myReviews && myReviews.length > 0 && (
             <div className="space-y-3.5">
-              {myReviews.map((rev) => {
+              {myReviews.map((rev: UserReviewHistoryItem) => {
                 const formattedDate = new Date(rev.createdAt).toLocaleDateString('th-TH', {
                   day: 'numeric',
                   month: 'short',

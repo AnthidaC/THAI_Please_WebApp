@@ -14,6 +14,7 @@ import {
   X,
 } from 'lucide-react';
 import { getTransactionSlip, createReview, SlipData } from '../../../services/paymentApi';
+import { reviewApi } from '../../../services/reviewApi';
 import { APP_ROUTES } from '../../../constants/routes';
 
 const AUTOSAVE_PERMISSION_KEY = 'thai_please_slip_autosave_permission';
@@ -349,6 +350,18 @@ export const CitizenPaymentSlipPage: React.FC = () => {
     queryFn: () => getTransactionSlip(id || ''),
     enabled: !!id,
   });
+
+  // ตรวจสอบข้อมูลการประเมินรีวิวเดิมของธุรกรรมนี้ (Existing Review Check)
+  const { data: reviewCheckData } = useQuery({
+    queryKey: ['transaction-review-check', slip?.transactionId],
+    queryFn: () => reviewApi.getReviewByTransaction(slip?.transactionId || ''),
+    enabled: Boolean(slip?.transactionId),
+    retry: false,
+    staleTime: 60 * 1000,
+  });
+
+  const existingReview = reviewCheckData?.review;
+  const isAlreadyReviewed = Boolean(reviewCheckData?.reviewed && existingReview);
 
   // ส่งคะแนนรีวิวไปบันทึกที่ Backend (ใช้ transactionId ของสลิปนี้เท่านั้น)
   const handleSubmitReview = useCallback(async () => {
@@ -930,8 +943,51 @@ export const CitizenPaymentSlipPage: React.FC = () => {
           )}
         </button>
 
-        {/* แถบประเมินร้านค้า (สะอาด เรียบง่าย ไม่รกสายตา) */}
-        {!reviewSubmitted ? (
+        {/* แถบประเมินร้านค้า / ข้อมูลที่เคยประเมินแล้ว */}
+        {isAlreadyReviewed && existingReview ? (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-4 shadow-2xs space-y-2.5 animate-fadeIn">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center space-x-2 min-w-0">
+                <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                <span className="text-xs font-bold text-emerald-900 truncate">
+                  คุณประเมินรายการนี้แล้ว
+                </span>
+              </div>
+              <div className="flex items-center space-x-1 shrink-0">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <Star
+                    key={star}
+                    className={`h-3.5 w-3.5 ${
+                      star <= existingReview.ratingStars
+                        ? 'text-amber-400 fill-amber-400'
+                        : 'text-slate-200 fill-slate-100'
+                    }`}
+                  />
+                ))}
+                <span className="text-xs font-bold text-slate-700 ml-1">
+                  {existingReview.ratingStars} / 5
+                </span>
+              </div>
+            </div>
+
+            {existingReview.reviewText ? (
+              <p className="text-xs text-slate-700 bg-white/90 p-2.5 rounded-lg border border-emerald-100 italic leading-relaxed">
+                "{existingReview.reviewText}"
+              </p>
+            ) : null}
+
+            <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-emerald-100/80">
+              <span>รีวิวโดยผู้ซื้อจริง (Verified Purchase)</span>
+              <span>
+                {new Date(existingReview.createdAt).toLocaleDateString('th-TH', {
+                  day: 'numeric',
+                  month: 'short',
+                  year: 'numeric',
+                })}
+              </span>
+            </div>
+          </div>
+        ) : !reviewSubmitted ? (
           <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-2xs flex items-center justify-between gap-3">
             <div className="flex items-center space-x-2 min-w-0">
               <Star className="h-4 w-4 text-amber-400 fill-amber-400 shrink-0" />
@@ -940,10 +996,21 @@ export const CitizenPaymentSlipPage: React.FC = () => {
               </span>
             </div>
             <button
-              onClick={() => { setReviewError(null); setShowReviewModal(true); }}
-              className="shrink-0 rounded-full bg-slate-100 hover:bg-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 transition"
+              id="btn-review-merchant"
+              onClick={() =>
+                navigate(APP_ROUTES.CITIZEN_REVIEW, {
+                  state: {
+                    transactionId: slip.transactionId,
+                    shopName: slip.shopName,
+                    totalAmount: slip.totalAmount,
+                    citizenPaidAmount: slip.citizenPaidAmount,
+                    timestamp: slip.timestamp,
+                  },
+                })
+              }
+              className="shrink-0 rounded-full bg-slate-100 hover:bg-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 transition active:scale-98"
             >
-              ประเมินร้าน
+              ประเมินร้านค้า
             </button>
           </div>
         ) : (
