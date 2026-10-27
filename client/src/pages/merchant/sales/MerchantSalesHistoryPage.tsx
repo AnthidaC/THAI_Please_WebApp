@@ -21,10 +21,11 @@ export const MerchantSalesHistoryPage: React.FC = () => {
   const navigate = useNavigate();
   const [filterStatus, setFilterStatus] = useState<'ALL' | 'SUCCESS' | 'FLAGGED' | 'REJECTED'>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [salesDate, setSalesDate] = useState(() => new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10));
 
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ['merchant-sales'],
-    queryFn: () => getMerchantHistory(),
+    queryKey: ['merchant-sales', salesDate],
+    queryFn: () => getMerchantHistory(undefined, salesDate || undefined),
   });
 
   const allTransactions = data?.transactions || [];
@@ -121,6 +122,12 @@ export const MerchantSalesHistoryPage: React.FC = () => {
       </div>
 
       <main className="mx-auto w-full max-w-6xl px-3.5 sm:px-6 lg:px-8 space-y-4 sm:space-y-6">
+        <div className="flex flex-wrap items-center gap-3 rounded-card border border-hairline bg-white p-4 text-sm">
+          <label htmlFor="sales-date" className="font-medium">ยอดขายประจำวันที่ (เวลาไทย)</label>
+          <input id="sales-date" type="date" value={salesDate} onChange={event => setSalesDate(event.target.value)} className="rounded-full border border-hairline px-3 py-2" />
+          <button type="button" onClick={() => setSalesDate('')} className="rounded-full border border-hairline px-4 py-2 text-xs">ดูทั้งหมด</button>
+          {!salesDate && <span className="text-xs text-ink-muted">กำลังแสดงยอดขายทั้งหมด</span>}
+        </div>
         {/* ข้อมูลร้านค้า */}
         {data?.merchant && (
           <div className="rounded-card border border-hairline bg-white p-4 sm:p-5 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">

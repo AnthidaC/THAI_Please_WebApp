@@ -29,6 +29,7 @@ import {
 } from '../../../services/paymentApi';
 import { APP_ROUTES } from '../../../constants/routes';
 import { QrCameraScanner } from '../../../components/payment/QrCameraScanner';
+import { usePaymentPinStatus } from '../../../hooks/usePaymentPinStatus';
 
 export const CitizenScanCopayPage: React.FC = () => {
   const navigate = useNavigate();
@@ -57,6 +58,7 @@ export const CitizenScanCopayPage: React.FC = () => {
     queryKey: ['wallet-balance'],
     queryFn: getWalletBalance,
   });
+  const { data: pinStatus } = usePaymentPinStatus();
 
   // ติดตามพิกัด GPS จริงจากเบราว์เซอร์แบบเบื้องหลัง
   useEffect(() => {
@@ -169,12 +171,18 @@ export const CitizenScanCopayPage: React.FC = () => {
         discountCode: appliedDiscount?.code,
       }),
     onSuccess: (data) => {
+      setPin('');
       // ชำระเงินสำเร็จ นำทางไปยังหน้า e-Slip พร้อมสั่งบันทึกสลิปอัตโนมัติ (Auto-Save)
       navigate(`/citizen/slip/${data.transactionId}?autosave=1`, {
         state: { autoSave: true },
       });
     },
     onError: (err: any) => {
+      setPin('');
+      if (err.response?.data?.code?.startsWith('PIN_')) {
+        setCheckoutError(err.response.data.message);
+        return;
+      }
       // หากไม่ผ่านหรือตำแหน่งอยู่นอกระยะ หรือหมดอายุ ให้เด้งกลับหน้าสแกนใหม่
       setScannedData(null);
       setQrReference('');
@@ -188,6 +196,7 @@ export const CitizenScanCopayPage: React.FC = () => {
 
   // เมื่อกล้องอ่าน QR ได้ → ตรวจสอบรายการทันที (ไม่ต้องกดปุ่มเพิ่ม)
   const handleDetected = (text: string) => {
+    setPin('');
     setCheckoutError(null);
     setAppliedDiscount(null);
     setDiscountCodeInput('');
@@ -603,6 +612,8 @@ export const CitizenScanCopayPage: React.FC = () => {
                     type="password"
                     inputMode="numeric"
                     maxLength={6}
+                    autoComplete="current-password"
+                    disabled={!pinStatus?.isSet || checkoutMutation.isPending}
                     value={pin}
                     onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
                     placeholder="******"
@@ -620,6 +631,7 @@ export const CitizenScanCopayPage: React.FC = () => {
                   id="btn-confirm-checkout"
                   disabled={
                     checkoutMutation.isPending ||
+                    !pinStatus?.isSet ||
                     pin.length !== 6 ||
                     (wallet
                       ? wallet.balance <

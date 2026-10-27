@@ -19,8 +19,9 @@ export const getBuyerHistory = async (req: Request, res: Response): Promise<void
 
 export const getMerchantHistory = async (req: Request, res: Response): Promise<void> => {
   try {
-    const merchantId = req.query.merchantId as string | undefined;
-    const history = await transactionService.getMerchantHistory(merchantId);
+    const merchantId = res.locals.paymentMerchantId as string;
+    const date = typeof req.query.date === 'string' ? req.query.date : undefined;
+    const history = await transactionService.getMerchantHistory(merchantId, date);
     sendSuccess(res, history, 'ดึงสรุปยอดขายและสถิติร้านค้าสำเร็จ');
   } catch (error: any) {
     sendError(res, error.message || 'ไม่สามารถดึงข้อมูลสถิติร้านค้าได้', 500);
@@ -30,7 +31,7 @@ export const getMerchantHistory = async (req: Request, res: Response): Promise<v
 export const getTransactionSlip = async (req: Request, res: Response): Promise<void> => {
   try {
     const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-    const slip = await transactionService.getTransactionSlip(id);
+    const slip = await transactionService.getTransactionSlip(id, req.user!.userId);
     sendSuccess(res, slip, 'ดึงหลักฐานการชำระเงิน (Slip) สำเร็จ');
   } catch (error: any) {
     sendError(res, error.message || 'ไม่พบหลักฐานการชำระเงิน', 404);

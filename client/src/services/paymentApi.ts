@@ -316,6 +316,16 @@ export const getWalletBalance = async (): Promise<WalletData> => {
   return res.data.data;
 };
 
+export const getPaymentPinStatus = async (): Promise<{ isSet: boolean; lockedUntil: string | null }> => {
+  const res = await axios.get('/wallet/pin/status');
+  return res.data.data;
+};
+
+export const setPaymentPin = async (payload: { pin: string; confirmPin: string; currentPin?: string }) => {
+  const res = await axios.put('/wallet/pin', payload);
+  return res.data.data;
+};
+
 export const topUpWallet = async (amount: number, paymentChannel = 'PROMPTPAY') => {
   const res = await axios.post('/wallet/top-up', { amount, paymentChannel });
   return res.data.data;
@@ -343,6 +353,35 @@ export const getQrPaymentStatus = async (
 ): Promise<QrPaymentStatusResponse> => {
   const res = await axios.get(`/payment/qr/${reference}/status`);
   return res.data.data;
+};
+
+/** Fetch streaming supports Bearer auth, unlike the browser's native EventSource. */
+export const streamQrPaymentStatus = async (
+  reference: string,
+  onStatus: (status: QrPaymentStatusResponse) => void,
+  signal: AbortSignal
+) => {
+  const token = localStorage.getItem('auth_token');
+  const response = await fetch(axios.getUri({ url: `/payment/qr/${encodeURIComponent(reference)}/stream` }), {
+    headers: token ? { Authorization: `Bearer ${token}` } : {}, signal,
+  });
+  if (!response.ok || !response.body) throw new Error('Unable to stream payment status');
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      let end: number;
+      while ((end = buffer.indexOf('\n\n')) !== -1) {
+        const event = buffer.slice(0, end); buffer = buffer.slice(end + 2);
+        const data = event.split('\n').find(line => line.startsWith('data: '));
+        if (data) onStatus(JSON.parse(data.slice(6)));
+      }
+    }
+  } finally { reader.releaseLock(); }
 };
 
 export const getQrDetails = async (
@@ -375,7 +414,7 @@ export const checkoutCopay = async (payload: {
   userLatitude: number;
   userLongitude: number;
   merchantId?: string;
-  pin?: string;
+  pin: string;
   discountCode?: string;
 }): Promise<CheckoutResult> => {
   const res = await axios.post('/payment/qr/checkout', payload);
@@ -388,9 +427,9 @@ export const getBuyerHistory = async (): Promise<TransactionItem[]> => {
   return res.data.data;
 };
 
-export const getMerchantHistory = async (merchantId?: string): Promise<MerchantSalesSummary> => {
+export const getMerchantHistory = async (merchantId?: string, date?: string): Promise<MerchantSalesSummary> => {
   const res = await axios.get('/transactions/merchant/history', {
-    params: merchantId ? { merchantId } : {},
+    params: { ...(merchantId ? { merchantId } : {}), ...(date ? { date } : {}) },
   });
   return res.data.data;
 };

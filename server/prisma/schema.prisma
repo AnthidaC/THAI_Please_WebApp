@@ -15,11 +15,13 @@ model User {
   province_code                               String                      @db.VarChar(10)
   is_registered_thai_plus                     Boolean                     @default(false)
   created_at                                  DateTime                    @default(now()) @db.Timestamptz(6)
+  payment_pin                                 payment_pins?
   recommendation_logs                         recommendation_logs[]
   referrals_referrals_referred_user_idTousers referrals[]                 @relation("referrals_referred_user_idTousers")
   referrals_referrals_referrer_user_idTousers referrals[]                 @relation("referrals_referrer_user_idTousers")
   reviews                                     reviews[]
   transactions                                transactions[]
+  user_badge_history                          user_badge_history[]
   user_badges                                 user_badges[]
   user_category_preferences                   user_category_preferences[]
   user_quests                                 user_quests[]
@@ -33,32 +35,35 @@ model User {
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model badges {
-  badge_id       String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  badge_name     String        @db.VarChar(100)
-  badge_level    String        @db.VarChar(20)
-  description    String?
-  condition_type String        @db.VarChar(50)
-  required_count Int
-  status         String        @default("active") @db.VarChar(20)
-  created_at     DateTime      @default(now()) @db.Timestamptz(6)
-  user_badges    user_badges[]
+  badge_id                    String                      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  badge_name                  String                      @db.VarChar(100)
+  description                 String?
+  condition_type              String                      @unique(map: "uq_badges_condition_type") @db.VarChar(50)
+  status                      String                      @default("inactive") @db.VarChar(20)
+  implementation_status       String                      @default("pending") @db.VarChar(20)
+  created_at                  DateTime                    @default(now()) @db.Timestamptz(6)
+  updated_at                  DateTime                    @default(now()) @db.Timestamptz(6)
+  badge_tiers                 badge_tiers[]
+  achievement_condition_types achievement_condition_types @relation(fields: [condition_type], references: [condition_key], onUpdate: NoAction, map: "fk_badges_condition_type")
+  user_badge_history          user_badge_history[]
+  user_badges                 user_badges[]
 
-  @@unique([badge_level, condition_type], map: "uq_badges_level_condition")
+  @@index([status, implementation_status], map: "idx_badges_status_implementation")
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model campaigns {
-  campaign_id                   String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  campaign_name                 String    @db.VarChar(150)
-  government_copay_rate_percent Decimal   @default(60) @db.Decimal(5, 2)
-  citizen_payment_rate_percent  Decimal   @default(40) @db.Decimal(5, 2)
-  daily_quota_limit             Decimal   @default(150) @db.Decimal(10, 2)
-  total_quota_limit             Decimal   @default(3000) @db.Decimal(12, 2)
-  start_date                    DateTime  @db.Timestamptz(6)
-  end_date                      DateTime  @db.Timestamptz(6)
-  status                        String    @default("ACTIVE") @db.VarChar(20)
-  created_at                    DateTime          @default(now()) @db.Timestamptz(6)
+  campaign_id                   String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  campaign_name                 String             @db.VarChar(150)
+  government_copay_rate_percent Decimal            @default(60) @db.Decimal(5, 2)
+  citizen_payment_rate_percent  Decimal            @default(40) @db.Decimal(5, 2)
+  daily_quota_limit             Decimal            @default(150) @db.Decimal(10, 2)
+  total_quota_limit             Decimal            @default(3000) @db.Decimal(12, 2)
+  start_date                    DateTime           @db.Timestamptz(6)
+  end_date                      DateTime           @db.Timestamptz(6)
+  status                        String             @default("ACTIVE") @db.VarChar(20)
+  created_at                    DateTime           @default(now()) @db.Timestamptz(6)
   campaign_periods              campaign_periods[]
   quests                        quests[]
   wallets                       wallets[]
@@ -122,6 +127,7 @@ model merchants {
   merchant_applications             merchant_applications?
   merchant_location_change_requests merchant_location_change_requests[]
   merchant_profile_audit_logs       merchant_profile_audit_logs[]
+  payment_qr_codes                  payment_qr_codes[]
   recommendation_logs               recommendation_logs[]
   referrals                         referrals[]
   reviews                           reviews[]
@@ -274,14 +280,16 @@ model transactions {
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model user_badges {
-  user_badge_id String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  user_id       String   @db.Uuid
-  badge_id      String   @db.Uuid
-  earned_at     DateTime @default(now()) @db.Timestamptz(6)
-  badges        badges   @relation(fields: [badge_id], references: [badge_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_user_badges_badge")
-  users         User     @relation(fields: [user_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_user_badges_user")
+  user_badge_id String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id       String      @db.Uuid
+  badge_id      String      @db.Uuid
+  badge_tier_id String      @db.Uuid
+  earned_at     DateTime    @default(now()) @db.Timestamptz(6)
+  badges        badges      @relation(fields: [badge_id], references: [badge_id], onUpdate: NoAction, map: "fk_user_badges_badge")
+  badge_tiers   badge_tiers @relation(fields: [badge_id, badge_tier_id], references: [badge_id, tier_id], onUpdate: NoAction, map: "fk_user_badges_badge_tier")
+  users         User        @relation(fields: [user_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_user_badges_user")
 
-  @@unique([user_id, badge_id], map: "uq_user_badges_user_badge")
+  @@unique([user_id, badge_id], map: "uq_user_badges_user_badge_current")
   @@index([badge_id], map: "idx_user_badges_badge")
   @@index([user_id], map: "idx_user_badges_user")
 }
@@ -371,25 +379,46 @@ model wallet_transactions {
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model wallets {
-  wallet_id             String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  user_id               String                @unique(map: "uq_wallets_user") @db.Uuid
-  campaign_id           String?               @db.Uuid
-  balance               Decimal               @default(0) @db.Decimal(12, 2)
-  daily_quota_limit     Decimal               @default(150) @db.Decimal(10, 2)
-  daily_quota_used      Decimal               @default(0) @db.Decimal(10, 2)
-  last_quota_reset_date DateTime              @default(dbgenerated("CURRENT_DATE")) @db.Date
-  total_quota_remaining Decimal               @default(3000) @db.Decimal(12, 2)
-  eligibility_status    String                @db.VarChar(30)
-  status                String                @default("ACTIVE") @db.VarChar(20)
-  created_at            DateTime              @default(now()) @db.Timestamptz(6)
-  updated_at            DateTime              @default(now()) @db.Timestamptz(6)
+  wallet_id             String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id               String                 @unique(map: "uq_wallets_user") @db.Uuid
+  campaign_id           String?                @db.Uuid
+  balance               Decimal                @default(0) @db.Decimal(12, 2)
+  daily_quota_limit     Decimal                @default(150) @db.Decimal(10, 2)
+  daily_quota_used      Decimal                @default(0) @db.Decimal(10, 2)
+  last_quota_reset_date DateTime               @default(dbgenerated("CURRENT_DATE")) @db.Date
+  total_quota_remaining Decimal                @default(3000) @db.Decimal(12, 2)
+  eligibility_status    String                 @db.VarChar(30)
+  status                String                 @default("ACTIVE") @db.VarChar(20)
+  created_at            DateTime               @default(now()) @db.Timestamptz(6)
+  updated_at            DateTime               @default(now()) @db.Timestamptz(6)
   wallet_period_quotas  wallet_period_quotas[]
   wallet_transactions   wallet_transactions[]
-  campaigns             campaigns?            @relation(fields: [campaign_id], references: [campaign_id], onUpdate: NoAction, map: "fk_wallets_campaign")
-  users                 User                  @relation(fields: [user_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_wallets_user")
+  campaigns             campaigns?             @relation(fields: [campaign_id], references: [campaign_id], onUpdate: NoAction, map: "fk_wallets_campaign")
+  users                 User                   @relation(fields: [user_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_wallets_user")
 
   @@index([campaign_id], map: "idx_wallets_campaign")
   @@index([status], map: "idx_wallets_status")
+}
+
+model payment_pins {
+  user_id         String    @id @db.Uuid
+  pin_hash        String    @db.VarChar(255)
+  failed_attempts Int       @default(0)
+  locked_until    DateTime? @db.Timestamptz(6)
+  updated_at      DateTime  @default(now()) @db.Timestamptz(6)
+  users           User      @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model payment_qr_codes {
+  qr_reference String    @id @db.VarChar(64)
+  merchant_id  String    @db.Uuid
+  payload      Json
+  status       String    @default("ACTIVE") @db.VarChar(20)
+  expires_at   DateTime  @db.Timestamptz(6)
+  created_at   DateTime  @default(now()) @db.Timestamptz(6)
+  merchants    merchants @relation(fields: [merchant_id], references: [merchant_id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([expires_at])
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
@@ -524,4 +553,64 @@ model wallet_period_quotas {
   @@unique([wallet_id, period_id], map: "uq_wallet_period_quotas_wallet_period")
   @@index([period_id], map: "idx_wallet_period_quotas_period")
   @@index([wallet_id], map: "idx_wallet_period_quotas_wallet")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model has constraints using non-default deferring rules and requires additional setup for migrations. Visit https://pris.ly/d/constraint-deferring for more info.
+model badge_tiers {
+  tier_id            String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  badge_id           String               @db.Uuid
+  tier_name          String               @db.VarChar(50)
+  tier_level         Int
+  required_count     Int
+  icon_url           String?              @db.VarChar(2048)
+  badges             badges               @relation(fields: [badge_id], references: [badge_id], onUpdate: NoAction, map: "fk_badge_tiers_badge")
+  user_badge_history user_badge_history[]
+  user_badges        user_badges[]
+
+  @@unique([badge_id, tier_level], map: "uq_badge_tiers_badge_level")
+  @@unique([badge_id, required_count], map: "uq_badge_tiers_badge_required_count")
+  @@unique([badge_id, tier_id], map: "uq_badge_tiers_badge_tier")
+  @@index([badge_id], map: "idx_badge_tiers_badge")
+}
+
+model user_badge_history {
+  history_id           String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id              String      @db.Uuid
+  badge_id             String      @db.Uuid
+  badge_tier_id        String      @db.Uuid
+  earned_at            DateTime    @default(now()) @db.Timestamptz(6)
+  legacy_user_badge_id String?     @unique(map: "uq_user_badge_history_legacy_id") @db.Uuid
+  badges               badges      @relation(fields: [badge_id], references: [badge_id], onUpdate: NoAction, map: "fk_user_badge_history_badge")
+  badge_tiers          badge_tiers @relation(fields: [badge_id, badge_tier_id], references: [badge_id, tier_id], onUpdate: NoAction, map: "fk_user_badge_history_badge_tier")
+  users                User        @relation(fields: [user_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_user_badge_history_user")
+
+  @@unique([user_id, badge_tier_id], map: "uq_user_badge_history_user_tier")
+  @@index([badge_id, earned_at], map: "idx_user_badge_history_badge_earned")
+  @@index([user_id, earned_at], map: "idx_user_badge_history_user_earned")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model achievement_condition_types {
+  condition_type_id     String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  condition_key         String   @unique(map: "uq_achievement_condition_types_key") @db.VarChar(50)
+  display_name          String   @db.VarChar(100)
+  description           String?
+  measurement_unit      String   @default("other") @db.VarChar(20)
+  implementation_status String   @default("pending") @db.VarChar(20)
+  created_at            DateTime @default(now()) @db.Timestamptz(6)
+  updated_at            DateTime @default(now()) @db.Timestamptz(6)
+  badges                badges?
+
+  @@index([implementation_status], map: "idx_achievement_condition_types_status")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model auth_identities {
+  email        String   @id @db.VarChar(254)
+  account_type String   @db.VarChar(30)
+  account_id   String   @db.Uuid
+  created_at   DateTime @default(now()) @db.Timestamptz(6)
+
+  @@unique([account_type, account_id], map: "auth_identities_account_unique")
 }

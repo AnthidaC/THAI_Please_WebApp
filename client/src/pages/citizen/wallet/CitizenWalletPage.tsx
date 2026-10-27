@@ -24,6 +24,7 @@ import {
   getBuyerHistory,
 } from '../../../services/paymentApi';
 import { APP_ROUTES } from '../../../constants/routes';
+import { PaymentPinSettings } from '../../../components/payment/PaymentPinSettings';
 
 export const CitizenWalletPage: React.FC = () => {
   const navigate = useNavigate();
@@ -184,6 +185,7 @@ export const CitizenWalletPage: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 items-start">
           {/* Left Column: Balances & Quota (lg:col-span-7) */}
           <div className="lg:col-span-7 space-y-4">
+            <PaymentPinSettings />
             {/* 1. การ์ดยอดเงินส่วนตัว (Personal Wallet Balance) */}
             <section className="relative overflow-hidden rounded-card border border-hairline bg-white p-4 sm:p-5 md:p-6 shadow-sm transition hover:shadow-md">
               <div className="flex flex-wrap items-center justify-between gap-2">

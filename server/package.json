@@ -10,7 +10,11 @@
     "db:migrate": "npx prisma migrate dev",
     "db:generate": "npx prisma generate",
     "db:studio": "npx prisma studio",
-    "test:engine": "tsx src/tests/payment-engine.test.ts"
+    "db:payment:status": "tsx src/scripts/payment-schema.ts",
+    "db:payment:apply": "tsx src/scripts/payment-schema.ts --apply",
+    "test:engine": "tsx src/tests/payment-engine.test.ts",
+    "test:safety": "tsx --test src/tests/payment-safety.test.ts",
+    "test:payment:integration": "tsx src/tests/payment-safety.integration.test.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.4.1",

@@ -1,4 +1,5 @@
 import prisma from '../utils/prisma';
+import { thaiDayRange } from '../utils/thai-date';
 
 export interface MerchantBehaviorBaseline {
   totalTxCount: number;
@@ -477,8 +478,7 @@ export class FraudService {
 
     const now = Date.now();
     const tenMinutesAgo = new Date(now - 10 * 60 * 1000);
-    const startOfToday = new Date();
-    startOfToday.setHours(0, 0, 0, 0);
+    const startOfToday = thaiDayRange().start;
 
     // 1. ดึงประวัติธุรกรรมล่าสุดของผู้ใช้ใน 10 นาที เพื่อดูความถี่และความเร็วการเปลี่ยนพิกัด
     const recentTx = await prisma.transactions.findMany({
@@ -540,7 +540,7 @@ export class FraudService {
       prisma.transactions.findMany({
         where: {
           merchant_id: params.merchantId,
-          status: { in: ['COMPLETED', 'SETTLED', 'USED', 'AUTO_APPROVED'] },
+          status: { in: ['SUCCESS', 'FLAGGED'] },
         },
         select: {
           total_amount: true,
@@ -555,7 +555,7 @@ export class FraudService {
       prisma.transactions.findMany({
         where: {
           user_id: params.userId,
-          status: { in: ['COMPLETED', 'SETTLED', 'USED', 'AUTO_APPROVED'] },
+          status: { in: ['SUCCESS', 'FLAGGED'] },
         },
         select: {
           total_amount: true,
@@ -1070,7 +1070,7 @@ export class FraudService {
       // 2. อัปเดต transactions สถานะ (หาก Approve ให้ยืนยันสำเร็จ)
       if (action === 'APPROVE_ALL') {
         await tx.transactions.updateMany({
-          where: { transaction_id: { in: txIds } },
+          where: { transaction_id: { in: txIds }, status: 'FLAGGED' },
           data: { status: 'SUCCESS' },
         });
       }
@@ -1144,12 +1144,9 @@ export class FraudService {
     const newDecision = decisionMap[action] || 'REJECTED_BY_ADMIN';
 
     // ไม่ดึงเงินคืนอัตโนมัติ: คงสถานะธุรกรรมเดิมไว้เป็น SUCCESS (เมื่อชำระเงินแล้ว) หรือ REJECTED (เฉพาะรายการสแกนไม่ผ่าน 0 บาท)
-    const newTxStatus =
-      action === 'APPROVE'
-        ? 'SUCCESS'
-        : Number(txRecord?.total_amount || 0) > 0 && Number(txRecord?.citizen_paid_amount || 0) > 0
-        ? 'SUCCESS'
-        : 'REJECTED';
+    // Reviewing a declined GPS attempt cannot create a paid transaction without a debit.
+    const newTxStatus = txRecord && ['SUCCESS', 'FLAGGED'].includes(txRecord.status)
+      ? 'SUCCESS' : txRecord?.status || 'REJECTED';
 
     await prisma.$transaction(async (tx: any) => {
       await tx.fraud_checks.update({
@@ -1168,7 +1165,7 @@ export class FraudService {
           where: { transaction_id: fraudCheck.transaction_id },
           data: {
             status: newTxStatus,
-            ...(action === 'APPROVE' && !txRecord.completed_at ? { completed_at: new Date() } : {}),
+            ...(newTxStatus === 'SUCCESS' && !txRecord.completed_at ? { completed_at: new Date() } : {}),
           },
         });
 

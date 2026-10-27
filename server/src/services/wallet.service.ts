@@ -1,4 +1,5 @@
 import prisma from '../utils/prisma';
+import { thaiDateKey } from '../utils/thai-date';
 
 export interface CurrentPeriodInfo {
   periodId: string;
@@ -106,7 +107,7 @@ export class WalletService {
    */
   public async getWalletByUserId(userId: string): Promise<WalletDetails> {
     const now = new Date();
-    const todayStr = now.toISOString().split('T')[0];
+    const todayStr = thaiDateKey(now);
 
     // ดึงโครงการ Co-pay ที่เปิดใช้งานล่าสุดในระบบจาก DB
     const activeCampaign = await prisma.campaigns.findFirst({
@@ -136,7 +137,7 @@ export class WalletService {
           total_quota_remaining: hasActiveCampaign ? activeCampaign.total_quota_limit : 3000.0,
           eligibility_status: hasActiveCampaign ? 'ELIGIBLE' : 'INELIGIBLE',
           status: 'ACTIVE',
-          last_quota_reset_date: new Date(),
+          last_quota_reset_date: new Date(`${todayStr}T00:00:00Z`),
         },
         include: { campaigns: true },
       });
@@ -144,14 +145,14 @@ export class WalletService {
       // ตรวจสอบการข้ามวันเพื่อรีเซ็ต daily_quota_used
       const lastResetStr = new Date(wallet.last_quota_reset_date).toISOString().split('T')[0];
       if (lastResetStr !== todayStr) {
-        wallet = await prisma.wallets.update({
-          where: { wallet_id: wallet.wallet_id },
+        await prisma.wallets.updateMany({
+          where: { wallet_id: wallet.wallet_id, last_quota_reset_date: { lt: new Date(`${todayStr}T00:00:00Z`) } },
           data: {
             daily_quota_used: 0.0,
-            last_quota_reset_date: new Date(),
+            last_quota_reset_date: new Date(`${todayStr}T00:00:00Z`),
           },
-          include: { campaigns: true },
         });
+        wallet = (await prisma.wallets.findUnique({ where: { wallet_id: wallet.wallet_id }, include: { campaigns: true } }))!;
       }
     }
 
@@ -256,8 +257,10 @@ export class WalletService {
 
         if (!walletPeriodQuota) {
           const limit = Number(period.period_quota_limit);
-          walletPeriodQuota = await prisma.wallet_period_quotas.create({
-            data: {
+          walletPeriodQuota = await prisma.wallet_period_quotas.upsert({
+            where: { wallet_id_period_id: { wallet_id: wallet.wallet_id, period_id: period.period_id } },
+            update: {},
+            create: {
               wallet_id: wallet.wallet_id,
               period_id: period.period_id,
               quota_limit: limit,
@@ -353,19 +356,32 @@ export class WalletService {
     if (!wallet) {
       throw new Error('ไม่พบข้อมูลกระเป๋าเงินของผู้ใช้');
     }
+    if (wallet.status === 'SUSPENDED' || wallet.eligibility_status === 'SUSPENDED') {
+      throw new Error('สิทธิ์ของคุณถูกระงับชั่วคราว กรุณาติดต่อผู้ดูแลระบบ');
+    }
 
-    const updatedWallet = await prisma.wallets.update({
-      where: { wallet_id: wallet.wallet_id },
-      data: {
-        campaign_id: campaign.campaign_id,
-        eligibility_status: 'ELIGIBLE',
-        daily_quota_limit: campaign.daily_quota_limit,
-        total_quota_remaining: campaign.total_quota_limit,
-      },
+    // Serialize enrollment with checkout so retries cannot refill spent quota.
+    await prisma.$transaction(async tx => {
+      await tx.$queryRaw`SELECT wallet_id FROM wallets WHERE wallet_id = ${wallet!.wallet_id}::uuid FOR UPDATE`;
+      const latest = await tx.wallets.findUniqueOrThrow({ where: { wallet_id: wallet!.wallet_id } });
+      if (latest.status === 'SUSPENDED' || latest.eligibility_status === 'SUSPENDED') {
+        throw new Error('สิทธิ์ของคุณถูกระงับชั่วคราว กรุณาติดต่อผู้ดูแลระบบ');
+      }
+      if (latest.campaign_id === campaign.campaign_id) return;
+      await tx.wallets.update({
+        where: { wallet_id: latest.wallet_id },
+        data: {
+          campaign_id: campaign.campaign_id,
+          eligibility_status: 'ELIGIBLE',
+          daily_quota_limit: campaign.daily_quota_limit,
+          total_quota_remaining: campaign.total_quota_limit,
+        },
+      });
     });
 
     return {
       success: true,
+      wallet: await this.getWalletByUserId(userId),
       message: `ลงทะเบียนรับสิทธิ์ ${campaign.campaign_name} สำเร็จเรียบร้อยแล้ว`,
       campaignName: campaign.campaign_name,
       dailyQuotaLimit: Number(campaign.daily_quota_limit),
@@ -388,14 +404,13 @@ export class WalletService {
     }
 
     const currentWallet = await this.getWalletByUserId(userId);
-    const newBalance = Math.round((currentWallet.balance + amount) * 100) / 100;
     const refNumber = `TOPUP-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
     const result = await prisma.$transaction(async (tx: any) => {
       const updatedWallet = await tx.wallets.update({
         where: { wallet_id: currentWallet.walletId },
         data: {
-          balance: newBalance,
+          balance: { increment: amount },
         },
       });
 
@@ -406,7 +421,7 @@ export class WalletService {
           amount,
           payment_channel: paymentChannel,
           reference_number: refNumber,
-          balance_after: newBalance,
+          balance_after: updatedWallet.balance,
         },
       });
 

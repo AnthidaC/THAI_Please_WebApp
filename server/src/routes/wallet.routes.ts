@@ -4,11 +4,15 @@ import {
   topUpWallet,
   enrollInCampaign,
 } from '../controllers/wallet.controller';
-import { authenticate } from '../middlewares/auth.middleware';
+import { authenticatePaymentSession as authenticate } from '../middlewares/payment-access.middleware';
+import { getPaymentPinStatus, setPaymentPin } from '../controllers/payment-pin.controller';
 import { validate } from '../middlewares/validate.middleware';
-import { topUpWalletSchema } from '../validations/payment.validation';
+import { topUpWalletSchema, setPaymentPinSchema } from '../validations/payment.validation';
 
 const router = Router();
+
+router.get('/pin/status', authenticate, getPaymentPinStatus);
+router.put('/pin', authenticate, validate(setPaymentPinSchema), setPaymentPin);
 
 // GET /api/wallet/balance
 router.get('/balance', authenticate, getWalletBalance);

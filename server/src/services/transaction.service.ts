@@ -1,4 +1,5 @@
 import prisma from '../utils/prisma';
+import { thaiDayRange } from '../utils/thai-date';
 
 export class TransactionService {
   /**
@@ -108,32 +109,22 @@ export class TransactionService {
   /**
    * เรียกดูสรุปยอดขาย ประวัติการขาย และยอดเงินอุดหนุนรัฐของร้านค้า
    */
-  public async getMerchantHistory(merchantId?: string) {
-    // หากไม่ระบุ merchantId ให้ใช้ร้านแรก หรือค้นหาร้านที่ได้รับความนิยม
-    let targetMerchantId = merchantId;
-    if (!targetMerchantId) {
-      const firstMerchant = await prisma.merchants.findFirst();
-      if (!firstMerchant) {
-        return {
-          merchant: null,
-          summary: {
-            totalRevenue: 0,
-            governmentSubsidyTotal: 0,
-            citizenPaidTotal: 0,
-            totalTransactions: 0,
-          },
-          transactions: [],
-        };
-      }
-      targetMerchantId = firstMerchant.merchant_id;
+  public async getMerchantHistory(merchantId: string, date?: string) {
+    const targetMerchantId = merchantId;
+    if (!targetMerchantId) throw new Error('ไม่พบร้านค้าที่ผูกกับบัญชี');
+    if (date && (!/^\d{4}-\d{2}-\d{2}$/.test(date) ||
+        Number.isNaN(Date.parse(`${date}T00:00:00+07:00`)) ||
+        new Date(`${date}T00:00:00Z`).toISOString().slice(0, 10) !== date)) {
+      throw new Error('รูปแบบวันที่ไม่ถูกต้อง');
     }
+    const range = date ? thaiDayRange(new Date(`${date}T12:00:00+07:00`)) : null;
 
     const merchant = await prisma.merchants.findUnique({
       where: { merchant_id: targetMerchantId },
     });
 
     const transactions = await prisma.transactions.findMany({
-      where: { merchant_id: targetMerchantId },
+      where: { merchant_id: targetMerchantId, ...(range ? { created_at: { gte: range.start, lt: range.end } } : {}) },
       include: {
         users: {
           select: {
@@ -202,7 +193,7 @@ export class TransactionService {
   /**
    * ดึงข้อมูลหลักฐานการชำระเงิน (e-Slip) สำหรับออกใบเสร็จ
    */
-  public async getTransactionSlip(transactionId: string) {
+  public async getTransactionSlip(transactionId: string, userId: string) {
     const tx = await prisma.transactions.findUnique({
       where: { transaction_id: transactionId },
       include: {
@@ -221,7 +212,7 @@ export class TransactionService {
       },
     });
 
-    if (!tx) {
+    if (!tx || tx.user_id !== userId) {
       throw new Error('ไม่พบข้อมูลรายการทำธุรกรรม');
     }
 
