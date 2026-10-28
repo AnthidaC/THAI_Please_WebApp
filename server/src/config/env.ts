@@ -3,8 +3,6 @@ import { z } from 'zod';
 
 dotenv.config();
 
-const parseIdList = (value: string) => value.split(',').map((id) => id.trim().toLowerCase()).filter(Boolean);
-
 const envSchema = z.object({
   PORT: z.string().default('5000'),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
@@ -16,31 +14,10 @@ const envSchema = z.object({
   UPSTASH_REDIS_REST_TOKEN: z.string().optional(),
   JWT_SECRET: z.string().min(8, 'JWT_SECRET must be at least 8 characters'),
   JWT_EXPIRES_IN: z.string().default('1d'),
-  DEMO_CITIZEN_USER_IDS: z.string().default('').transform(parseIdList),
-  DEMO_MERCHANT_IDS: z.string().default('').transform(parseIdList),
-  DEMO_ADMIN_STAFF_IDS: z.string().default('').transform(parseIdList),
   AI_PROVIDER: z.enum(['gemini', 'openai', 'custom']).default('gemini'),
   AI_FRAUD_API_KEY: z.string().optional(),
   AI_FRAUD_MODEL: z.string().default('gemini-1.5-flash'),
   AI_FRAUD_ENDPOINT: z.string().optional(),
-}).superRefine((values, context) => {
-  const allowlists = [
-    ['DEMO_CITIZEN_USER_IDS', values.DEMO_CITIZEN_USER_IDS],
-    ['DEMO_MERCHANT_IDS', values.DEMO_MERCHANT_IDS],
-    ['DEMO_ADMIN_STAFF_IDS', values.DEMO_ADMIN_STAFF_IDS],
-  ] as const;
-  allowlists.forEach(([key, ids]) => {
-    const seen = new Set<string>();
-    ids.forEach((id, index) => {
-      if (!z.string().uuid().safeParse(id).success) {
-        context.addIssue({ code: z.ZodIssueCode.custom, path: [key, index], message: 'Demo account IDs must be UUIDs' });
-      }
-      if (seen.has(id)) {
-        context.addIssue({ code: z.ZodIssueCode.custom, path: [key, index], message: 'Demo account IDs must be unique' });
-      }
-      seen.add(id);
-    });
-  });
 });
 
 const parsedEnv = envSchema.safeParse(process.env);

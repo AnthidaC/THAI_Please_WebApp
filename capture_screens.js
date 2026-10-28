@@ -51,7 +51,7 @@ async function run() {
   // Handle uncaught page errors gracefully
   page.on('pageerror', (err) => console.log('Page error:', err.message));
 
-  // Initialize a server-issued Citizen session for the allowlisted test account.
+  // Initialize a server-issued Citizen session for a DB-marked test account.
   await page.goto(`${APP_URL}/`, { waitUntil: 'domcontentloaded' });
   await setDemoSession(page, 'CITIZEN');
 

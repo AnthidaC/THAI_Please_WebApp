@@ -49,49 +49,42 @@ const invokeMiddleware = async (
 };
 
 const options = (overrides: Partial<DemoLoginOptions> = {}): DemoLoginOptions => ({
-  allowedAccountIds: {
-    CITIZEN: [citizenId],
-    MERCHANT: [merchantId],
-    ADMIN: [adminId],
-  },
-  findAccount: async (role, accountId) => accounts[role].id === accountId ? accounts[role] : null,
+  findAccount: async (role, accountId) => !accountId || accounts[role].id === accountId ? accounts[role] : null,
   issueToken: signToken,
   ...overrides,
 });
 
-test('mock login rejects roles with no configured test account', async () => {
+test('mock login returns not found when a role has no marked test account', async () => {
   let lookupCount = 0;
-  const findAccount = async () => { lookupCount += 1; return accounts.CITIZEN; };
-  const result = await invoke(options({
-    allowedAccountIds: { CITIZEN: [], MERCHANT: [], ADMIN: [] },
-    findAccount,
-  }), { role: 'CITIZEN' });
+  const findAccount = async () => { lookupCount += 1; return null; };
+  const result = await invoke(options({ findAccount }), { role: 'CITIZEN' });
   assert.equal(result.statusCode, 404);
-  assert.equal(lookupCount, 0);
+  assert.equal(lookupCount, 1);
 });
 
-test('mock login rejects unknown roles, unlisted accounts, and unconfigured roles', async () => {
+test('mock login rejects unknown roles and account IDs that do not match a marked account', async () => {
   assert.equal((await invoke(options(), { role: 'OWNER' })).statusCode, 400);
-  assert.equal((await invoke(options(), { role: 'MERCHANT', accountId: unknownId })).statusCode, 403);
-  assert.equal((await invoke(options({ allowedAccountIds: { CITIZEN: [citizenId], MERCHANT: [], ADMIN: [adminId] } }), { role: 'MERCHANT' })).statusCode, 404);
+  assert.equal((await invoke(options(), { role: 'MERCHANT', accountId: unknownId })).statusCode, 404);
 });
 
-test('mock login requires a selected allowlisted account when a role has several', async () => {
+test('mock login delegates deterministic test-account selection to the database lookup', async () => {
   let lookupCount = 0;
+  let selectedId: string | undefined;
   const configured = options({
-    allowedAccountIds: { CITIZEN: [citizenId, unknownId], MERCHANT: [merchantId], ADMIN: [adminId] },
     findAccount: async (role, accountId) => {
       lookupCount += 1;
-      return accounts[role].id === accountId ? accounts[role] : null;
+      selectedId = accountId;
+      return accounts[role];
     },
   });
-  assert.equal((await invoke(configured, { role: 'CITIZEN' })).statusCode, 403);
-  assert.equal(lookupCount, 0, 'the handler must not choose or look up an account when selection is ambiguous');
+  assert.equal((await invoke(configured, { role: 'CITIZEN' })).statusCode, 200);
+  assert.equal(selectedId, undefined, 'the database lookup selects the first eligible marked account when no ID is supplied');
   assert.equal((await invoke(configured, { role: 'CITIZEN', accountId: citizenId })).statusCode, 200);
-  assert.equal((await invoke(configured, { role: 'CITIZEN', accountId: merchantId })).statusCode, 403);
+  assert.equal(selectedId, citizenId);
+  assert.equal(lookupCount, 2);
 });
 
-test('configured IDs must resolve to usable accounts', async () => {
+test('the requested account must resolve to a usable marked account', async () => {
   const result = await invoke(options({ findAccount: async () => null }), { role: 'ADMIN' });
   assert.equal(result.statusCode, 404);
 });

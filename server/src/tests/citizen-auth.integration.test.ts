@@ -17,7 +17,9 @@ const campaignId = randomUUID();
 const firstCitizenId = randomUUID();
 const secondCitizenId = randomUUID();
 const merchantId = randomUUID();
+const unapprovedMerchantId = randomUUID();
 const adminStaffId = randomUUID();
+const unlinkedAdminStaffId = randomUUID();
 
 const bangkokMonthStart = (year: number, month: number): Date => new Date(Date.UTC(year, month, 1, -7));
 
@@ -35,9 +37,6 @@ const main = async () => {
   process.env.CLIENT_URL = 'http://localhost:5174';
   process.env.DATABASE_URL = sourceUrl;
   process.env.DIRECT_URL = sourceUrl;
-  process.env.DEMO_CITIZEN_USER_IDS = firstCitizenId;
-  process.env.DEMO_MERCHANT_IDS = merchantId;
-  process.env.DEMO_ADMIN_STAFF_IDS = adminStaffId;
   process.env.REDIS_URL = '';
   process.env.UPSTASH_REDIS_REST_URL = '';
   process.env.UPSTASH_REDIS_REST_TOKEN = '';
@@ -55,7 +54,7 @@ const main = async () => {
     schemaCreated = true;
 
     const tables = [
-      'users', 'merchants', 'merchant_applications', 'staff_accounts', 'campaigns', 'campaign_periods',
+      'users', 'merchants', 'merchant_applications', 'staff_accounts', 'auth_identities', 'campaigns', 'campaign_periods',
       'wallets', 'wallet_period_quotas', 'transactions', 'wallet_transactions', 'fraud_checks', 'referrals',
       'rewards', 'user_rewards', 'reviews', 'badges', 'badge_condition_types', 'badge_tiers', 'user_badges',
       'user_badge_history', 'quests', 'user_quests', 'payment_pins', 'payment_qr_codes',
@@ -103,6 +102,7 @@ const main = async () => {
           full_name: `Synthetic Citizen ${index + 1}`,
           province_code: '10',
           is_registered_thai_plus: true,
+          created_at: new Date(`2026-10-0${index + 1}T00:00:00.000Z`),
         },
       })
     ));
@@ -117,6 +117,16 @@ const main = async () => {
         is_approved: true,
       },
     });
+    await db.merchants.create({
+      data: {
+        merchant_id: unapprovedMerchantId,
+        tax_id: `test-${randomUUID().replace(/-/g, '').slice(0, 15)}`,
+        shop_name: 'Synthetic Unapproved Merchant',
+        latitude: 13.7563,
+        longitude: 100.5018,
+        is_approved: false,
+      },
+    });
     await db.staff_accounts.create({
       data: {
         staff_id: adminStaffId,
@@ -125,6 +135,23 @@ const main = async () => {
         password_hash: 'not-used-by-demo-login',
         role: 'ADMIN',
         is_active: true,
+      },
+    });
+    await db.staff_accounts.create({
+      data: {
+        staff_id: unlinkedAdminStaffId,
+        email: `synthetic-unlinked-${randomUUID()}@example.test`,
+        full_name: 'Synthetic Unlinked Admin',
+        password_hash: 'not-used-by-demo-login',
+        role: 'ADMIN',
+        is_active: true,
+      },
+    });
+    await db.auth_identities.create({
+      data: {
+        email: `synthetic-admin-${randomUUID()}@example.test`,
+        account_type: 'STAFF_ACCOUNT',
+        account_id: adminStaffId,
       },
     });
 
@@ -204,7 +231,16 @@ const main = async () => {
     assert.equal((await fetchJson(baseUrl, '/auth/register', undefined, { method: 'POST', body: '{}' })).response.status, 404);
     assert.equal((await fetchJson(baseUrl, '/auth/demo-login', undefined, {
       method: 'POST', body: JSON.stringify({ role: 'CITIZEN', accountId: secondCitizenId }),
-    })).response.status, 403);
+    })).response.status, 200);
+    assert.equal((await fetchJson(baseUrl, '/auth/demo-login', undefined, {
+      method: 'POST', body: JSON.stringify({ role: 'CITIZEN', accountId: randomUUID() }),
+    })).response.status, 404);
+    assert.equal((await fetchJson(baseUrl, '/auth/demo-login', undefined, {
+      method: 'POST', body: JSON.stringify({ role: 'MERCHANT', accountId: unapprovedMerchantId }),
+    })).response.status, 404);
+    assert.equal((await fetchJson(baseUrl, '/auth/demo-login', undefined, {
+      method: 'POST', body: JSON.stringify({ role: 'ADMIN', accountId: unlinkedAdminStaffId }),
+    })).response.status, 404);
     assert.equal((await fetchJson(baseUrl, '/auth/me')).response.status, 401);
     assert.equal((await fetchJson(baseUrl, '/auth/me', 'invalid-token')).response.status, 401);
     assert.equal((await fetchJson(baseUrl, '/wallet/balance')).response.status, 401);
