@@ -81,8 +81,6 @@ The live table list includes objects whose creation is not fully represented in 
    npx prisma migrate dev --name <ชื่อการเปลี่ยนแปลง>
    ```
 
-Run `migrate dev` only against an isolated local database; it can modify its target. Do not point it at shared Supabase. Use `migrate deploy` only for reviewed migrations after staging verification and a backup. Do not use `db push` or reset to repair migration history.
-
 ## 4. Migration history and schema reconciliation
 
 ### Recovered auth/staff migration
