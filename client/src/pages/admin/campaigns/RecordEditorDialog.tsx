@@ -182,7 +182,9 @@ export const RecordEditorDialog: React.FC<Props> = ({ resource, record, campaign
   const [periodsEnabled, setPeriodsEnabled] = useState(() => Boolean((record as CampaignRecord | null)?.periods?.length));
   const [monthCount, setMonthCount] = useState('');
   const [monthlyQuota, setMonthlyQuota] = useState('');
-  const [badgeTiers, setBadgeTiers] = useState(() => initialBadgeTiers(record, initialBadgeCondition?.measurementUnit, initialBadgeCondition?.key));
+  const [badgeTiers, setBadgeTiers] = useState(() => resource === 'badges'
+    ? initialBadgeTiers(record, initialBadgeCondition?.measurementUnit, initialBadgeCondition?.key)
+    : []);
   const [badgeThresholdsEdited, setBadgeThresholdsEdited] = useState(false);
   const [error, setError] = useState('');
   const dialogRef = useRef<HTMLElement>(null);
