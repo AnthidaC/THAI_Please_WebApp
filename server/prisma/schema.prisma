@@ -51,7 +51,7 @@ model badges {
   implementation_status String        @default("pending") @db.VarChar(20)
   created_at            DateTime      @default(now()) @db.Timestamptz(6)
   updated_at            DateTime      @default(now()) @updatedAt @db.Timestamptz(6)
-  condition_type_definition badge_condition_types @relation(fields: [condition_type], references: [condition_key], onDelete: Restrict, onUpdate: NoAction, map: "fk_badges_condition_type")
+  condition_type_definition condition_types @relation(fields: [condition_type], references: [condition_key], onDelete: Restrict, onUpdate: NoAction, map: "fk_badges_condition_type")
   badge_tiers           badge_tiers[]
   user_badges           user_badges[] @relation("BadgeUserBadges")
   user_badge_history    user_badge_history[] @relation("BadgeHistory")
@@ -59,9 +59,9 @@ model badges {
   @@index([status, implementation_status], map: "idx_badges_status_implementation")
 }
 
-model badge_condition_types {
-  condition_type_id    String    @id(map: "achievement_condition_types_pkey") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  condition_key        String    @unique(map: "uq_achievement_condition_types_key") @db.VarChar(50)
+model condition_types {
+  condition_type_id    String    @id(map: "condition_types_pkey") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  condition_key        String    @unique(map: "uq_condition_types_key") @db.VarChar(50)
   display_name         String    @db.VarChar(100)
   description          String?   @db.Text
   measurement_unit     String    @default("other") @db.VarChar(20)
@@ -69,8 +69,9 @@ model badge_condition_types {
   created_at           DateTime  @default(now()) @db.Timestamptz(6)
   updated_at           DateTime  @default(now()) @updatedAt @db.Timestamptz(6)
   badges               badges[]
+  quests               quests[]
 
-  @@index([implementation_status], map: "idx_achievement_condition_types_status")
+  @@index([implementation_status], map: "idx_condition_types_status")
 }
 
 model badge_tiers {
@@ -186,7 +187,7 @@ model quests {
   reward_id    String?        @db.Uuid
   quest_name   String         @db.VarChar(150)
   description  String?
-  quest_type   String         @db.VarChar(50)
+  condition_type String         @db.VarChar(50)
   target_value Decimal        @db.Decimal(12, 2)
   starts_at    DateTime       @db.Timestamptz(6)
   ends_at      DateTime       @db.Timestamptz(6)
@@ -195,6 +196,7 @@ model quests {
   updated_at   DateTime       @default(now()) @db.Timestamptz(6)
   campaigns    campaigns?     @relation(fields: [campaign_id], references: [campaign_id], onUpdate: NoAction, map: "fk_quests_campaign")
   rewards      rewards?       @relation(fields: [reward_id], references: [reward_id], onUpdate: NoAction, map: "fk_quests_reward")
+  condition_type_definition condition_types @relation(fields: [condition_type], references: [condition_key], onDelete: Restrict, onUpdate: NoAction, map: "fk_quests_condition_type")
   user_quests  user_quests[]
   user_rewards user_rewards[]
 
@@ -202,6 +204,7 @@ model quests {
   @@index([starts_at, ends_at], map: "idx_quests_date_range")
   @@index([reward_id], map: "idx_quests_reward")
   @@index([status], map: "idx_quests_status")
+  @@index([condition_type], map: "idx_quests_condition_type")
 }
 
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.

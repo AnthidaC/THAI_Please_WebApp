@@ -67,7 +67,7 @@ const initialValues = (resource: ManagedResource, record: ManagedRecord | null):
     return {
       name: item?.name ?? '',
       description: item?.description ?? '',
-      type: item?.type ?? 'weekly_shop_visits',
+      type: item?.conditionType ?? '',
       targetValue: item?.targetValue ?? '1',
       campaignId: item?.campaignId ?? '',
       rewardId: item?.rewardId ?? '',
@@ -174,12 +174,6 @@ const formatCents = (cents: bigint | null) => cents === null
   ? '—'
   : new Intl.NumberFormat('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(cents) / 100);
 
-const missionTypeOptions = [
-  { value: 'weekly_shop_visits', label: 'เยี่ยมชมร้านค้าให้ครบตามจำนวนครั้งต่อสัปดาห์' },
-  { value: 'referral', label: 'แนะนำเพื่อนให้เข้าร่วมโครงการ' },
-  { value: 'visit_diverse_shops', label: 'ใช้สิทธิ์กับร้านค้าหลายแห่ง' },
-];
-
 export const RecordEditorDialog: React.FC<Props> = ({ resource, record, campaigns, rewards, saving, conditionTypes, conditionTypesError, onManageConditionTypes, onClose, onSave }) => {
   const initialFormValues = initialValues(resource, record);
   const initialBadgeCondition = conditionTypes.find((condition) => condition.key === initialFormValues.conditionType);
@@ -194,6 +188,7 @@ export const RecordEditorDialog: React.FC<Props> = ({ resource, record, campaign
   const dialogRef = useRef<HTMLElement>(null);
   const content = titles[resource];
   const selectedConditionType = conditionTypes.find((condition) => condition.key === values.conditionType);
+  const selectedMissionConditionType = conditionTypes.find((condition) => condition.key === values.type);
   const badgeRecord = resource === 'badges' ? record as BadgeRecord | null : null;
   const badgeTierStructureCompatible = !badgeRecord || (
     badgeRecord.tierStructureCompatible && hasCanonicalBadgeTierStructure(badgeRecord.tiers)
@@ -303,6 +298,14 @@ export const RecordEditorDialog: React.FC<Props> = ({ resource, record, campaign
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError('');
+    if (resource === 'missions') {
+      const isRegisteredCondition = conditionTypes.some((condition) => condition.key === values.type);
+      const isUnchangedLegacyCondition = Boolean(record) && (record as MissionRecord).conditionType === values.type;
+      if (!isRegisteredCondition && !isUnchangedLegacyCondition) {
+        showValidationError('กรุณาเลือกประเภทเงื่อนไขจากรายการ หรือเพิ่มประเภทใหม่ในหน้าจัดการประเภทเงื่อนไข', 'mission-type');
+        return;
+      }
+    }
     if (resource === 'badges') {
       if (!badgeTierStructureCompatible) {
         showValidationError('เหรียญตรานี้มีระดับเดิมที่ไม่ตรงกับ 4 ระดับมาตรฐาน จึงป้องกันการบันทึกไว้ก่อน กรุณาตรวจสอบแผนปรับข้อมูลโดยรักษาประวัติเดิม');
@@ -394,7 +397,7 @@ export const RecordEditorDialog: React.FC<Props> = ({ resource, record, campaign
         payload = {
           questName: values.name.trim(),
           description: values.description.trim() || null,
-          questType: values.type.trim(),
+          conditionType: values.type.trim(),
           targetValue: Number(values.targetValue),
           campaignId: values.campaignId || null,
           rewardId: values.rewardId || null,
@@ -566,11 +569,18 @@ export const RecordEditorDialog: React.FC<Props> = ({ resource, record, campaign
                 <Field label="ชื่อภารกิจ" htmlFor="mission-name"><input id="mission-name" autoFocus required maxLength={150} value={values.name} onChange={(event) => set('name', event.target.value)} className={inputClass} placeholder="เช่น แวะร้านค้าในชุมชน 3 แห่ง" /></Field>
                 <Field label="รายละเอียด" htmlFor="mission-description"><textarea id="mission-description" rows={3} maxLength={1000} value={values.description} onChange={(event) => set('description', event.target.value)} className={`${inputClass} resize-y`} placeholder="อธิบายสิ่งที่ผู้ใช้ต้องทำ" /></Field>
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <Field label="ประเภทภารกิจ" htmlFor="mission-type" hint="เลือกกิจกรรมที่ใช้วัดความคืบหน้าของภารกิจ">
-                    <select id="mission-type" required value={values.type} onChange={(event) => set('type', event.target.value)} className={inputClass}>
-                      {!missionTypeOptions.some((option) => option.value === values.type) && <option value={values.type}>ประเภทเดิม: {values.type}</option>}
-                      {missionTypeOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                  <Field label="ประเภทเงื่อนไข" htmlFor="mission-type" hint="ใช้รายการประเภทเงื่อนไขเดียวกับเหรียญตรา">
+                    <select id="mission-type" required disabled={conditionTypesError} aria-describedby={conditionTypesError ? 'mission-type-hint mission-type-error' : selectedMissionConditionType?.description ? 'mission-type-hint mission-type-description' : 'mission-type-hint'} value={values.type} onChange={(event) => set('type', event.target.value)} className={`${inputClass} min-h-11`}>
+                      <option value="">เลือกประเภทเงื่อนไข</option>
+                      {record && !conditionTypes.some((condition) => condition.key === values.type) && <option value={values.type}>ประเภทเดิม: {values.type}</option>}
+                      {conditionTypes.map((condition) => <option key={condition.id} value={condition.key}>{condition.displayName} ({condition.key})</option>)}
                     </select>
+                    {conditionTypesError ? (
+                      <p id="mission-type-error" role="alert" className="mt-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-status-error">โหลดรายการประเภทเงื่อนไขไม่สำเร็จ กรุณาลองใหม่ก่อนสร้างภารกิจ</p>
+                    ) : selectedMissionConditionType?.description ? (
+                      <p id="mission-type-description" className="mt-2 text-xs leading-5 text-ink-muted">{selectedMissionConditionType.description}</p>
+                    ) : null}
+                    <button type="button" onClick={onManageConditionTypes} className="mt-2 min-h-11 rounded-pill border border-blue-200 bg-white px-3.5 text-xs font-semibold text-brand-blue hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-100">จัดการประเภทเงื่อนไข</button>
                   </Field>
                   <Field label="เป้าหมาย" htmlFor="mission-target"><input id="mission-target" required type="number" min="0.01" step="0.01" value={values.targetValue} onChange={(event) => set('targetValue', event.target.value)} className={inputClass} /></Field>
                   <Field label="แคมเปญ" htmlFor="mission-campaign">

@@ -40,7 +40,7 @@ export interface MissionRecord {
   rewardName: string | null;
   name: string;
   description: string | null;
-  type: string;
+  conditionType: string;
   targetValue: string;
   startsAt: string;
   endsAt: string;

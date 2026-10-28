@@ -89,7 +89,7 @@ const mapQuest = (row: any) => ({
   rewardName: row.rewards?.reward_name ?? null,
   name: row.quest_name,
   description: row.description,
-  type: row.quest_type,
+  conditionType: row.condition_type,
   targetValue: row.target_value.toString(),
   startsAt: toIso(row.starts_at),
   endsAt: toIso(row.ends_at),
@@ -127,6 +127,16 @@ const loadRewardRecord = async (db: any, rewardId: string) => {
 
 const assertDateRange = (start: Date, end: Date) => {
   if (start >= end) throw new GamificationServiceError('End date must be after start date', 400);
+};
+
+const assertQuestConditionTypeRegistered = async (conditionType: string) => {
+  const registeredType = await prisma.condition_types.findUnique({
+    where: { condition_key: conditionType },
+    select: { condition_type_id: true },
+  });
+  if (!registeredType) {
+    throw new GamificationServiceError('Quest condition type is not registered', 400);
+  }
 };
 
 const assertCampaignShares = (governmentShare: number, citizenShare: number) => {
@@ -323,13 +333,14 @@ export const gamificationService = {
     } })).map(mapQuest)
   ),
   createQuest: (input: any) => withDatabaseErrors(async () => {
+    await assertQuestConditionTypeRegistered(input.conditionType);
     assertDateRange(input.startsAt, input.endsAt);
     return mapQuest(await prisma.quests.create({ data: {
       campaign_id: input.campaignId ?? null,
       reward_id: input.rewardId ?? null,
       quest_name: input.questName,
       description: input.description ?? null,
-      quest_type: input.questType,
+      condition_type: input.conditionType,
       target_value: input.targetValue,
       starts_at: input.startsAt,
       ends_at: input.endsAt,
@@ -339,13 +350,16 @@ export const gamificationService = {
   updateQuest: (id: string, input: any) => withDatabaseErrors(async () => {
     const current = await prisma.quests.findUnique({ where: { quest_id: id } });
     if (!current) throw new GamificationServiceError('Record not found', 404);
+    if (input.conditionType !== undefined && input.conditionType !== current.condition_type) {
+      await assertQuestConditionTypeRegistered(input.conditionType);
+    }
     assertDateRange(input.startsAt ?? current.starts_at, input.endsAt ?? current.ends_at);
     return mapQuest(await prisma.quests.update({ where: { quest_id: id }, data: {
       ...(input.campaignId !== undefined && { campaign_id: input.campaignId }),
       ...(input.rewardId !== undefined && { reward_id: input.rewardId }),
       ...(input.questName !== undefined && { quest_name: input.questName }),
       ...(input.description !== undefined && { description: input.description }),
-      ...(input.questType !== undefined && { quest_type: input.questType }),
+      ...(input.conditionType !== undefined && { condition_type: input.conditionType }),
       ...(input.targetValue !== undefined && { target_value: input.targetValue }),
       ...(input.startsAt !== undefined && { starts_at: input.startsAt }),
       ...(input.endsAt !== undefined && { ends_at: input.endsAt }),

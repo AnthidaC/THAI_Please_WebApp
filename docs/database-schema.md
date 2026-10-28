@@ -53,7 +53,7 @@ The live table list includes objects whose creation is not fully represented in 
 | `reviews` | รีวิวและคะแนนประเมินร้านค้าหลังทำรายการ (จำกัด 24 ชม.) | Dev 3 |
 | `quests` | ภารกิจ Gamification ภายในแคมเปญ | Dev 4 |
 | `user_quests` | สถานะการทำภารกิจของผู้ใช้งาน | Dev 4 |
-| `badge_condition_types` | Thai condition metadata and implementation workflow; handler availability comes from the backend registry | Dev 4 |
+| `condition_types` | Shared Thai condition metadata for quests and badges; handler availability comes from the backend registry | Dev 4 |
 | `badges` | เหรียญตราความสำเร็จแบบหลายระดับ | Dev 4 |
 | `badge_tiers` | Tier names, levels, thresholds, and optional icons for each Badge series | Dev 4 |
 | `user_badge_history` | Permanent per-tier unlock timestamps | Dev 4 |
@@ -100,6 +100,8 @@ The three migrations that had been pending were reconciled as follows:
 - `202610270001_payment_pin_and_qr`: the two tables, exact column definitions, keys, foreign keys, expiry index, RLS settings, revoked Supabase API-role privileges, and partial unique paid-QR index were already present. The migration was marked applied; its table-creation SQL was not executed against the populated tables.
 - `20261027180000_rename_condition_catalog_table`: `public.badge_condition_types` existed and `public.achievement_condition_types` did not. The migration's post-state was already present, so Prisma recorded it as applied without another rename. The existing primary-key index name remains `achievement_condition_types_pkey` and is mapped in Prisma.
 - `20261027160000_campaign_period_exact_quota`: after the existing campaign was configured with three 1,000 THB periods, `migrate deploy` applied the exact-equality trigger. There are no period-enabled campaigns whose configured sum differs from the campaign total.
+
+Migration `20261029120000_rename_condition_types_and_link_quests` renames the shared catalog table to `condition_types`, renames `quests.quest_type` to `quests.condition_type`, and adds a restrictive foreign key from quests to `condition_types.condition_key`. Its preflight found no quest rows to remap.
 
 The models for `payment_pins` and `payment_qr_codes` already existed in Prisma and match the live columns, defaults, keys, foreign keys, and expiry index. `payment_pins.user_id` cascades from `users`; `payment_qr_codes.merchant_id` references `merchants` with the database default `NO ACTION`. RLS is enabled on both payment tables and no RLS policies are present. The payment PIN hash remains selected only inside the server-side verification flow.
 
@@ -152,7 +154,7 @@ Reconciliation timestamps missing unlocks at the time it runs, because the schem
 - Period quota rows remain independent. Unused quota expires at the period end and is never carried into a later period.
 - SQL CHECK constraints enforce per-row ranges. Deferred database triggers serialize period writes on the parent campaign and verify non-overlap, campaign containment, and the configured total at commit. Prisma ORM 6 does not model these triggers or cross-table rules; preserve their SQL migration definitions.
 
-Daily quota accounting uses the Bangkok calendar date, stored as PostgreSQL `DATE`. Wallet reads and checkout serialize daily resets with a wallet-row lock. `badge_condition_types.condition_key` is unique and referenced by `badges.condition_type`; its immutable-key trigger protects Badge references. The catalog stores display/workflow metadata only. Handler availability comes from the backend registry and must not be inferred from a catalog row alone.
+Daily quota accounting uses the Bangkok calendar date, stored as PostgreSQL `DATE`. Wallet reads and checkout serialize daily resets with a wallet-row lock. `condition_types.condition_key` is unique and referenced by both `badges.condition_type` and `quests.condition_type`; its immutable-key trigger protects both references. The catalog stores display/workflow metadata only. Handler availability comes from the backend registry and must not be inferred from a catalog row alone.
 
 On 2026-10-28, Campaign `11111111-1111-1111-1111-111111111111` retained its 3,000 THB total and was aligned to three exact Bangkok calendar months. October, November, and December now meet at `2026-10-31T17:00:00Z` and `2026-11-30T17:00:00Z`; December ends at `2026-12-31T17:00:00Z`. No completed transaction occurred in either one-second boundary window.
 

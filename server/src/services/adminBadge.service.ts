@@ -168,7 +168,7 @@ export const adminBadgeService = {
   listConditionTypes: async () => ({ supported: badgeConditionRegistry.listConditionTypes() }),
 
   create: (input: BadgeCreateInput) => withDatabaseErrors(async () => {
-    const conditionType = await prisma.badge_condition_types.findUnique({
+    const conditionType = await prisma.condition_types.findUnique({
       where: { condition_key: input.conditionType },
       select: { condition_key: true },
     });
@@ -291,7 +291,7 @@ export const adminBadgeService = {
       handlerRegistered: badgeConditionRegistry.has(badge.condition_type),
     });
     if (blocker) throw new AdminBadgeServiceError(blocker, 409);
-    const conditionType = await tx.badge_condition_types.findUnique({
+    const conditionType = await tx.condition_types.findUnique({
       where: { condition_key: badge.condition_type },
       select: { implementation_status: true },
     });

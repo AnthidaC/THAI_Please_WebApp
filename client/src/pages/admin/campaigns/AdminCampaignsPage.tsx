@@ -217,7 +217,7 @@ export const AdminCampaignsPage: React.FC = () => {
   const conditionTypesQuery = useQuery({
     queryKey: ['admin', 'gamification', 'condition-types'],
     queryFn: () => gamificationApi.conditionTypes(),
-    enabled: resource === 'badges' || conditionTypesOpen,
+    enabled: resource === 'badges' || resource === 'missions' || conditionTypesOpen,
   });
 
   const campaigns = campaignsQuery.data ?? [];
@@ -266,7 +266,7 @@ export const AdminCampaignsPage: React.FC = () => {
     const searchable = resource === 'campaigns'
       ? `${(record as CampaignRecord).name}`
       : resource === 'missions'
-        ? `${(record as MissionRecord).name} ${(record as MissionRecord).campaignName ?? ''} ${(record as MissionRecord).type}`
+        ? `${(record as MissionRecord).name} ${(record as MissionRecord).campaignName ?? ''} ${(record as MissionRecord).conditionType}`
         : resource === 'rewards'
           ? `${(record as RewardRecord).name} ${(record as RewardRecord).type}`
           : `${(record as BadgeRecord).name} ${(record as BadgeRecord).conditionType}`;
@@ -342,7 +342,7 @@ export const AdminCampaignsPage: React.FC = () => {
     if (resource === 'missions') {
       const item = record as MissionRecord;
       return [
-        <div key="primary" className="flex items-start gap-3"><div className="mt-0.5 rounded-xl bg-violet-50 p-2 text-violet-700"><Target className="h-4 w-4" /></div><div><p className="font-semibold text-ink">{item.name}</p><p className="mt-1 max-w-[260px] truncate text-xs text-ink-muted">{item.description || item.type}</p></div></div>,
+        <div key="primary" className="flex items-start gap-3"><div className="mt-0.5 rounded-xl bg-violet-50 p-2 text-violet-700"><Target className="h-4 w-4" /></div><div><p className="font-semibold text-ink">{item.name}</p><p className="mt-1 max-w-[260px] truncate text-xs text-ink-muted">{item.description || item.conditionType}</p></div></div>,
         <div key="links" className="min-w-[145px]"><p className="text-sm text-ink">{item.campaignName || 'ไม่ผูกแคมเปญ'}</p><p className="mt-1 text-xs text-ink-muted">รางวัล: {item.rewardName || 'ยังไม่กำหนด'}</p></div>,
         <div key="target" className="min-w-[100px]"><p className="font-mono text-sm font-medium text-ink">{formatNumber(item.targetValue)}</p><p className="mt-1 text-xs text-ink-muted">เป้าหมาย · {item.participantCount} คน</p></div>,
         <div key="date" className="min-w-[145px]"><p className="text-sm text-ink">{formatDate(item.startsAt)}</p><p className="mt-1 text-xs text-ink-muted">ถึง {formatDate(item.endsAt)}</p></div>,
