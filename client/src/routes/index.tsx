@@ -21,11 +21,13 @@ import { CitizenAchievementsPage } from '../pages/citizen/achievements/CitizenAc
 import { CitizenReviewPage } from '../pages/citizen/reviews/CitizenReviewPage';
 import { CitizenNearMePage } from '../pages/citizen/recommendations/CitizenNearMePage';
 import { CitizenMerchantDetailPage } from '../pages/citizen/merchants/CitizenMerchantDetailPage';
+import { CitizenPreferencesPage } from '../pages/citizen/preferences/CitizenPreferencesPage';
 import { CitizenProfilePage } from '../pages/citizen/profile/CitizenProfilePage';
 
 // Merchant Flow Pages
 import { MerchantPosQrPage } from '../pages/merchant/pos-qr/MerchantPosQrPage';
 import { MerchantSalesHistoryPage } from '../pages/merchant/sales/MerchantSalesHistoryPage';
+import { MerchantReviewsPage } from '../pages/merchant/reviews/MerchantReviewsPage';
 
 // Admin Flow Pages
 import { AdminFraudAlertsPage } from '../pages/admin/fraud-alerts/AdminFraudAlertsPage';
@@ -75,6 +77,10 @@ export const router = createBrowserRouter([
         element: <CitizenMerchantDetailPage />,
       },
       {
+        path: APP_ROUTES.CITIZEN_PREFERENCES,
+        element: <CitizenPreferencesPage />,
+      },
+      {
         path: APP_ROUTES.PROFILE,
         element: <CitizenProfilePage />,
       },
@@ -87,6 +93,10 @@ export const router = createBrowserRouter([
       {
         path: APP_ROUTES.MERCHANT_SALES,
         element: <MerchantSalesHistoryPage />,
+      },
+      {
+        path: APP_ROUTES.MERCHANT_REVIEWS,
+        element: <MerchantReviewsPage />,
       },
 
       // Admin routes

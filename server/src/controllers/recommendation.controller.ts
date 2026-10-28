@@ -7,6 +7,7 @@ import {
   recommendationTrackingService,
   RecommendationTrackingError,
 } from '../services/recommendation-tracking.service';
+import { preferenceService } from '../services/preference.service';
 import { getRecommendationsQuerySchema } from '../validations/recommendation.validation';
 import { recommendationTrackingParamSchema } from '../validations/recommendation-tracking.validation';
 import { sendSuccess, sendError } from '../utils/response';
@@ -34,6 +35,22 @@ export const getNearbyRecommendations = async (req: Request, res: Response): Pro
     // หากเป็น Guest จะได้ undefined/null ซึ่งระบบจะส่งคำแนะนำปกติโดยไม่บันทึก Impression Log
     const userId = req.user?.userId || null;
 
+    // โหลดประเภทร้านค้าที่ผู้ใช้สนใจ (Citizen Category Preferences) สำหรับปรับแต่งคำแนะนำ
+    let userPreferredCategories: string[] | undefined = undefined;
+    if (userId) {
+      try {
+        const userPrefs = await preferenceService.getUserPreferences(userId);
+        if (userPrefs && userPrefs.preferences.length > 0) {
+          userPreferredCategories = userPrefs.preferences.map((p) => p.categoryId);
+        }
+      } catch (prefErr: any) {
+        console.warn(
+          '[RecommendationController] Failed to load user preferences for recommendations:',
+          prefErr?.message
+        );
+      }
+    }
+
     // 3. ประมวลผลค้นหาและจัดอันดับร้านค้า (2-Stage Hybrid + Fallback)
     const result = await recommendationService.getRecommendations({
       userId,
@@ -41,6 +58,7 @@ export const getNearbyRecommendations = async (req: Request, res: Response): Pro
       longitude,
       radiusKm,
       limit,
+      userPreferredCategories,
     });
 
     sendSuccess(res, result, 'ดึงข้อมูลร้านค้าแนะนำสำเร็จ');

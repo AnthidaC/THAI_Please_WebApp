@@ -9,6 +9,7 @@ export interface CandidateMerchant {
   averageRating: number;
   transactionCount24h: number;
   baseScore: number; // คะแนนปกติ 0.00 - 1.00 จาก Rule-based Stage 1
+  categoryId?: string | null; // Canonical Category ID (5 Categories)
   contextKeywordHints?: string[]; // คำสำคัญช่วยวิเคราะห์บริบท (ไม่ใช่หมวดหมู่ยืนยันทางการ)
 }
 

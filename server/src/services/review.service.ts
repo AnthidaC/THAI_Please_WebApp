@@ -16,6 +16,7 @@ export interface CreateReviewInput {
   transactionId: string;
   ratingStars: number;
   reviewText?: string | null;
+  isAnonymous?: boolean;
 }
 
 export interface ReviewSubmissionResult {
@@ -26,6 +27,7 @@ export interface ReviewSubmissionResult {
   ratingStars: number;
   reviewText: string | null;
   isVerifiedPurchase: boolean;
+  isAnonymous: boolean;
   newMerchantAverageRating: number;
   totalMerchantReviews: number;
   createdAt: string;
@@ -80,9 +82,11 @@ function maskName(fullName: string): string {
  */
 export const createReview = async (
   userId: string,
-  input: CreateReviewInput
+  input: CreateReviewInput,
+  prismaClient: any = prisma,
+  skipBadgeAward = false
 ): Promise<ReviewSubmissionResult> => {
-  const transaction = await prisma.transactions.findUnique({
+  const transaction = await prismaClient.transactions.findUnique({
     where: { transaction_id: input.transactionId },
     include: {
       reviews: true,
@@ -98,12 +102,16 @@ export const createReview = async (
   if (!transaction || transaction.user_id !== userId) {
     throw new ReviewServiceError('ไม่พบข้อมูลธุรกรรมชำระเงินในระบบ', 404);
   }
-  if (!REVIEWABLE_STATUSES.includes(transaction.status)) {
+
+  // นโยบาย Payment-First: อนุญาตเฉพาะธุรกรรมที่ชำระเงินสำเร็จจริง (completed_at ไม่เป็น null)
+  if (!transaction.completed_at || !REVIEWABLE_STATUSES.includes(transaction.status)) {
     throw new ReviewServiceError('สามารถประเมินรีวิวได้เฉพาะธุรกรรมที่ชำระเงินสำเร็จเท่านั้น', 400);
   }
-  if (Date.now() - new Date(transaction.created_at).getTime() > REVIEW_WINDOW_MS) {
+
+  // หน้าต่างการรีวิว 24 ชั่วโมง: เริ่มนับจากเวลาชำระเงินสำเร็จ (transactions.completed_at)
+  if (Date.now() - new Date(transaction.completed_at).getTime() > REVIEW_WINDOW_MS) {
     throw new ReviewServiceError(
-      'สิทธิ์การประเมินรีวิวหมดอายุแล้ว (สามารถรีวิวได้ภายใน 24 ชม. หลังทำรายการ)',
+      'สิทธิ์การประเมินรีวิวหมดอายุแล้ว (สามารถรีวิวได้ภายใน 24 ชม. หลังชำระเงิน)',
       400
     );
   }
@@ -113,7 +121,7 @@ export const createReview = async (
 
   let result: ReviewSubmissionResult;
   try {
-    result = await prisma.$transaction(async (txPrisma) => {
+    result = await prismaClient.$transaction(async (txPrisma: any) => {
       // Row-level lock ของร้านค้าเพื่อป้องกัน Race condition
       await txPrisma.$queryRaw`
         SELECT merchant_id 
@@ -130,6 +138,7 @@ export const createReview = async (
           rating_stars: input.ratingStars,
           review_text: input.reviewText?.trim() || null,
           is_verified_purchase: true,
+          is_anonymous: Boolean(input.isAnonymous),
         },
       });
 
@@ -157,6 +166,7 @@ export const createReview = async (
         ratingStars: createdReview.rating_stars,
         reviewText: createdReview.review_text,
         isVerifiedPurchase: createdReview.is_verified_purchase,
+        isAnonymous: createdReview.is_anonymous,
         newMerchantAverageRating: newAverage,
         totalMerchantReviews: aggregate._count.rating_stars,
         createdAt: createdReview.created_at.toISOString(),
@@ -170,55 +180,155 @@ export const createReview = async (
   }
 
   // Post-commit: Gamification Badge Evaluation
-  await awardAfterActivity(userId, ['review_count'], 'review creation');
+  if (!skipBadgeAward) {
+    await awardAfterActivity(userId, ['review_count'], 'review creation');
+  }
 
   return result;
 };
 
 /**
- * ดึงข้อมูลการประเมินรีวิวของธุรกรรมเฉพาะราย (Authenticated)
+ * ดึงข้อมูลการประเมินรีวิวและความพร้อมใช้งานสิทธิ์รีวิวของธุรกรรมเฉพาะราย (Authenticated)
  */
-export const getReviewByTransactionId = async (userId: string, transactionId: string) => {
-  const review = await prisma.reviews.findUnique({
+export const getReviewByTransactionId = async (
+  userId: string,
+  transactionId: string,
+  prismaClient: any = prisma
+) => {
+  // ตรวจสอบทั้งสถานะธุรกรรมและข้อมูลรีวิวในคิวรีเดียว
+  const transaction = await prismaClient.transactions.findUnique({
     where: { transaction_id: transactionId },
     include: {
-      merchants: {
-        select: {
-          merchant_id: true,
-          shop_name: true,
+      reviews: {
+        include: {
+          merchants: {
+            select: {
+              merchant_id: true,
+              shop_name: true,
+            },
+          },
         },
       },
     },
   });
 
-  if (!review) {
-    return { reviewed: false, review: null };
+  if (!transaction) {
+    // Fallback: ตรวจสอบตาราง reviews โดยตรงเพื่อความเข้ากันได้
+    const review = await prismaClient.reviews.findUnique({
+      where: { transaction_id: transactionId },
+      include: {
+        merchants: {
+          select: {
+            merchant_id: true,
+            shop_name: true,
+          },
+        },
+      },
+    });
+
+    if (!review) {
+      return {
+        reviewed: false,
+        isEligible: false,
+        eligibilityStatus: 'NOT_ELIGIBLE' as const,
+        message: 'ไม่พบข้อมูลธุรกรรมในระบบ',
+        review: null,
+      };
+    }
+
+    if (review.user_id !== userId) {
+      throw new ReviewServiceError('ไม่มีสิทธิ์เข้าถึงข้อมูลรีวิวของธุรกรรมผู้อื่น', 403);
+    }
+
+    return {
+      reviewed: true,
+      isEligible: false,
+      eligibilityStatus: 'ALREADY_REVIEWED' as const,
+      message: 'ธุรกรรมนี้ได้รับการประเมินรีวิวไปแล้ว',
+      review: {
+        reviewId: review.review_id,
+        transactionId: review.transaction_id,
+        merchantId: review.merchant_id,
+        merchantName: review.merchants.shop_name,
+        ratingStars: review.rating_stars,
+        reviewText: review.review_text,
+        isVerifiedPurchase: review.is_verified_purchase,
+        isAnonymous: review.is_anonymous,
+        createdAt: review.created_at.toISOString(),
+      },
+    };
   }
 
-  if (review.user_id !== userId) {
+  if (transaction.user_id !== userId) {
     throw new ReviewServiceError('ไม่มีสิทธิ์เข้าถึงข้อมูลรีวิวของธุรกรรมผู้อื่น', 403);
   }
 
+  // 1. เคยประเมินรีวิวไปแล้ว
+  if (transaction.reviews) {
+    const rev = transaction.reviews;
+    return {
+      reviewed: true,
+      isEligible: false,
+      eligibilityStatus: 'ALREADY_REVIEWED' as const,
+      message: 'ธุรกรรมนี้ได้รับการประเมินรีวิวไปแล้ว',
+      review: {
+        reviewId: rev.review_id,
+        transactionId: rev.transaction_id,
+        merchantId: rev.merchant_id,
+        merchantName: rev.merchants.shop_name,
+        ratingStars: rev.rating_stars,
+        reviewText: rev.review_text,
+        isVerifiedPurchase: rev.is_verified_purchase,
+        isAnonymous: rev.is_anonymous,
+        createdAt: rev.created_at.toISOString(),
+      },
+    };
+  }
+
+  // 2. ตรวจสอบสถานะการชำระเงิน (ต้องชำระเงินสำเร็จจริง: completed_at ไม่เป็น null และสถานะอยู่ใน REVIEWABLE_STATUSES)
+  if (!transaction.completed_at || !REVIEWABLE_STATUSES.includes(transaction.status)) {
+    return {
+      reviewed: false,
+      isEligible: false,
+      eligibilityStatus: 'NOT_ELIGIBLE' as const,
+      message: 'สามารถประเมินรีวิวได้เฉพาะธุรกรรมที่ชำระเงินสำเร็จเท่านั้น',
+      review: null,
+    };
+  }
+
+  // 3. สิทธิ์รีวิวหมดอายุ 24 ชั่วโมง เริ่มนับจากเวลาชำระเงินสำเร็จ (transactions.completed_at)
+  const isExpired = Date.now() - new Date(transaction.completed_at).getTime() > REVIEW_WINDOW_MS;
+  const expiresAt = new Date(new Date(transaction.completed_at).getTime() + REVIEW_WINDOW_MS).toISOString();
+
+  if (isExpired) {
+    return {
+      reviewed: false,
+      isEligible: false,
+      eligibilityStatus: 'EXPIRED' as const,
+      message: 'สิทธิ์การประเมินรีวิวหมดอายุแล้ว (สามารถรีวิวได้ภายใน 24 ชม. หลังชำระเงิน)',
+      verificationTimestamp: new Date(transaction.completed_at).toISOString(),
+      expiresAt,
+      review: null,
+    };
+  }
+
+  // 4. มีสิทธิ์ส่งรีวิว (ชำระเงินสำเร็จ & ภายใน 24 ชม. & ยังไม่เคยรีวิว)
   return {
-    reviewed: true,
-    review: {
-      reviewId: review.review_id,
-      transactionId: review.transaction_id,
-      merchantId: review.merchant_id,
-      merchantName: review.merchants.shop_name,
-      ratingStars: review.rating_stars,
-      reviewText: review.review_text,
-      isVerifiedPurchase: review.is_verified_purchase,
-      createdAt: review.created_at.toISOString(),
-    },
+    reviewed: false,
+    isEligible: true,
+    eligibilityStatus: 'ELIGIBLE' as const,
+    message: null,
+    verificationTimestamp: new Date(transaction.completed_at).toISOString(),
+    expiresAt,
+    review: null,
   };
 };
 
 /**
  * ดึงประวัติการประเมินรีวิวทั้งหมดของผู้ใช้งานปัจจุบัน (Authenticated)
  */
-export const getUserReviews = async (userId: string) => {
-  const reviews = await prisma.reviews.findMany({
+export const getUserReviews = async (userId: string, prismaClient: any = prisma) => {
+  const reviews = await prismaClient.reviews.findMany({
     where: { user_id: userId },
     include: {
       merchants: {
@@ -240,7 +350,7 @@ export const getUserReviews = async (userId: string) => {
     orderBy: { created_at: 'desc' },
   });
 
-  return reviews.map((r) => ({
+  return reviews.map((r: any) => ({
     reviewId: r.review_id,
     transactionId: r.transaction_id,
     merchantId: r.merchant_id,
@@ -249,6 +359,7 @@ export const getUserReviews = async (userId: string) => {
     ratingStars: r.rating_stars,
     reviewText: r.review_text,
     isVerifiedPurchase: r.is_verified_purchase,
+    isAnonymous: r.is_anonymous,
     totalAmount: r.transactions ? Number(r.transactions.total_amount) : undefined,
     citizenPaidAmount: r.transactions ? Number(r.transactions.citizen_paid_amount) : undefined,
     transactionDate: r.transactions ? r.transactions.created_at.toISOString() : undefined,
@@ -262,9 +373,10 @@ export const getUserReviews = async (userId: string) => {
 export const getMerchantReviews = async (
   merchantId: string,
   page = 1,
-  limit = 10
+  limit = 10,
+  prismaClient: any = prisma
 ): Promise<MerchantReviewsResult> => {
-  const merchant = await prisma.merchants.findUnique({
+  const merchant = await prismaClient.merchants.findUnique({
     where: { merchant_id: merchantId },
     select: {
       merchant_id: true,
@@ -278,7 +390,7 @@ export const getMerchantReviews = async (
   }
 
   const skip = (page - 1) * limit;
-  const allRatingStars = await prisma.reviews.findMany({
+  const allRatingStars = await prismaClient.reviews.findMany({
     where: { merchant_id: merchantId },
     select: { rating_stars: true },
   });
@@ -291,7 +403,7 @@ export const getMerchantReviews = async (
     }
   }
 
-  const reviews = await prisma.reviews.findMany({
+  const reviews = await prismaClient.reviews.findMany({
     where: { merchant_id: merchantId },
     orderBy: { created_at: 'desc' },
     skip,
@@ -319,12 +431,12 @@ export const getMerchantReviews = async (
       totalPages: Math.ceil(totalItems / limit) || 1,
       totalItems,
     },
-    reviews: reviews.map((r) => ({
+    reviews: reviews.map((r: any) => ({
       reviewId: r.review_id,
       ratingStars: r.rating_stars,
       reviewText: r.review_text,
       isVerifiedPurchase: r.is_verified_purchase,
-      reviewerName: maskName(r.users.full_name),
+      reviewerName: r.is_anonymous ? 'ผู้ใช้งานไม่ประสงค์ออกนาม' : maskName(r.users?.full_name || ''),
       createdAt: r.created_at.toISOString(),
     })),
   };

@@ -15,10 +15,12 @@ export const APP_ROUTES = {
   CITIZEN_REFERRALS: '/citizen/referrals',
   CITIZEN_REVIEW: '/citizen/review',
   CITIZEN_ACHIEVEMENTS: '/citizen/achievements',
+  CITIZEN_PREFERENCES: '/citizen/preferences',
 
   // เส้นทางร้านค้า (Merchant Flow)
   MERCHANT_POS_QR: '/merchant/pos-qr',
   MERCHANT_SALES: '/merchant/sales',
+  MERCHANT_REVIEWS: '/merchant/reviews',
 
   // เส้นทางผู้ดูแลระบบ (Admin Flow)
   ADMIN_ROOT: '/admin',
