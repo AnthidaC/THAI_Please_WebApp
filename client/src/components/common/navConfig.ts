@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import { Home, Wallet, ScanLine, Store, User, QrCode, ShieldAlert, TrendingUp, Star } from 'lucide-react';
+import { Home, Wallet, ScanLine, Store, User, QrCode, ShieldAlert, TrendingUp, Star, Megaphone } from 'lucide-react';
 import { APP_ROUTES } from '../../constants/routes';
 
 /**
@@ -40,6 +40,7 @@ export const NAV_BY_ROLE: Record<NavRole, NavItem[]> = {
   ],
   ADMIN: [
     { to: APP_ROUTES.ADMIN_FRAUD_ALERTS, label: 'ตรวจทุจริต', fullLabel: 'ตรวจจับทุจริต', icon: ShieldAlert },
+    { to: APP_ROUTES.ADMIN_CAMPAIGNS, label: 'แคมเปญ', fullLabel: 'แคมเปญและสิทธิประโยชน์', icon: Megaphone },
   ],
 };
 
