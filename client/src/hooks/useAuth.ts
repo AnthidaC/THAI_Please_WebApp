@@ -7,7 +7,7 @@ export const useLogin = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: () => authApi.demoCitizenLogin(),
+    mutationFn: () => authApi.demoLogin('CITIZEN'),
     onSuccess: (data) => {
       setAuth(data.data.user, data.data.token);
       queryClient.setQueryData(['currentUser'], data.data.user);

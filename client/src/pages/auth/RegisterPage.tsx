@@ -14,7 +14,7 @@ export const RegisterPage: React.FC = () => (
     </div>
 
     <div role="status" className="rounded-xl border border-hairline bg-surface-soft/50 p-4 text-sm leading-6 text-ink-muted">
-      การลงทะเบียนต้องยืนยันตัวตนผ่าน ThaiD หรือ NDID ซึ่งยังไม่พร้อมใช้งานในระบบนี้ จึงยังไม่สามารถสร้างบัญชีจากข้อมูลที่กรอกเองได้
+      การสร้างบัญชีใหม่ยังไม่เปิดใช้ในระบบทดสอบ กรุณาเข้าสู่ระบบด้วยบัญชีจำลองที่ผู้พัฒนากำหนดไว้
     </div>
 
     <div className="border-t border-hairline pt-4 text-center text-xs text-ink-muted">

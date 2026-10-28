@@ -3,55 +3,68 @@ import { prisma } from '../utils/prisma';
 import { signToken, TokenPayload } from '../utils/jwt';
 import { env } from '../config/env';
 import { cache } from '../utils/redis';
+import { DEMO_LOGIN_ROLES, DemoLoginRole } from '../validations/auth.validation';
 
-interface DemoCitizenUser {
-  user_id: string;
-  full_name: string;
-  created_at: Date;
+interface DemoAccount {
+  id: string;
+  name: string;
+  createdAt: Date;
 }
 
-interface DemoCitizenLoginOptions {
+interface DemoLoginOptions {
   nodeEnv: string;
   enabled: boolean;
-  allowedUserIds: readonly string[];
-  findUserById: (userId: string) => Promise<DemoCitizenUser | null>;
+  allowedAccountIds: Record<DemoLoginRole, readonly string[]>;
+  findAccount: (role: DemoLoginRole, accountId: string) => Promise<DemoAccount | null>;
   issueToken: (payload: TokenPayload) => string;
 }
 
-export const createDemoCitizenLoginHandler = (options: DemoCitizenLoginOptions) => async (
+export const createDemoLoginHandler = (options: DemoLoginOptions) => async (
   req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
-  if (options.nodeEnv !== 'development' || !options.enabled || options.allowedUserIds.length === 0) {
-    res.status(404).json({ status: 'error', message: 'ไม่เปิดใช้งานการเข้าสู่ระบบทดสอบ' });
+  if (options.nodeEnv !== 'development' || !options.enabled) {
+    res.status(404).json({ status: 'error', message: 'ไม่เปิดใช้งานบัญชีจำลอง' });
     return;
   }
 
-  const allowedUserIds = new Set(options.allowedUserIds.map((userId) => userId.toLowerCase()));
-  const requestedId = typeof req.body?.userId === 'string' ? req.body.userId.toLowerCase() : undefined;
-  const userId = requestedId ?? (allowedUserIds.size === 1 ? [...allowedUserIds][0] : undefined);
-  if (!userId || !allowedUserIds.has(userId)) {
+  const requestedRole = req.body?.role;
+  if (typeof requestedRole !== 'string' || !DEMO_LOGIN_ROLES.includes(requestedRole as DemoLoginRole)) {
+    res.status(400).json({ status: 'error', message: 'กรุณาเลือกประเภทบัญชีจำลองให้ถูกต้อง' });
+    return;
+  }
+  const role = requestedRole as DemoLoginRole;
+
+  const allowedAccountIds = new Set(options.allowedAccountIds[role].map((accountId) => accountId.toLowerCase()));
+  if (allowedAccountIds.size === 0) {
+    res.status(404).json({ status: 'error', message: 'ยังไม่ได้กำหนดบัญชีจำลองสำหรับบทบาทนี้' });
+    return;
+  }
+
+  const requestedId = typeof req.body?.accountId === 'string' ? req.body.accountId.toLowerCase() : undefined;
+  const accountId = requestedId ?? (allowedAccountIds.size === 1 ? [...allowedAccountIds][0] : undefined);
+  if (!accountId || !allowedAccountIds.has(accountId)) {
     res.status(403).json({ status: 'error', message: 'บัญชีนี้ไม่ได้รับอนุญาตให้เข้าสู่ระบบทดสอบ' });
     return;
   }
 
   try {
-    const user = await options.findUserById(userId);
-    if (!user) {
-      res.status(404).json({ status: 'error', message: 'ไม่พบบัญชีทดสอบประชาชนที่กำหนดไว้' });
+    const account = await options.findAccount(role, accountId);
+    if (!account) {
+      res.status(404).json({ status: 'error', message: 'ไม่พบบัญชีจำลองที่กำหนดไว้หรือบัญชีไม่พร้อมใช้งาน' });
       return;
     }
 
-    const token = options.issueToken({ userId: user.user_id, role: 'CITIZEN', isDemo: true });
+    const token = options.issueToken({ userId: account.id, role, isDemo: true });
     res.json({
       status: 'success',
       data: {
         user: {
-          id: user.user_id,
-          name: user.full_name,
-          role: 'USER',
-          createdAt: user.created_at.toISOString(),
+          id: account.id,
+          name: account.name,
+          role: role === 'CITIZEN' ? 'USER' : role,
+          createdAt: account.createdAt.toISOString(),
         },
         token,
       },
@@ -61,14 +74,39 @@ export const createDemoCitizenLoginHandler = (options: DemoCitizenLoginOptions) 
   }
 };
 
-export const demoCitizenLogin = createDemoCitizenLoginHandler({
+export const demoLogin = createDemoLoginHandler({
   nodeEnv: env.NODE_ENV,
-  enabled: env.DEMO_CITIZEN_AUTH_ENABLED,
-  allowedUserIds: env.DEMO_CITIZEN_USER_IDS,
-  findUserById: (userId) => prisma.user.findUnique({
-    where: { user_id: userId },
-    select: { user_id: true, full_name: true, created_at: true },
-  }),
+  enabled: env.DEMO_AUTH_ENABLED,
+  allowedAccountIds: {
+    CITIZEN: env.DEMO_CITIZEN_USER_IDS,
+    MERCHANT: env.DEMO_MERCHANT_IDS,
+    ADMIN: env.DEMO_ADMIN_STAFF_IDS,
+  },
+  findAccount: async (role, accountId) => {
+    if (role === 'CITIZEN') {
+      const user = await prisma.user.findUnique({
+        where: { user_id: accountId },
+        select: { user_id: true, full_name: true, created_at: true },
+      });
+      return user ? { id: user.user_id, name: user.full_name, createdAt: user.created_at } : null;
+    }
+
+    if (role === 'MERCHANT') {
+      const merchant = await prisma.merchants.findUnique({
+        where: { merchant_id: accountId },
+        select: { merchant_id: true, shop_name: true, created_at: true },
+      });
+      return merchant ? { id: merchant.merchant_id, name: merchant.shop_name, createdAt: merchant.created_at } : null;
+    }
+
+    const staff = await prisma.staff_accounts.findUnique({
+      where: { staff_id: accountId },
+      select: { staff_id: true, full_name: true, created_at: true, role: true, is_active: true },
+    });
+    return staff?.role === 'ADMIN' && staff.is_active
+      ? { id: staff.staff_id, name: staff.full_name, createdAt: staff.created_at }
+      : null;
+  },
   issueToken: signToken,
 });
 

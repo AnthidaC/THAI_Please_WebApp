@@ -4,10 +4,15 @@ import { AlertCircle, ArrowRight, LoaderCircle, LogIn, ShieldAlert, Store, User 
 import { useAuthStore } from '../../stores/authStore';
 import { APP_ROUTES, homeRouteForRole } from '../../constants/routes';
 import { authApi } from '../../services/authApi';
-import { User as AppUser } from '../../types';
+import { DemoLoginRole, User as AppUser } from '../../types';
 
-const demoCitizenLoginEnabled = import.meta.env.DEV
-  && import.meta.env.VITE_DEMO_CITIZEN_AUTH_ENABLED === 'true';
+const demoLoginEnabled = import.meta.env.DEV && import.meta.env.VITE_DEMO_AUTH_ENABLED === 'true';
+
+const demoAccountIdForRole: Partial<Record<DemoLoginRole, string | undefined>> = {
+  CITIZEN: import.meta.env.VITE_DEMO_CITIZEN_USER_ID,
+  MERCHANT: import.meta.env.VITE_DEMO_MERCHANT_ID,
+  ADMIN: import.meta.env.VITE_DEMO_ADMIN_STAFF_ID,
+};
 
 const safeTargetForRole = (role: AppUser['role'], requestedPath?: string): string => {
   const allowedPrefix = role === 'ADMIN' ? '/admin' : role === 'MERCHANT' ? '/merchant' : '/citizen';
@@ -22,53 +27,25 @@ export const LoginPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const from = (location.state as { from?: { pathname: string } } | null)?.from?.pathname;
 
-  const handleCitizenDemoLogin = async () => {
+  const handleDemoLogin = async (role: DemoLoginRole) => {
     if (useAuthStore.getState().isAuthenticated) {
-      setErrorMsg('กรุณาออกจากระบบบัญชีปัจจุบันก่อนเข้าสู่บัญชีทดสอบ');
+      setErrorMsg('กรุณาออกจากระบบบัญชีปัจจุบันก่อนเปลี่ยนบัญชีทดสอบ');
       return;
     }
 
     setErrorMsg(null);
     setIsLoading(true);
     try {
-      const response = await authApi.demoCitizenLogin(import.meta.env.VITE_DEMO_CITIZEN_USER_ID);
+      const response = await authApi.demoLogin(role, demoAccountIdForRole[role]);
       setAuth(response.data.user, response.data.token);
-      navigate(safeTargetForRole('USER', from), { replace: true });
+      navigate(safeTargetForRole(response.data.user.role, from), { replace: true });
     } catch (error) {
       const responseMessage = (error as { response?: { data?: { message?: string } } })
         .response?.data?.message;
-      setErrorMsg(responseMessage || 'เข้าสู่ระบบทดสอบไม่สำเร็จ กรุณาตรวจสอบการตั้งค่าบัญชีทดสอบ');
+      setErrorMsg(responseMessage || 'เข้าสู่ระบบบัญชีจำลองไม่สำเร็จ กรุณาตรวจสอบบัญชีที่กำหนดไว้');
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleRoleDemoLogin = (role: 'ADMIN' | 'MERCHANT') => {
-    if (useAuthStore.getState().isAuthenticated) {
-      setErrorMsg('กรุณาออกจากระบบบัญชีปัจจุบันก่อนเปลี่ยนบัญชีทดสอบ');
-      return;
-    }
-
-    const users: Record<'ADMIN' | 'MERCHANT', AppUser> = {
-      ADMIN: {
-        id: 'admin-001',
-        email: 'admin.super@thaiplease.go.th',
-        name: 'ผู้ดูแลระบบส่วนกลาง',
-        role: 'ADMIN',
-        createdAt: new Date().toISOString(),
-      },
-      MERCHANT: {
-        id: '4ebb77a7-2248-4c67-a56e-d5cdfcbb210b',
-        email: 'chickenrice.shop@thaiplease.go.th',
-        name: 'ร้านค้าทดสอบ',
-        role: 'MERCHANT',
-        createdAt: new Date().toISOString(),
-      },
-    };
-
-    setErrorMsg(null);
-    setAuth(users[role], `demo-token-${role.toLowerCase()}`);
-    navigate(safeTargetForRole(role, from), { replace: true });
   };
 
   return (
@@ -82,7 +59,7 @@ export const LoginPage: React.FC = () => {
       </div>
 
       <div className="rounded-xl border border-hairline bg-surface-soft/50 p-4 text-sm leading-6 text-ink-muted">
-        การเข้าสู่ระบบประชาชนต้องยืนยันตัวตนผ่าน ThaiD หรือ NDID ซึ่งยังไม่พร้อมใช้งานในระบบนี้
+        ระบบนี้ใช้บัญชีจำลองที่กำหนดไว้สำหรับทดสอบ Citizen, ร้านค้า และผู้ดูแลระบบในสภาพแวดล้อมพัฒนา
       </div>
 
       {errorMsg && (
@@ -92,35 +69,25 @@ export const LoginPage: React.FC = () => {
         </div>
       )}
 
-      {demoCitizenLoginEnabled && (
-        <button
-          type="button"
-          id="btn-demo-citizen"
-          onClick={handleCitizenDemoLogin}
-          disabled={isLoading}
-          className="group flex min-h-12 w-full items-center justify-between rounded-xl border border-blue-200 bg-blue-50 p-3 text-left text-sm font-medium text-ink transition hover:bg-blue-100 disabled:cursor-wait disabled:opacity-60"
-        >
-          <span className="flex items-center gap-3">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-100 text-brand-blue">
-              {isLoading ? <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" /> : <User className="h-4 w-4" aria-hidden="true" />}
-            </span>
-            <span>
-              <span className="block font-bold">เข้าสู่ระบบบัญชีทดสอบประชาชน</span>
-              <span className="block text-xs text-ink-muted">สำหรับทดสอบในสภาพแวดล้อมพัฒนาเท่านั้น</span>
-            </span>
-          </span>
-          <ArrowRight className="h-4 w-4 text-ink-muted transition group-hover:translate-x-1 group-hover:text-brand-blue" aria-hidden="true" />
-        </button>
-      )}
-
-      {import.meta.env.DEV && (
+      {demoLoginEnabled && (
         <div className="space-y-2 border-t border-hairline pt-4">
-          <p className="text-center text-xs font-semibold text-ink-muted">บัญชีทดสอบสำหรับผู้ดูแลและร้านค้า</p>
+          <p className="text-center text-xs font-semibold text-ink-muted">เลือกบทบาทบัญชีจำลอง</p>
+          <button
+            type="button"
+            id="btn-demo-citizen"
+            onClick={() => handleDemoLogin('CITIZEN')}
+            disabled={isLoading}
+            className="group flex min-h-11 w-full items-center justify-between rounded-xl border border-hairline bg-surface-soft/60 p-3 text-left text-xs font-medium text-ink transition hover:border-blue-200 hover:bg-blue-50 disabled:cursor-wait disabled:opacity-60"
+          >
+            <span className="flex items-center gap-3"><User className="h-4 w-4 text-brand-blue" aria-hidden="true" />เข้าสู่ระบบประชาชนทดสอบ</span>
+            {isLoading ? <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" /> : <ArrowRight className="h-4 w-4 text-ink-muted transition group-hover:translate-x-1" aria-hidden="true" />}
+          </button>
           <button
             type="button"
             id="btn-demo-merchant"
-            onClick={() => handleRoleDemoLogin('MERCHANT')}
-            className="group flex min-h-11 w-full items-center justify-between rounded-xl border border-hairline bg-surface-soft/60 p-3 text-left text-xs font-medium text-ink transition hover:border-emerald-200 hover:bg-emerald-50"
+            onClick={() => handleDemoLogin('MERCHANT')}
+            disabled={isLoading}
+            className="group flex min-h-11 w-full items-center justify-between rounded-xl border border-hairline bg-surface-soft/60 p-3 text-left text-xs font-medium text-ink transition hover:border-emerald-200 hover:bg-emerald-50 disabled:cursor-wait disabled:opacity-60"
           >
             <span className="flex items-center gap-3"><Store className="h-4 w-4 text-emerald-700" aria-hidden="true" />เข้าสู่ระบบร้านค้าทดสอบ</span>
             <ArrowRight className="h-4 w-4 text-ink-muted transition group-hover:translate-x-1" aria-hidden="true" />
@@ -128,11 +95,12 @@ export const LoginPage: React.FC = () => {
           <button
             type="button"
             id="btn-demo-admin"
-            onClick={() => handleRoleDemoLogin('ADMIN')}
-            className="group flex min-h-11 w-full items-center justify-between rounded-xl border border-hairline bg-surface-soft/60 p-3 text-left text-xs font-medium text-ink transition hover:border-red-200 hover:bg-red-50"
+            onClick={() => handleDemoLogin('ADMIN')}
+            disabled={isLoading}
+            className="group flex min-h-11 w-full items-center justify-between rounded-xl border border-hairline bg-surface-soft/60 p-3 text-left text-xs font-medium text-ink transition hover:border-red-200 hover:bg-red-50 disabled:cursor-wait disabled:opacity-60"
           >
             <span className="flex items-center gap-3"><ShieldAlert className="h-4 w-4 text-status-error" aria-hidden="true" />เข้าสู่ระบบผู้ดูแลทดสอบ</span>
-            <ArrowRight className="h-4 w-4 text-ink-muted transition group-hover:translate-x-1" aria-hidden="true" />
+            {isLoading ? <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" /> : <ArrowRight className="h-4 w-4 text-ink-muted transition group-hover:translate-x-1" aria-hidden="true" />}
           </button>
         </div>
       )}

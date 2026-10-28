@@ -1,21 +1,27 @@
-# Citizen authentication
+# Authentication and development mock accounts
 
-## Current boundary
+## Current authentication boundary
 
-Production Citizen login and registration are unavailable until ThaiD or NDID identity proof is integrated. A citizen ID, name, or email sent by the browser is not proof of identity; `/api/auth/login` and `/api/auth/register` are not mounted.
+The application does not integrate with ThaiD, NDID, or another external identity provider. It also does not currently provide password-based login or self-service registration. The login screen offers development mock accounts for Citizens, Merchants, and Admins when explicitly enabled.
 
-Citizen profile, wallet, payment PIN, transaction history, review, and achievement routes require a verified Bearer JWT with the `CITIZEN` role. Private identity is always taken from the verified token's `userId`; these routes do not use a caller-supplied user ID to select another account. Admin routes continue to require the Admin role.
+Protected APIs still require a signed, expiring Bearer JWT. The server issues mock-session JWTs only after checking a configured account ID against the allowlist for that role and confirming the account exists. Citizen identity is taken from the verified token's `userId`; private APIs must not select identity from a caller-supplied user ID. Admin and Merchant authorization continues to check the verified role.
 
-## Development demo login
+## Enable development mock login
 
-The optional `POST /api/auth/demo-citizen-login` route is mounted only when all these conditions hold:
+Set the following backend variables in a local development environment:
 
-- `NODE_ENV=development`
-- `DEMO_CITIZEN_AUTH_ENABLED=true`
-- `DEMO_CITIZEN_USER_IDS` contains one or more comma-separated UUIDs for explicitly provisioned synthetic Citizen test accounts
+```dotenv
+NODE_ENV=development
+DEMO_AUTH_ENABLED=true
+DEMO_CITIZEN_USER_IDS=<synthetic users.user_id UUIDs>
+DEMO_MERCHANT_IDS=<synthetic merchants.merchant_id UUIDs>
+DEMO_ADMIN_STAFF_IDS=<active synthetic staff_accounts.staff_id UUIDs with role ADMIN>
+```
 
-The backend fails startup if demo authentication is enabled outside development or if its allowlist is empty, malformed, or duplicated. The request may omit `userId` when exactly one account is allowlisted; with multiple accounts it must select an allowlisted ID. The backend confirms the selected account exists in `users` and signs a normal expiring JWT using the application's configured JWT secret. It returns only the account ID, display name, role, and creation time.
+IDs are comma-separated when a role has several test accounts. If exactly one ID is configured for a role, the login request can omit `accountId`; if there are several, the client must select an allowlisted ID. Configure the matching optional `VITE_DEMO_CITIZEN_USER_ID`, `VITE_DEMO_MERCHANT_ID`, or `VITE_DEMO_ADMIN_STAFF_ID` in the Vite development environment when selecting among multiple accounts. The browser never decides which account IDs are trusted; the backend allowlists are authoritative.
 
-The Citizen demo button is shown only in a Vite development build with `VITE_DEMO_CITIZEN_AUTH_ENABLED=true`. An optional `VITE_DEMO_CITIZEN_USER_ID` chooses one account from the server allowlist; the server remains authoritative. Keep these variables out of production configuration and never add a real person's account to the demo allowlist.
+Mock login is disabled by default, is mounted only in development, and fails configuration validation if enabled outside development or if any configured ID is malformed or duplicated. The endpoint is `POST /api/auth/demo-login` with `{ "role": "CITIZEN" | "MERCHANT" | "ADMIN", "accountId"?: "<UUID>" }`. Admin mock login accepts only active staff accounts whose database role is `ADMIN`. No mock session can grant a different role than the requested and server-validated role.
 
-The browser clears the local session after an API returns HTTP 401. Role-gated routes redirect to the matching login flow, and a Citizen session cannot enter Admin or Merchant routes.
+Use only isolated synthetic test accounts in these allowlists. Do not use a real Citizen, Merchant, or Staff account. Static tokens such as `demo-token` are not supported, and no login path falls back to the first database account.
+
+The browser stores the returned session using the existing auth store. A 401 clears the session, role-gated routes enforce their existing boundaries, and logging out clears the current session.

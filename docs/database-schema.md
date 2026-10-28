@@ -31,7 +31,7 @@ The live table list includes objects whose creation is not fully represented in 
 | ตาราง | วัตถุประสงค์ / ความสัมพันธ์ | ผู้รับผิดชอบ (Dev) |
 | :--- | :--- | :---: |
 | `users` | ข้อมูลประชาชน (`citizen_id_hash`, `province_code`, `is_registered_thai_plus`) | Dev 1 |
-| `auth_identities` | Email identity registry for password-based merchant applications and staff accounts; citizens continue to use ThaiD/NDID | Dev 1 |
+| `auth_identities` | Email identity registry for merchant applications and staff accounts; the current app does not use an external identity provider | Dev 1 |
 | `staff_accounts` | Staff identities used to review merchant applications and location requests | Dev 1 |
 | `wallets` | กระเป๋าเงินดิจิทัลประชาชน เชื่อมกับ `campaigns` และ `users` | Dev 2 |
 | `wallet_period_quotas` | Per-wallet quota usage for a campaign period | Dev 2 |
@@ -89,7 +89,7 @@ Run `migrate dev` only against an isolated local database; it can modify its tar
 
 The original `20261027000000_auth_identities_and_staff_roles` migration was recovered from remote-tracking branch `origin/developer-1-identity-admin-dashboard`, commit `8dbeeb6220754313be45d9f51fe8d97a4ef199ab` (`home-role-edit`). Its original path is `server/prisma/migrations/20261027000000_auth_identities_and_staff_roles/migration.sql`; the companion `down.sql` was restored from the same commit. The SHA-256 of the original Git blob and restored file is `89bf94fae6d5238541f60247555a33d6dd99e73d3ff00484e29ed4f2e6bb37ee`, identical to the successful `_prisma_migrations` record. The database records it as applied on 2026-10-27.
 
-The migration changes the staff role check to `ADMIN` / `GOVERNMENT_EXECUTIVE`, creates `auth_identities`, backfills active merchant applications and staff accounts, and maintains the registry with triggers. `account_id` is intentionally polymorphic, so the table has no foreign key to either source table. Citizen login remains on the ThaiD/NDID path. The current Prisma model represents its columns and unique key; PostgreSQL check constraints and synchronization triggers stay in SQL.
+The migration changes the staff role check to `ADMIN` / `GOVERNMENT_EXECUTIVE`, creates `auth_identities`, backfills active merchant applications and staff accounts, and maintains the registry with triggers. `account_id` is intentionally polymorphic, so the table has no foreign key to either source table. The app uses development-only mock login for configured test accounts and has no ThaiD or NDID integration. The current Prisma model represents its columns and unique key; PostgreSQL check constraints and synchronization triggers stay in SQL.
 
 ### Current development database status
 

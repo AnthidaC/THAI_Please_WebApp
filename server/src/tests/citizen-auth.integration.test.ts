@@ -16,6 +16,8 @@ if (!/^dev2_citizen_e2e_[a-f0-9]{32}$/.test(schema)) throw new Error('Invalid is
 const campaignId = randomUUID();
 const firstCitizenId = randomUUID();
 const secondCitizenId = randomUUID();
+const merchantId = randomUUID();
+const adminStaffId = randomUUID();
 
 const bangkokMonthStart = (year: number, month: number): Date => new Date(Date.UTC(year, month, 1, -7));
 
@@ -33,8 +35,10 @@ const main = async () => {
   process.env.CLIENT_URL = 'http://localhost:5174';
   process.env.DATABASE_URL = sourceUrl;
   process.env.DIRECT_URL = sourceUrl;
-  process.env.DEMO_CITIZEN_AUTH_ENABLED = 'true';
+  process.env.DEMO_AUTH_ENABLED = 'true';
   process.env.DEMO_CITIZEN_USER_IDS = firstCitizenId;
+  process.env.DEMO_MERCHANT_IDS = merchantId;
+  process.env.DEMO_ADMIN_STAFF_IDS = adminStaffId;
   process.env.REDIS_URL = '';
   process.env.UPSTASH_REDIS_REST_URL = '';
   process.env.UPSTASH_REDIS_REST_TOKEN = '';
@@ -104,6 +108,27 @@ const main = async () => {
       })
     ));
 
+    await db.merchants.create({
+      data: {
+        merchant_id: merchantId,
+        tax_id: `test-${randomUUID().replace(/-/g, '').slice(0, 15)}`,
+        shop_name: 'Synthetic Merchant',
+        latitude: 13.7563,
+        longitude: 100.5018,
+        is_approved: true,
+      },
+    });
+    await db.staff_accounts.create({
+      data: {
+        staff_id: adminStaffId,
+        email: `synthetic-${randomUUID()}@example.test`,
+        full_name: 'Synthetic Admin',
+        password_hash: 'not-used-by-demo-login',
+        role: 'ADMIN',
+        is_active: true,
+      },
+    });
+
     const syntheticPin = randomInt(0, 1_000_000).toString().padStart(6, '0');
     await db.payment_pins.create({
       data: {
@@ -151,17 +176,35 @@ const main = async () => {
     const health = await fetchJson(baseUrl, '/health');
     assert.equal(health.response.status, 200);
 
-    const login = await fetchJson(baseUrl, '/auth/demo-citizen-login', undefined, { method: 'POST', body: '{}' });
+    const login = await fetchJson(baseUrl, '/auth/demo-login', undefined, {
+      method: 'POST', body: JSON.stringify({ role: 'CITIZEN' }),
+    });
     assert.equal(login.response.status, 200);
     assert.equal(login.body.data.user.id, firstCitizenId);
     assert.equal(login.body.data.user.role, 'USER');
     assert.equal('citizen_id_hash' in login.body.data.user, false);
     const citizenToken = login.body.data.token as string;
 
+    const merchantLogin = await fetchJson(baseUrl, '/auth/demo-login', undefined, {
+      method: 'POST', body: JSON.stringify({ role: 'MERCHANT' }),
+    });
+    assert.equal(merchantLogin.response.status, 200);
+    assert.equal(merchantLogin.body.data.user.id, merchantId);
+    assert.equal(merchantLogin.body.data.user.role, 'MERCHANT');
+    const merchantToken = merchantLogin.body.data.token as string;
+
+    const adminLogin = await fetchJson(baseUrl, '/auth/demo-login', undefined, {
+      method: 'POST', body: JSON.stringify({ role: 'ADMIN' }),
+    });
+    assert.equal(adminLogin.response.status, 200);
+    assert.equal(adminLogin.body.data.user.id, adminStaffId);
+    assert.equal(adminLogin.body.data.user.role, 'ADMIN');
+    const adminToken = adminLogin.body.data.token as string;
+
     assert.equal((await fetchJson(baseUrl, '/auth/login', undefined, { method: 'POST', body: '{}' })).response.status, 404);
     assert.equal((await fetchJson(baseUrl, '/auth/register', undefined, { method: 'POST', body: '{}' })).response.status, 404);
-    assert.equal((await fetchJson(baseUrl, '/auth/demo-citizen-login', undefined, {
-      method: 'POST', body: JSON.stringify({ userId: secondCitizenId }),
+    assert.equal((await fetchJson(baseUrl, '/auth/demo-login', undefined, {
+      method: 'POST', body: JSON.stringify({ role: 'CITIZEN', accountId: secondCitizenId }),
     })).response.status, 403);
     assert.equal((await fetchJson(baseUrl, '/auth/me')).response.status, 401);
     assert.equal((await fetchJson(baseUrl, '/auth/me', 'invalid-token')).response.status, 401);
@@ -234,24 +277,24 @@ const main = async () => {
     assert.equal(ownerBadge.body.data.isUnlocked, true);
     assert.equal(ownerBadge.body.data.currentTier.id, awardedTier.tier_id);
 
-    const adminJwt = signToken({ userId: randomUUID(), role: 'ADMIN' });
     const merchantJwt = signToken({ userId: randomUUID(), role: 'MERCHANT' });
     assert.equal((await fetchJson(baseUrl, '/campaigns', citizenToken)).response.status, 403);
-    assert.equal((await fetchJson(baseUrl, '/auth/me', adminJwt)).response.status, 403);
-    assert.equal((await fetchJson(baseUrl, '/wallet/balance', adminJwt)).response.status, 403);
+    assert.equal((await fetchJson(baseUrl, '/auth/me', adminToken)).response.status, 403);
+    assert.equal((await fetchJson(baseUrl, '/wallet/balance', adminToken)).response.status, 403);
     assert.equal((await fetchJson(baseUrl, '/wallet/balance', merchantJwt)).response.status, 403);
 
-    const adminCampaigns = await fetchJson(baseUrl, '/campaigns', 'demo-token-admin');
+    assert.equal((await fetchJson(baseUrl, '/campaigns', merchantToken)).response.status, 403);
+    const adminCampaigns = await fetchJson(baseUrl, '/campaigns', adminToken);
     assert.equal(adminCampaigns.response.status, 200);
     assert.equal(adminCampaigns.body.data[0].id, campaign.campaign_id);
     assert.equal(adminCampaigns.body.data[0].totalQuotaLimit, '3000');
     assert.equal(adminCampaigns.body.data[0].periods.length, 3);
     assert.ok(adminCampaigns.body.data[0].periods.every((period: { quotaLimit: string }) => period.quotaLimit === '1000'));
-    assert.equal((await fetchJson(baseUrl, '/condition-types', 'demo-token-admin')).response.status, 200);
-    assert.equal((await fetchJson(baseUrl, '/badge-condition-types', 'demo-token-admin')).response.status, 200);
-    assert.equal((await fetchJson(baseUrl, '/badges', 'demo-token-admin')).response.status, 200);
+    assert.equal((await fetchJson(baseUrl, '/condition-types', adminToken)).response.status, 200);
+    assert.equal((await fetchJson(baseUrl, '/badge-condition-types', adminToken)).response.status, 200);
+    assert.equal((await fetchJson(baseUrl, '/badges', adminToken)).response.status, 200);
 
-    console.log('Citizen API integration passed: demo JWT, profile, wallet, achievements, role guards, and Admin APIs.');
+    console.log('Authentication integration passed: Citizen, Merchant, and Admin demo JWTs, role guards, profile, wallet, achievements, and Admin APIs.');
     if (keepOpen) {
       console.log(`Isolated browser API ready at http://localhost:${address.port}; synthetic Citizen: ${firstCitizenId}.`);
       await new Promise<void>((resolve) => process.once('SIGINT', resolve));

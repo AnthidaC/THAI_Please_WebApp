@@ -6,6 +6,8 @@ export interface User {
   createdAt: string;
 }
 
+export type DemoLoginRole = 'CITIZEN' | 'MERCHANT' | 'ADMIN';
+
 export interface AuthResponse {
   status: 'success' | 'error';
   data: {
