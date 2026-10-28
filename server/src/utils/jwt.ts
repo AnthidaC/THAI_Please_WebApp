@@ -6,7 +6,7 @@ export interface TokenPayload {
   role: string;
   /** Issued-at (seconds), set by jsonwebtoken. */
   iat?: number;
-  /** Marks a development-only mock account session. */
+  /** Marks a mock account session. */
   isDemo?: boolean;
 }
 

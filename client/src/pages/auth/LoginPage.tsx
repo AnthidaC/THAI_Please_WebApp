@@ -6,8 +6,6 @@ import { APP_ROUTES, homeRouteForRole } from '../../constants/routes';
 import { authApi } from '../../services/authApi';
 import { DemoLoginRole, User as AppUser } from '../../types';
 
-const demoLoginEnabled = import.meta.env.DEV && import.meta.env.VITE_DEMO_AUTH_ENABLED === 'true';
-
 const demoAccountIdForRole: Partial<Record<DemoLoginRole, string | undefined>> = {
   CITIZEN: import.meta.env.VITE_DEMO_CITIZEN_USER_ID,
   MERCHANT: import.meta.env.VITE_DEMO_MERCHANT_ID,
@@ -59,7 +57,7 @@ export const LoginPage: React.FC = () => {
       </div>
 
       <div className="rounded-xl border border-hairline bg-surface-soft/50 p-4 text-sm leading-6 text-ink-muted">
-        ระบบนี้ใช้บัญชีจำลองที่กำหนดไว้สำหรับทดสอบ Citizen, ร้านค้า และผู้ดูแลระบบในสภาพแวดล้อมพัฒนา
+        ระบบนี้ใช้บัญชีจำลองที่กำหนดไว้สำหรับทดสอบ Citizen, ร้านค้า และผู้ดูแลระบบ
       </div>
 
       {errorMsg && (
@@ -69,41 +67,39 @@ export const LoginPage: React.FC = () => {
         </div>
       )}
 
-      {demoLoginEnabled && (
-        <div className="space-y-2 border-t border-hairline pt-4">
-          <p className="text-center text-xs font-semibold text-ink-muted">เลือกบทบาทบัญชีจำลอง</p>
-          <button
-            type="button"
-            id="btn-demo-citizen"
-            onClick={() => handleDemoLogin('CITIZEN')}
-            disabled={isLoading}
-            className="group flex min-h-11 w-full items-center justify-between rounded-xl border border-hairline bg-surface-soft/60 p-3 text-left text-xs font-medium text-ink transition hover:border-blue-200 hover:bg-blue-50 disabled:cursor-wait disabled:opacity-60"
-          >
-            <span className="flex items-center gap-3"><User className="h-4 w-4 text-brand-blue" aria-hidden="true" />เข้าสู่ระบบประชาชนทดสอบ</span>
-            {isLoading ? <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" /> : <ArrowRight className="h-4 w-4 text-ink-muted transition group-hover:translate-x-1" aria-hidden="true" />}
-          </button>
-          <button
-            type="button"
-            id="btn-demo-merchant"
-            onClick={() => handleDemoLogin('MERCHANT')}
-            disabled={isLoading}
-            className="group flex min-h-11 w-full items-center justify-between rounded-xl border border-hairline bg-surface-soft/60 p-3 text-left text-xs font-medium text-ink transition hover:border-emerald-200 hover:bg-emerald-50 disabled:cursor-wait disabled:opacity-60"
-          >
-            <span className="flex items-center gap-3"><Store className="h-4 w-4 text-emerald-700" aria-hidden="true" />เข้าสู่ระบบร้านค้าทดสอบ</span>
-            <ArrowRight className="h-4 w-4 text-ink-muted transition group-hover:translate-x-1" aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            id="btn-demo-admin"
-            onClick={() => handleDemoLogin('ADMIN')}
-            disabled={isLoading}
-            className="group flex min-h-11 w-full items-center justify-between rounded-xl border border-hairline bg-surface-soft/60 p-3 text-left text-xs font-medium text-ink transition hover:border-red-200 hover:bg-red-50 disabled:cursor-wait disabled:opacity-60"
-          >
-            <span className="flex items-center gap-3"><ShieldAlert className="h-4 w-4 text-status-error" aria-hidden="true" />เข้าสู่ระบบผู้ดูแลทดสอบ</span>
-            {isLoading ? <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" /> : <ArrowRight className="h-4 w-4 text-ink-muted transition group-hover:translate-x-1" aria-hidden="true" />}
-          </button>
-        </div>
-      )}
+      <div className="space-y-2 border-t border-hairline pt-4">
+        <p className="text-center text-xs font-semibold text-ink-muted">เลือกบทบาทบัญชีจำลอง</p>
+        <button
+          type="button"
+          id="btn-demo-citizen"
+          onClick={() => handleDemoLogin('CITIZEN')}
+          disabled={isLoading}
+          className="group flex min-h-11 w-full items-center justify-between rounded-xl border border-hairline bg-surface-soft/60 p-3 text-left text-xs font-medium text-ink transition hover:border-blue-200 hover:bg-blue-50 disabled:cursor-wait disabled:opacity-60"
+        >
+          <span className="flex items-center gap-3"><User className="h-4 w-4 text-brand-blue" aria-hidden="true" />เข้าสู่ระบบประชาชนทดสอบ</span>
+          {isLoading ? <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" /> : <ArrowRight className="h-4 w-4 text-ink-muted transition group-hover:translate-x-1" aria-hidden="true" />}
+        </button>
+        <button
+          type="button"
+          id="btn-demo-merchant"
+          onClick={() => handleDemoLogin('MERCHANT')}
+          disabled={isLoading}
+          className="group flex min-h-11 w-full items-center justify-between rounded-xl border border-hairline bg-surface-soft/60 p-3 text-left text-xs font-medium text-ink transition hover:border-emerald-200 hover:bg-emerald-50 disabled:cursor-wait disabled:opacity-60"
+        >
+          <span className="flex items-center gap-3"><Store className="h-4 w-4 text-emerald-700" aria-hidden="true" />เข้าสู่ระบบร้านค้าทดสอบ</span>
+          {isLoading ? <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" /> : <ArrowRight className="h-4 w-4 text-ink-muted transition group-hover:translate-x-1" aria-hidden="true" />}
+        </button>
+        <button
+          type="button"
+          id="btn-demo-admin"
+          onClick={() => handleDemoLogin('ADMIN')}
+          disabled={isLoading}
+          className="group flex min-h-11 w-full items-center justify-between rounded-xl border border-hairline bg-surface-soft/60 p-3 text-left text-xs font-medium text-ink transition hover:border-red-200 hover:bg-red-50 disabled:cursor-wait disabled:opacity-60"
+        >
+          <span className="flex items-center gap-3"><ShieldAlert className="h-4 w-4 text-status-error" aria-hidden="true" />เข้าสู่ระบบผู้ดูแลทดสอบ</span>
+          {isLoading ? <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" /> : <ArrowRight className="h-4 w-4 text-ink-muted transition group-hover:translate-x-1" aria-hidden="true" />}
+        </button>
+      </div>
 
       <div className="border-t border-hairline pt-4 text-center text-xs text-ink-muted">
         ต้องการลงทะเบียนรับสิทธิ์?{' '}

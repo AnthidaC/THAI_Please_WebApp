@@ -35,7 +35,6 @@ const main = async () => {
   process.env.CLIENT_URL = 'http://localhost:5174';
   process.env.DATABASE_URL = sourceUrl;
   process.env.DIRECT_URL = sourceUrl;
-  process.env.DEMO_AUTH_ENABLED = 'true';
   process.env.DEMO_CITIZEN_USER_IDS = firstCitizenId;
   process.env.DEMO_MERCHANT_IDS = merchantId;
   process.env.DEMO_ADMIN_STAFF_IDS = adminStaffId;

@@ -12,8 +12,6 @@ interface DemoAccount {
 }
 
 interface DemoLoginOptions {
-  nodeEnv: string;
-  enabled: boolean;
   allowedAccountIds: Record<DemoLoginRole, readonly string[]>;
   findAccount: (role: DemoLoginRole, accountId: string) => Promise<DemoAccount | null>;
   issueToken: (payload: TokenPayload) => string;
@@ -24,11 +22,6 @@ export const createDemoLoginHandler = (options: DemoLoginOptions) => async (
   res: Response,
   next: NextFunction
 ): Promise<void> => {
-  if (options.nodeEnv !== 'development' || !options.enabled) {
-    res.status(404).json({ status: 'error', message: 'ไม่เปิดใช้งานบัญชีจำลอง' });
-    return;
-  }
-
   const requestedRole = req.body?.role;
   if (typeof requestedRole !== 'string' || !DEMO_LOGIN_ROLES.includes(requestedRole as DemoLoginRole)) {
     res.status(400).json({ status: 'error', message: 'กรุณาเลือกประเภทบัญชีจำลองให้ถูกต้อง' });
@@ -38,7 +31,7 @@ export const createDemoLoginHandler = (options: DemoLoginOptions) => async (
 
   const allowedAccountIds = new Set(options.allowedAccountIds[role].map((accountId) => accountId.toLowerCase()));
   if (allowedAccountIds.size === 0) {
-    res.status(404).json({ status: 'error', message: 'ยังไม่ได้กำหนดบัญชีจำลองสำหรับบทบาทนี้' });
+    res.status(404).json({ status: 'error', message: 'ยังไม่ได้กำหนดบัญชีทดสอบสำหรับบทบาทนี้' });
     return;
   }
 
@@ -75,8 +68,6 @@ export const createDemoLoginHandler = (options: DemoLoginOptions) => async (
 };
 
 export const demoLogin = createDemoLoginHandler({
-  nodeEnv: env.NODE_ENV,
-  enabled: env.DEMO_AUTH_ENABLED,
   allowedAccountIds: {
     CITIZEN: env.DEMO_CITIZEN_USER_IDS,
     MERCHANT: env.DEMO_MERCHANT_IDS,

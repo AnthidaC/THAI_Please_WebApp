@@ -49,8 +49,6 @@ const invokeMiddleware = async (
 };
 
 const options = (overrides: Partial<DemoLoginOptions> = {}): DemoLoginOptions => ({
-  nodeEnv: 'development',
-  enabled: true,
   allowedAccountIds: {
     CITIZEN: [citizenId],
     MERCHANT: [merchantId],
@@ -61,13 +59,14 @@ const options = (overrides: Partial<DemoLoginOptions> = {}): DemoLoginOptions =>
   ...overrides,
 });
 
-test('mock login is unavailable when disabled or outside development', async () => {
+test('mock login rejects roles with no configured test account', async () => {
   let lookupCount = 0;
   const findAccount = async () => { lookupCount += 1; return accounts.CITIZEN; };
-  const disabled = await invoke(options({ enabled: false, findAccount }), { role: 'CITIZEN' });
-  const production = await invoke(options({ nodeEnv: 'production', findAccount }), { role: 'CITIZEN' });
-  assert.equal(disabled.statusCode, 404);
-  assert.equal(production.statusCode, 404);
+  const result = await invoke(options({
+    allowedAccountIds: { CITIZEN: [], MERCHANT: [], ADMIN: [] },
+    findAccount,
+  }), { role: 'CITIZEN' });
+  assert.equal(result.statusCode, 404);
   assert.equal(lookupCount, 0);
 });
 
