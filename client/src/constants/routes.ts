@@ -5,18 +5,33 @@ export const APP_ROUTES = {
   DASHBOARD: '/dashboard',
   PROFILE: '/profile',
 
-  // เส้นทางประชาชน (Citizen Flow - Dev 2)
+  // เส้นทางประชาชน (Citizen Flow)
   CITIZEN_WALLET: '/citizen/wallet',
   CITIZEN_SCAN_COPAY: '/citizen/scan-copay',
   CITIZEN_SLIP: '/citizen/slip/:id',
   CITIZEN_TRANSACTIONS: '/citizen/transactions',
+  CITIZEN_NEAR_ME: '/citizen/near-me',
+  CITIZEN_MERCHANT_DETAIL: '/citizen/merchant-detail',
+  CITIZEN_REFERRALS: '/citizen/referrals',
+  CITIZEN_REVIEW: '/citizen/review',
+  CITIZEN_ACHIEVEMENTS: '/citizen/achievements',
 
-  // เส้นทางร้านค้า (Merchant Flow - Dev 2)
+  // เส้นทางร้านค้า (Merchant Flow)
   MERCHANT_POS_QR: '/merchant/pos-qr',
   MERCHANT_SALES: '/merchant/sales',
 
-  // เส้นทางผู้ดูแลระบบ (Admin Flow - Dev 2)
+  // เส้นทางผู้ดูแลระบบ (Admin Flow)
+  ADMIN_ROOT: '/admin',
+  ADMIN_DASHBOARD: '/admin/dashboard',
   ADMIN_FRAUD_ALERTS: '/admin/fraud-alerts',
+  ADMIN_CAMPAIGNS: '/admin/campaigns',
 } as const;
+
+export const homeRouteForRole = (role: string | undefined): string => {
+  if (role === 'ADMIN') return APP_ROUTES.ADMIN_DASHBOARD;
+  if (role === 'MERCHANT') return APP_ROUTES.MERCHANT_POS_QR;
+  if (role === 'USER') return APP_ROUTES.CITIZEN_WALLET;
+  return APP_ROUTES.HOME;
+};
 
 export type AppRoute = typeof APP_ROUTES[keyof typeof APP_ROUTES];

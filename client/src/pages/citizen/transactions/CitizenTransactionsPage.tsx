@@ -19,7 +19,7 @@ import { APP_ROUTES } from '../../../constants/routes';
 
 export const CitizenTransactionsPage: React.FC = () => {
   const navigate = useNavigate();
-  const [filterType, setFilterType] = useState<'ALL' | 'SUCCESS' | 'FLAGGED'>('ALL');
+  const [filterType, setFilterType] = useState<'ALL' | 'SUCCESS'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
 
   const { data: transactions, isLoading, refetch, isFetching } = useQuery({
@@ -29,8 +29,7 @@ export const CitizenTransactionsPage: React.FC = () => {
 
   const filtered = useMemo(() => {
     return (transactions || []).filter((tx) => {
-      if (filterType === 'SUCCESS' && tx.status !== 'SUCCESS') return false;
-      if (filterType === 'FLAGGED' && tx.status !== 'FLAGGED') return false;
+      if (filterType === 'SUCCESS' && tx.status !== 'SUCCESS' && tx.status !== 'FLAGGED') return false;
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         return (
@@ -54,11 +53,10 @@ export const CitizenTransactionsPage: React.FC = () => {
           acc.citizenPaid += tx.citizenPaidAmount || 0;
           acc.govCopay += tx.governmentCopayAmount || 0;
         }
-        if (tx.status === 'SUCCESS') acc.successCount += 1;
-        if (tx.status === 'FLAGGED') acc.flaggedCount += 1;
+        if (tx.status === 'SUCCESS' || tx.status === 'FLAGGED') acc.successCount += 1;
         return acc;
       },
-      { count: 0, citizenPaid: 0, govCopay: 0, successCount: 0, flaggedCount: 0 }
+      { count: 0, citizenPaid: 0, govCopay: 0, successCount: 0 }
     );
   }, [transactions]);
 
@@ -156,7 +154,6 @@ export const CitizenTransactionsPage: React.FC = () => {
               [
                 { key: 'ALL', label: 'ทั้งหมด', count: summary.count },
                 { key: 'SUCCESS', label: 'สำเร็จ', count: summary.successCount },
-                { key: 'FLAGGED', label: 'รอตรวจสอบ', count: summary.flaggedCount },
               ] as const
             ).map((tab) => (
               <button
@@ -195,7 +192,6 @@ export const CitizenTransactionsPage: React.FC = () => {
           ) : (
             <div className="divide-y divide-hairline">
               {filtered.map((tx) => {
-                const isFlagged = tx.status === 'FLAGGED';
                 const isRejected = tx.status === 'REJECTED';
                 const isTopUp = tx.transactionType === 'TOPUP';
                 const isRefund = tx.transactionType === 'REFUND';
@@ -229,8 +225,6 @@ export const CitizenTransactionsPage: React.FC = () => {
                             ? 'bg-emerald-50 text-status-success border-emerald-200'
                             : isRejected
                             ? 'bg-red-50 text-status-error border-red-200'
-                            : isFlagged
-                            ? 'bg-amber-50 text-amber-700 border-amber-200'
                             : 'bg-brand-blue-light text-brand-blue border-blue-200'
                         }`}
                       >
@@ -248,11 +242,6 @@ export const CitizenTransactionsPage: React.FC = () => {
                             <span className="inline-flex shrink-0 items-center space-x-1 rounded-pill bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-status-error border border-red-200">
                               <AlertTriangle className="h-2.5 w-2.5 text-status-error" />
                               <span>ยกเลิกและคืนเงินแล้ว</span>
-                            </span>
-                          ) : isFlagged ? (
-                            <span className="inline-flex shrink-0 items-center space-x-1 rounded-pill bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-800 border border-amber-200">
-                              <AlertTriangle className="h-2.5 w-2.5 text-amber-600" />
-                              <span>รอตรวจสอบ</span>
                             </span>
                           ) : (
                             <span className="inline-flex shrink-0 items-center space-x-1 rounded-pill bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 border border-emerald-200">

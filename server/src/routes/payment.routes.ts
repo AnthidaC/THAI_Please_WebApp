@@ -7,7 +7,8 @@ import {
   checkoutCopay,
   validateDiscount,
 } from '../controllers/payment.controller';
-import { authenticate } from '../middlewares/auth.middleware';
+import { authenticatePaymentSession as authenticate, requirePaymentMerchant } from '../middlewares/payment-access.middleware';
+import { requireCitizen } from '../middlewares/auth.middleware';
 import { validate } from '../middlewares/validate.middleware';
 import {
   generateQrSchema,
@@ -18,21 +19,23 @@ import {
 const router = Router();
 
 // POST /api/payment/qr/generate
-router.post('/qr/generate', validate(generateQrSchema), generateDynamicQr);
+router.post('/qr/generate', authenticate, requirePaymentMerchant, validate(generateQrSchema), generateDynamicQr);
 
 // GET /api/payment/qr/:reference/stream (Server-Sent Events: แจ้งเตือน POS ร้านค้าแบบ Real-Time ทันที 0 ms)
-router.get('/qr/:reference/stream', streamQrPaymentStatus);
+router.get('/qr/:reference/stream', authenticate, requirePaymentMerchant, streamQrPaymentStatus);
 
 // GET /api/payment/qr/:reference/status (สำหรับร้านค้าตรวจสอบสถานะการชำระเงินแบบ Real-time Polling Fallback)
-router.get('/qr/:reference/status', getQrPaymentStatus);
+router.get('/qr/:reference/status', authenticate, requirePaymentMerchant, getQrPaymentStatus);
 
 // GET /api/payment/qr/:reference
-router.get('/qr/:reference', getQrDetails);
+router.get('/qr/:reference', authenticate, requireCitizen, getQrDetails);
 
 
 // POST /api/payment/discount/validate
 router.post(
   '/discount/validate',
+  authenticate,
+  requireCitizen,
   validate(validateDiscountSchema),
   validateDiscount
 );
@@ -41,6 +44,7 @@ router.post(
 router.post(
   '/qr/checkout',
   authenticate,
+  requireCitizen,
   validate(checkoutCopaySchema),
   checkoutCopay
 );

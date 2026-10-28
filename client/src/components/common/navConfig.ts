@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import { Wallet, QrCode, Store, ShieldAlert, TrendingUp, History, ScanLine } from 'lucide-react';
+import { Home, Wallet, ScanLine, Store, User, QrCode, ShieldAlert, TrendingUp } from 'lucide-react';
 import { APP_ROUTES } from '../../constants/routes';
 
 /**
@@ -8,10 +8,12 @@ import { APP_ROUTES } from '../../constants/routes';
  * แถบเมนู (โดยเฉพาะแถบล่างบนมือถือ) จะเปลี่ยนไปตามบทบาทของผู้ใช้งาน
  * ห้ามรวมเมนูของหลายบทบาทไว้ในแถบเดียวกัน
  *
- * หมายเหตุสำหรับตอนรวมงาน (Merge):
- * - ถ้าระบบ Auth ของทีมมี role จริง (เช่น CITIZEN / MERCHANT / ADMIN)
- *   ให้แก้เฉพาะฟังก์ชัน `resolveNavRole` ให้คืนค่าตาม role นั้น
- * - ถ้าเพื่อนเพิ่มหน้าใหม่ ให้เพิ่ม item ลงใน array ของ role นั้น ๆ ที่นี่ที่เดียว
+ * สำหรับบทบาทประชาชน (CITIZEN) ลำดับเมนูประกอบด้วย 5 ลำดับ:
+ * 1. หน้าหลัก (Home)
+ * 2. กระเป๋าเงิน (Wallet)
+ * 3. สแกนจ่าย (Scan Pay) - ปุ่มหลักตรงกลาง
+ * 4. แนะนำร้าน (Recommended Stores)
+ * 5. โปรไฟล์ส่วนตัว (Profile) - มีทางไปหน้าเกมและหน้าตั้งค่าอยู่ภายใน
  */
 export type NavRole = 'CITIZEN' | 'MERCHANT' | 'ADMIN';
 
@@ -25,9 +27,11 @@ export interface NavItem {
 
 export const NAV_BY_ROLE: Record<NavRole, NavItem[]> = {
   CITIZEN: [
-    { to: APP_ROUTES.CITIZEN_WALLET, label: 'กระเป๋าเงิน', icon: Wallet },
+    { to: APP_ROUTES.HOME, label: 'หน้าแรก', fullLabel: 'หน้าหลัก', icon: Home },
+    { to: APP_ROUTES.CITIZEN_WALLET, label: 'กระเป๋าเงิน', fullLabel: 'กระเป๋าเงิน', icon: Wallet },
     { to: APP_ROUTES.CITIZEN_SCAN_COPAY, label: 'สแกนจ่าย', fullLabel: 'สแกนจ่าย Co-pay', icon: ScanLine, primary: true },
-    { to: APP_ROUTES.CITIZEN_TRANSACTIONS, label: 'ประวัติ', fullLabel: 'ประวัติการใช้จ่าย', icon: History },
+    { to: APP_ROUTES.CITIZEN_NEAR_ME, label: 'แนะนำร้าน', fullLabel: 'แนะนำร้านค้า', icon: Store },
+    { to: APP_ROUTES.PROFILE, label: 'โปรไฟล์', fullLabel: 'โปรไฟล์ส่วนตัว', icon: User },
   ],
   MERCHANT: [
     { to: APP_ROUTES.MERCHANT_POS_QR, label: 'สร้าง QR', fullLabel: 'สร้าง QR รับเงิน', icon: QrCode, primary: true },

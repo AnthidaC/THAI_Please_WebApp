@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import QRCode from 'qrcode';
 import {
   CheckCircle2,
@@ -13,7 +13,8 @@ import {
   FileCheck2,
   X,
 } from 'lucide-react';
-import { getTransactionSlip, SlipData } from '../../../services/paymentApi';
+import { getTransactionSlip, createReview, SlipData } from '../../../services/paymentApi';
+import { reviewApi } from '../../../services/reviewApi';
 import { APP_ROUTES } from '../../../constants/routes';
 
 const AUTOSAVE_PERMISSION_KEY = 'thai_please_slip_autosave_permission';
@@ -63,16 +64,10 @@ async function renderBankSlipCanvasPng(
   ctx.fillRect(0, 0, width, height);
 
   // แถบเส้นสีเอกลักษณ์ด้านบนสุด (Top Brand Accent)
-  const isFlagged = slip.status === 'FLAGGED';
   const topBarGrad = ctx.createLinearGradient(0, 0, width, 0);
-  if (isFlagged) {
-    topBarGrad.addColorStop(0, '#D97706');
-    topBarGrad.addColorStop(1, '#F59E0B');
-  } else {
-    topBarGrad.addColorStop(0, '#1D4ED8');
-    topBarGrad.addColorStop(0.5, '#2563EB');
-    topBarGrad.addColorStop(1, '#059669');
-  }
+  topBarGrad.addColorStop(0, '#1D4ED8');
+  topBarGrad.addColorStop(0.5, '#2563EB');
+  topBarGrad.addColorStop(1, '#059669');
   ctx.fillStyle = topBarGrad;
   ctx.fillRect(0, 0, width, 8);
 
@@ -91,9 +86,9 @@ async function renderBankSlipCanvasPng(
   // สถานะและวันเวลาด้านขวา
   const rightX = width - 50;
   ctx.textAlign = 'right';
-  ctx.fillStyle = isFlagged ? '#D97706' : '#059669';
+  ctx.fillStyle = '#059669';
   ctx.font = 'bold 22px "Prompt", "Noto Sans Thai", sans-serif';
-  ctx.fillText(isFlagged ? 'ชำระเงินสำเร็จ (รอตรวจสอบ)' : '✓ ชำระเงินสำเร็จ', rightX, curY);
+  ctx.fillText('✓ ชำระเงินสำเร็จ', rightX, curY);
 
   const formattedDate = new Date(slip.timestamp).toLocaleString('th-TH', {
     day: 'numeric',
@@ -305,6 +300,7 @@ async function renderBankSlipCanvasPng(
 export const CitizenPaymentSlipPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
   const location = useLocation();
 
@@ -331,6 +327,8 @@ export const CitizenPaymentSlipPage: React.FC = () => {
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewSubmitted, setReviewSubmitted] = useState(false);
+  const [reviewSaving, setReviewSaving] = useState(false);
+  const [reviewError, setReviewError] = useState<string | null>(null);
 
   // ข้อมูลรูปภาพสลิปที่เรนเดอร์ล่วงหน้าไว้ในหน่วยความจำ
   const [cachedSlipDataUrl, setCachedSlipDataUrl] = useState<string>('');
@@ -346,6 +344,39 @@ export const CitizenPaymentSlipPage: React.FC = () => {
     queryFn: () => getTransactionSlip(id || ''),
     enabled: !!id,
   });
+
+  // ตรวจสอบข้อมูลการประเมินรีวิวเดิมของธุรกรรมนี้ (Existing Review Check)
+  const { data: reviewCheckData } = useQuery({
+    queryKey: ['transaction-review-check', slip?.transactionId],
+    queryFn: () => reviewApi.getReviewByTransaction(slip?.transactionId || ''),
+    enabled: Boolean(slip?.transactionId),
+    retry: false,
+    staleTime: 60 * 1000,
+  });
+
+  const existingReview = reviewCheckData?.review;
+  const isAlreadyReviewed = Boolean(reviewCheckData?.reviewed && existingReview);
+
+  // ส่งคะแนนรีวิวไปบันทึกที่ Backend (ใช้ transactionId ของสลิปนี้เท่านั้น)
+  const handleSubmitReview = useCallback(async () => {
+    if (!slip?.transactionId || reviewSaving) return;
+    setReviewSaving(true);
+    setReviewError(null);
+    try {
+      await createReview({ transactionId: slip.transactionId, ratingStars: reviewRating });
+      setReviewSubmitted(true);
+      setShowReviewModal(false);
+      // รีเฟรชสถานะรีวิวและความคืบหน้าตราความสำเร็จที่อาจปลดล็อกใหม่
+      void queryClient.invalidateQueries({ queryKey: ['buyer-history'] });
+      void queryClient.invalidateQueries({ queryKey: ['my-badges'] });
+    } catch (error: any) {
+      setReviewError(
+        error?.response?.data?.message || 'ส่งผลการประเมินไม่สำเร็จ กรุณาลองใหม่อีกครั้ง'
+      );
+    } finally {
+      setReviewSaving(false);
+    }
+  }, [slip?.transactionId, reviewRating, reviewSaving, queryClient]);
 
   // ฟังก์ชันสั่งดาวน์โหลดไฟล์ PNG ที่เรนเดอร์เตรียมไว้แล้วลงเครื่องทันที (Instant Download)
   const triggerInstantDownload = useCallback(
@@ -529,8 +560,6 @@ export const CitizenPaymentSlipPage: React.FC = () => {
       </div>
     );
   }
-
-  const isFlagged = slip.status === 'FLAGGED';
   const maskedWalletId = `G-Wallet •••-•-•${(slip.transactionId || '8492').slice(-4)}`;
   const formattedTimestamp = new Date(slip.timestamp).toLocaleString('th-TH', {
     day: 'numeric',
@@ -606,10 +635,12 @@ export const CitizenPaymentSlipPage: React.FC = () => {
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-bold text-slate-900">ประเมินร้านค้า</h2>
               <button
+                type="button"
                 onClick={() => setShowReviewModal(false)}
-                className="text-slate-400 hover:text-slate-600 transition"
+                aria-label="ปิดหน้าต่างประเมินร้านค้า"
+                className="rounded-full p-1 text-slate-400 transition hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
               >
-                <X className="h-4 w-4" />
+                <X className="h-4 w-4" aria-hidden="true" />
               </button>
             </div>
 
@@ -623,9 +654,12 @@ export const CitizenPaymentSlipPage: React.FC = () => {
                   key={star}
                   type="button"
                   onClick={() => setReviewRating(star)}
-                  className="p-1 transition hover:scale-110"
+                  aria-label={`ให้ ${star} ดาว`}
+                  aria-pressed={reviewRating === star}
+                  className="rounded-full p-1 transition hover:scale-110 motion-reduce:transform-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
                 >
                   <Star
+                    aria-hidden="true"
                     className={`h-7 w-7 ${
                       star <= reviewRating
                         ? 'fill-amber-400 text-amber-400'
@@ -637,14 +671,17 @@ export const CitizenPaymentSlipPage: React.FC = () => {
             </div>
 
             <div className="pt-1">
+              {reviewError && (
+                <p role="alert" className="mb-2 text-center text-[11px] font-medium text-status-error">
+                  {reviewError}
+                </p>
+              )}
               <button
-                onClick={() => {
-                  setReviewSubmitted(true);
-                  setShowReviewModal(false);
-                }}
-                className="w-full rounded-full bg-blue-600 py-2.5 text-xs font-semibold text-white transition hover:bg-blue-700"
+                onClick={handleSubmitReview}
+                disabled={reviewSaving}
+                className="w-full rounded-full bg-blue-600 py-2.5 text-xs font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
               >
-                ส่งผลการประเมิน
+                {reviewSaving ? 'กำลังส่งผลการประเมิน…' : 'ส่งผลการประเมิน'}
               </button>
             </div>
           </div>
@@ -717,11 +754,7 @@ export const CitizenPaymentSlipPage: React.FC = () => {
         >
           {/* เส้นขอบสีด้านบนของสลิป (Top Accent Line) */}
           <div
-            className={`h-2 w-full ${
-              isFlagged
-                ? 'bg-amber-500'
-                : 'bg-gradient-to-r from-blue-700 via-indigo-600 to-emerald-500'
-            }`}
+            className="h-2 w-full bg-gradient-to-r from-blue-700 via-indigo-600 to-emerald-500"
           />
 
           <div className="p-5 sm:p-6 space-y-5">
@@ -736,13 +769,9 @@ export const CitizenPaymentSlipPage: React.FC = () => {
                 </span>
               </div>
               <div className="text-right">
-                <span
-                  className={`inline-flex items-center space-x-1 text-xs sm:text-sm font-bold ${
-                    isFlagged ? 'text-amber-600' : 'text-emerald-600'
-                  }`}
-                >
+                <span className="inline-flex items-center space-x-1 text-xs sm:text-sm font-bold text-emerald-600">
                   <CheckCircle2 className="h-4 w-4 shrink-0" />
-                  <span>{isFlagged ? 'ชำระเงินสำเร็จ (รอตรวจสอบ)' : 'ชำระเงินสำเร็จ'}</span>
+                  <span>ชำระเงินสำเร็จ</span>
                 </span>
                 <p className="font-mono text-[11px] text-slate-400 mt-0.5">
                   {formattedTimestamp} น.
@@ -898,8 +927,51 @@ export const CitizenPaymentSlipPage: React.FC = () => {
           )}
         </button>
 
-        {/* แถบประเมินร้านค้า (สะอาด เรียบง่าย ไม่รกสายตา) */}
-        {!reviewSubmitted ? (
+        {/* แถบประเมินร้านค้า / ข้อมูลที่เคยประเมินแล้ว */}
+        {isAlreadyReviewed && existingReview ? (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-4 shadow-2xs space-y-2.5 animate-fadeIn">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center space-x-2 min-w-0">
+                <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                <span className="text-xs font-bold text-emerald-900 truncate">
+                  คุณประเมินรายการนี้แล้ว
+                </span>
+              </div>
+              <div className="flex items-center space-x-1 shrink-0">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <Star
+                    key={star}
+                    className={`h-3.5 w-3.5 ${
+                      star <= existingReview.ratingStars
+                        ? 'text-amber-400 fill-amber-400'
+                        : 'text-slate-200 fill-slate-100'
+                    }`}
+                  />
+                ))}
+                <span className="text-xs font-bold text-slate-700 ml-1">
+                  {existingReview.ratingStars} / 5
+                </span>
+              </div>
+            </div>
+
+            {existingReview.reviewText ? (
+              <p className="text-xs text-slate-700 bg-white/90 p-2.5 rounded-lg border border-emerald-100 italic leading-relaxed">
+                "{existingReview.reviewText}"
+              </p>
+            ) : null}
+
+            <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-emerald-100/80">
+              <span>รีวิวโดยผู้ซื้อจริง (Verified Purchase)</span>
+              <span>
+                {new Date(existingReview.createdAt).toLocaleDateString('th-TH', {
+                  day: 'numeric',
+                  month: 'short',
+                  year: 'numeric',
+                })}
+              </span>
+            </div>
+          </div>
+        ) : !reviewSubmitted ? (
           <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-2xs flex items-center justify-between gap-3">
             <div className="flex items-center space-x-2 min-w-0">
               <Star className="h-4 w-4 text-amber-400 fill-amber-400 shrink-0" />
@@ -908,10 +980,21 @@ export const CitizenPaymentSlipPage: React.FC = () => {
               </span>
             </div>
             <button
-              onClick={() => setShowReviewModal(true)}
-              className="shrink-0 rounded-full bg-slate-100 hover:bg-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 transition"
+              id="btn-review-merchant"
+              onClick={() =>
+                navigate(APP_ROUTES.CITIZEN_REVIEW, {
+                  state: {
+                    transactionId: slip.transactionId,
+                    shopName: slip.shopName,
+                    totalAmount: slip.totalAmount,
+                    citizenPaidAmount: slip.citizenPaidAmount,
+                    timestamp: slip.timestamp,
+                  },
+                })
+              }
+              className="shrink-0 rounded-full bg-slate-100 hover:bg-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 transition active:scale-98"
             >
-              ประเมินร้าน
+              ประเมินร้านค้า
             </button>
           </div>
         ) : (

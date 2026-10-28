@@ -49,6 +49,7 @@ export const Navbar: React.FC = () => {
               <NavLink
                 key={to}
                 to={to}
+                end={to === APP_ROUTES.HOME}
                 className={({ isActive }) =>
                   `inline-flex items-center space-x-1.5 px-2.5 lg:px-3 py-1.5 rounded-pill transition whitespace-nowrap ${
                     isActive
@@ -100,10 +101,16 @@ export const Navbar: React.FC = () => {
 
       {/* 2. MOBILE BOTTOM NAVIGATION BAR — แสดงเฉพาะเมนูของบทบาทปัจจุบัน (Thumb-friendly) */}
       {navItems.length > 1 && (
-        <div className="fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-md border-t border-hairline px-2 pt-1 pb-[max(0.25rem,env(safe-area-inset-bottom))] flex justify-around items-end shadow-[0_-2px_12px_rgba(0,0,0,0.08)] md:hidden">
+        <div className="fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-md border-t border-hairline px-1 sm:px-2 pt-1 pb-[max(0.25rem,env(safe-area-inset-bottom))] flex justify-around items-end shadow-[0_-2px_12px_rgba(0,0,0,0.08)] md:hidden">
           {navItems.map(({ to, label, icon: Icon, primary }) =>
             primary ? (
-              <NavLink key={to} to={to} className="flex flex-col items-center -mt-5">
+              <NavLink
+                key={to}
+                to={to}
+                end={to === APP_ROUTES.HOME}
+                aria-label={label}
+                className="flex flex-col items-center -mt-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue rounded-full"
+              >
                 {({ isActive }) => (
                   <>
                     <div
@@ -111,7 +118,7 @@ export const Navbar: React.FC = () => {
                         isActive ? 'shadow-blue-500/40 ring-2 ring-brand-blue' : 'shadow-blue-500/30'
                       }`}
                     >
-                      <Icon className="h-6 w-6" />
+                      <Icon className="h-6 w-6" aria-hidden="true" />
                     </div>
                     <span className={`text-[10px] mt-1 ${isActive ? 'text-brand-blue font-bold' : 'text-ink-body font-medium'}`}>
                       {label}
@@ -123,14 +130,16 @@ export const Navbar: React.FC = () => {
               <NavLink
                 key={to}
                 to={to}
+                end={to === APP_ROUTES.HOME}
+                aria-label={label}
                 className={({ isActive }) =>
-                  `flex flex-col items-center py-1 px-3 rounded-xl transition ${
+                  `flex flex-col items-center min-w-[50px] min-h-[44px] justify-center py-1 px-1 sm:px-2 rounded-xl transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue ${
                     isActive ? 'text-brand-blue font-semibold' : 'text-ink-muted hover:text-ink'
                   }`
                 }
               >
-                <Icon className="h-5 w-5" />
-                <span className="text-[10px] mt-0.5">{label}</span>
+                <Icon className="h-5 w-5" aria-hidden="true" />
+                <span className="text-[10px] mt-0.5 whitespace-nowrap">{label}</span>
               </NavLink>
             )
           )}

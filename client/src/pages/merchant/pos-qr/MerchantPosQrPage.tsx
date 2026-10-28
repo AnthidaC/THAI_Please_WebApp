@@ -23,6 +23,7 @@ import {
   generateDynamicQr,
   getMerchantHistory,
   getQrPaymentStatus,
+  streamQrPaymentStatus,
   DynamicQrResponse,
   QrPaymentStatusResponse,
 } from '../../../services/paymentApi';
@@ -184,33 +185,17 @@ export const MerchantPosQrPage: React.FC = () => {
     };
 
     // 1. เชื่อมต่อ Server-Sent Events (SSE) เพื่อรับแจ้งเตือนแบบ Real-Time ทันที (0 ms Latency)
-    let eventSource: EventSource | null = null;
-    try {
-      const sseUrl = `/api/payment/qr/${encodeURIComponent(qrResult.qrReference)}/stream`;
-      eventSource = new EventSource(sseUrl);
-
-      eventSource.onmessage = (event) => {
-        try {
-          const res = JSON.parse(event.data);
+    const streamController = new AbortController();
+    const eventSource = { close: () => streamController.abort() };
+    streamQrPaymentStatus(qrResult.qrReference, (res) => {
           if (res.status === 'USED' && res.paidTransaction) {
             handleSuccessfulPayment(res.paidTransaction);
-            eventSource?.close();
+            eventSource.close();
           } else if (res.status === 'EXPIRED') {
             setSecondsRemaining(0);
-            eventSource?.close();
+            eventSource.close();
           }
-        } catch {
-          // ignore parsing error
-        }
-      };
-
-      eventSource.onerror = () => {
-        // หาก SSE ตัดการเชื่อมต่อ ให้ปิดและปล่อยให้ Polling สำรองทำงานต่อ
-        eventSource?.close();
-      };
-    } catch {
-      // SSE not supported or blocked
-    }
+    }, streamController.signal).catch(() => { /* Polling remains available if streaming disconnects. */ });
 
     // 2. สำรองด้วย Polling เผื่อเครือข่ายไม่อนุญาต SSE (ความถี่ต่ำทุก 3 วินาทีเพื่อประหยัดทรัพยากร)
     const checkPaymentStatusFallback = async () => {

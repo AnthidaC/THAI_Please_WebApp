@@ -4,6 +4,10 @@ import { env } from '../config/env';
 export interface TokenPayload {
   userId: string;
   role: string;
+  /** Issued-at (seconds), set by jsonwebtoken. */
+  iat?: number;
+  /** Marks a mock account session. */
+  isDemo?: boolean;
 }
 
 export const signToken = (payload: TokenPayload): string => {
