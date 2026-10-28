@@ -84,6 +84,7 @@ const initialValues = (resource: ManagedResource, record: ManagedRecord | null):
       type: item?.type ?? 'discount',
       discountType: item?.discountType ?? 'percent',
       discountValue: item?.discountValue ?? '10',
+      quotaLimit: item?.quotaLimit == null ? '' : String(item.quotaLimit),
       validDays: String(item?.validDays ?? 30),
       status: item?.status ?? 'active',
     };
@@ -163,7 +164,7 @@ const Field: React.FC<{ label: string; htmlFor: string; hint?: string; children:
   <div className="space-y-1.5">
     <label htmlFor={htmlFor} className="block text-sm font-semibold text-ink">{label}</label>
     {children}
-    {hint && <p className="text-xs leading-5 text-ink-muted">{hint}</p>}
+    {hint && <p id={`${htmlFor}-hint`} className="text-xs leading-5 text-ink-muted">{hint}</p>}
   </div>
 );
 
@@ -408,6 +409,7 @@ export const RecordEditorDialog: React.FC<Props> = ({ resource, record, campaign
           rewardType: values.type,
           discountType: values.type === 'discount' ? values.discountType : null,
           discountValue: values.type === 'discount' ? Number(values.discountValue) : null,
+          quotaLimit: values.quotaLimit === '' ? null : Number(values.quotaLimit),
           validDays: Number(values.validDays),
           status: values.status,
         };
@@ -600,6 +602,9 @@ export const RecordEditorDialog: React.FC<Props> = ({ resource, record, campaign
                   </>}
                   <Field label="อายุรางวัล (วัน)" htmlFor="reward-validity"><input id="reward-validity" required type="number" min="1" max="3650" value={values.validDays} onChange={(event) => set('validDays', event.target.value)} className={inputClass} /></Field>
                 </div>
+                <Field label="โควตาใช้รวม (ครั้ง)" htmlFor="reward-quota-limit" hint="นับรวมทุกผู้ใช้ · เว้นว่างเพื่อไม่จำกัด · 0 คือปิดการใช้">
+                  <input id="reward-quota-limit" name="quotaLimit" aria-describedby="reward-quota-limit-hint" autoComplete="off" type="number" min="0" max="2147483647" step="1" inputMode="numeric" value={values.quotaLimit} onChange={(event) => set('quotaLimit', event.target.value)} className={inputClass} placeholder="เช่น 100…" />
+                </Field>
                 <Field label="สถานะ" htmlFor="reward-status"><select id="reward-status" value={values.status} onChange={(event) => set('status', event.target.value)} className={inputClass}><option value="active">เปิดใช้งาน</option><option value="paused">หยุดชั่วคราว</option><option value="archived">เก็บถาวร</option></select></Field>
               </>
             )}

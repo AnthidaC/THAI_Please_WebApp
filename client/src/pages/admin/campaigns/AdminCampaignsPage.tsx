@@ -358,7 +358,7 @@ export const AdminCampaignsPage: React.FC = () => {
         <div key="primary" className="flex items-start gap-3"><div className="mt-0.5 rounded-xl bg-emerald-50 p-2 text-emerald-700"><Gift className="h-4 w-4" /></div><div><p className="font-semibold text-ink">{item.name}</p><p className="mt-1 max-w-[250px] truncate text-xs text-ink-muted">{item.description || (item.type === 'coupon' ? 'คูปองสิทธิประโยชน์' : 'ส่วนลด')}</p></div></div>,
         <div key="type" className="min-w-[100px]"><p className="text-sm font-semibold text-ink">{item.type === 'coupon' ? 'คูปอง' : 'ส่วนลด'}</p><p className="mt-1 text-xs text-ink-muted">อายุ {item.validDays} วัน</p></div>,
         <div key="value" className="min-w-[100px]"><p className="font-mono text-sm font-semibold text-ink">{valueLabel}</p><p className="mt-1 text-xs text-ink-muted">มูลค่ารางวัล</p></div>,
-        <div key="count" className="min-w-[100px]"><p className="font-mono text-sm font-medium text-ink">{formatNumber(item.issuedCount)}</p><p className="mt-1 text-xs text-ink-muted">มอบให้ผู้ใช้</p></div>,
+        <div key="count" className="min-w-[112px]"><p className="font-mono text-sm font-medium text-ink">{item.quotaLimit === null ? formatNumber(item.issuedCount) : `${formatNumber(item.redeemedCount)} / ${formatNumber(item.quotaLimit)}`}</p><p className="mt-1 text-xs text-ink-muted">{item.quotaLimit === null ? 'มอบให้ผู้ใช้' : 'ใช้แล้ว / โควตา'}</p>{item.quotaLimit !== null && <p className="mt-1 text-[11px] text-ink-muted">เหลือ {formatNumber(Math.max(0, item.quotaLimit - item.redeemedCount))} · ออกแล้ว {formatNumber(item.issuedCount)}</p>}</div>,
         <div key="status"><StatusPill status={item.status} /></div>,
       ];
     }

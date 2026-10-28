@@ -284,6 +284,7 @@ model rewards {
   reward_type    String         @db.VarChar(20)
   discount_type  String?        @db.VarChar(20)
   discount_value Decimal?       @db.Decimal(10, 2)
+  quota_limit    Int?           @db.Integer
   valid_days     Int            @default(30)
   status         String         @default("active") @db.VarChar(20)
   created_at     DateTime       @default(now()) @db.Timestamptz(6)
