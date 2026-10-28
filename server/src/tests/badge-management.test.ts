@@ -1,24 +1,28 @@
 import assert from 'node:assert/strict';
 import { badgeCreateSchema, badgeUpdateSchema } from '../validations/badge-management.validation';
 import {
+  assertBadgeTierIdsStayWithLevels,
   assertEarnedTiersUnchanged,
+  FIXED_BADGE_TIER_IDENTITIES,
   getBadgeActivationBlocker,
+  hasFixedBadgeTierStructure,
 } from '../services/badge-management.rules';
 import { toBadgeCreateData } from '../services/adminBadge.service';
 import { BadgeConditionRegistry } from '../services/achievements/conditionRegistry';
-
 const validBadge = {
   badgeName: 'Referral Master',
   description: 'Successfully refer other users',
   conditionType: 'referral_count',
   tiers: [
-    { tierName: 'Bronze', tierLevel: 1, requiredCount: 5 },
-    { tierName: 'Silver', tierLevel: 2, requiredCount: 20 },
-    { tierName: 'Gold', tierLevel: 3, requiredCount: 50 },
+    { tierName: 'Bronze', tierLevel: 1, requiredCount: 1 },
+    { tierName: 'Silver', tierLevel: 2, requiredCount: 5 },
+    { tierName: 'Gold', tierLevel: 3, requiredCount: 15 },
+    { tierName: 'Platinum', tierLevel: 4, requiredCount: 30 },
   ],
 };
 
 assert.equal(badgeCreateSchema.safeParse(validBadge).success, true);
+assert.equal(badgeUpdateSchema.safeParse({ tiers: validBadge.tiers }).success, true, 'a valid fixed-tier update is accepted');
 assert.equal(badgeCreateSchema.safeParse({
   ...validBadge,
   status: 'active',
@@ -29,11 +33,11 @@ assert.equal(badgeCreateSchema.safeParse({
 }).success, false, 'creation cannot override the pending default');
 assert.equal(badgeCreateSchema.safeParse({
   ...validBadge,
-  tiers: [validBadge.tiers[0], { ...validBadge.tiers[1], tierLevel: 1 }],
+  tiers: [validBadge.tiers[0], { ...validBadge.tiers[1], tierLevel: 1 }, ...validBadge.tiers.slice(2)],
 }).success, false, 'duplicate tier levels must be rejected');
 assert.equal(badgeCreateSchema.safeParse({
   ...validBadge,
-  tiers: [validBadge.tiers[0], { ...validBadge.tiers[1], requiredCount: 5 }],
+  tiers: [validBadge.tiers[0], { ...validBadge.tiers[1], requiredCount: 1 }, ...validBadge.tiers.slice(2)],
 }).success, false, 'duplicate thresholds must be rejected');
 assert.equal(badgeCreateSchema.safeParse({
   ...validBadge,
@@ -41,38 +45,67 @@ assert.equal(badgeCreateSchema.safeParse({
 }).success, false, 'non-positive thresholds must be rejected');
 assert.equal(badgeCreateSchema.safeParse({
   ...validBadge,
-  tiers: [validBadge.tiers[0], { ...validBadge.tiers[1], requiredCount: 4 }],
+  tiers: [{ ...validBadge.tiers[0], requiredCount: 5 }, { ...validBadge.tiers[1], requiredCount: 4 }, ...validBadge.tiers.slice(2)],
 }).success, false, 'thresholds must increase by tier level');
+assert.equal(badgeCreateSchema.safeParse({ ...validBadge, tiers: validBadge.tiers.slice(0, 3) }).success, false, 'three tiers are rejected');
+assert.equal(badgeCreateSchema.safeParse({ ...validBadge, tiers: [...validBadge.tiers, validBadge.tiers[3]] }).success, false, 'five tiers are rejected');
+assert.equal(badgeCreateSchema.safeParse({
+  ...validBadge,
+  tiers: validBadge.tiers.map((tier, index) => index === 3 ? { ...tier, tierName: 'Diamond' } : tier),
+}).success, false, 'custom tier identities are rejected');
+assert.equal(badgeCreateSchema.safeParse({
+  ...validBadge,
+  tiers: validBadge.tiers.map((tier, index) => index === 3 ? { ...tier, requiredCount: 2_147_483_648 } : tier),
+}).success, false, 'thresholds must fit the existing INTEGER column');
+assert.ok(badgeCreateSchema.safeParse({
+  ...validBadge,
+  tiers: validBadge.tiers.map((tier, index) => index === 3 ? { ...tier, requiredCount: 'not-a-number' } : tier),
+}).error?.errors.every((issue) => issue.message.length > 0), 'invalid numeric input returns structured validation issues');
 assert.equal(badgeUpdateSchema.safeParse({ conditionType: 'new_type' }).success, false, 'condition type must be immutable');
 assert.equal(badgeUpdateSchema.safeParse({ badgeName: 'Updated Badge Name' }).success, true, 'metadata updates do not require tier data');
 assert.equal(badgeUpdateSchema.safeParse({}).success, false, 'empty updates must be rejected');
 const createData = toBadgeCreateData(validBadge);
-assert.equal(createData.badge_tiers.create.length, 3, 'Badge and tiers are submitted as one nested Prisma create');
+assert.equal(createData.badge_tiers.create.length, 4, 'Badge and exactly four tiers are submitted as one nested Prisma create');
+assert.deepEqual(createData.badge_tiers.create.map((tier) => tier.tier_name), ['Bronze', 'Silver', 'Gold', 'Platinum']);
 assert.equal('status' in createData, false, 'client cannot set activation status during creation');
 assert.equal('implementation_status' in createData, false, 'client cannot set implementation status during creation');
+
+const fixedTierDefinitions = FIXED_BADGE_TIER_IDENTITIES.map((identity, index) => ({
+  tierId: `tier-${index + 1}`,
+  ...identity,
+  requiredCount: validBadge.tiers[index].requiredCount,
+  iconUrl: null,
+}));
+assert.equal(hasFixedBadgeTierStructure(fixedTierDefinitions), true);
+assert.equal(hasFixedBadgeTierStructure(fixedTierDefinitions.slice(0, 3)), false, 'legacy tier count is incompatible');
+assert.doesNotThrow(() => assertBadgeTierIdsStayWithLevels(fixedTierDefinitions, fixedTierDefinitions));
+assert.throws(() => assertBadgeTierIdsStayWithLevels(fixedTierDefinitions, fixedTierDefinitions.map((tier, index) => ({
+  ...tier,
+  tierId: fixedTierDefinitions[(index + 1) % fixedTierDefinitions.length].tierId,
+}))), /fixed level identities/i, 'tier IDs cannot be reordered');
 
 assert.equal(getBadgeActivationBlocker({
   implementationStatus: 'ready',
   conditionType: 'referral_count',
-  tierCount: 3,
+  tiers: fixedTierDefinitions.slice(0, 3),
   handlerRegistered: false,
-}), 'No backend handler is registered for this condition type');
+}), 'ประเภทเงื่อนไขนี้ยังไม่มีตัวประมวลผลในระบบ');
 assert.equal(getBadgeActivationBlocker({
   implementationStatus: 'pending',
   conditionType: 'referral_count',
-  tierCount: 3,
+  tiers: fixedTierDefinitions,
   handlerRegistered: true,
-}), 'Implementation status must be ready before activation');
+}), 'ต้องกำหนดสถานะการพัฒนาเป็นพร้อมใช้งานก่อนเปิดเหรียญตรา');
 assert.equal(getBadgeActivationBlocker({
   implementationStatus: 'ready',
   conditionType: 'referral_count',
-  tierCount: 0,
+  tiers: fixedTierDefinitions.slice(0, 3),
   handlerRegistered: true,
-}), 'At least one valid tier is required before activation');
+}), 'เหรียญตราต้องมีระดับบรอนซ์ ซิลเวอร์ โกลด์ และแพลทินัมครบก่อนเปิดใช้งาน');
 assert.equal(getBadgeActivationBlocker({
   implementationStatus: 'ready',
   conditionType: 'referral_count',
-  tierCount: 3,
+  tiers: fixedTierDefinitions,
   handlerRegistered: true,
 }), null);
 

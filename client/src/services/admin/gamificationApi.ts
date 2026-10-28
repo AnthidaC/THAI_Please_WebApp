@@ -74,6 +74,7 @@ export interface BadgeRecord {
   handlerRegistered: boolean;
   activationEligible: boolean;
   tierCount: number;
+  tierStructureCompatible: boolean;
   createdAt: string;
   updatedAt: string;
   awardedCount: number;
