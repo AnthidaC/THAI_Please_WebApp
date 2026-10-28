@@ -37,6 +37,7 @@ export interface NearbyMerchantCandidate {
   distanceKm: number;
   formattedDistance: string;
   averageRating: number;
+  categoryId?: string | null;
 }
 
 /**
@@ -73,6 +74,7 @@ export interface RecommendedMerchantResult {
   formattedDistance: string;
   averageRating: number;
   transactionCount24h: number;
+  categoryId?: string | null;
   baseScore: number;
   finalScore: number;
   recommendationReason: string;
@@ -247,6 +249,7 @@ export class RecommendationService {
       latitude: any;
       longitude: any;
       average_rating_stars: any;
+      category_id?: string | null;
     }>;
 
     try {
@@ -258,6 +261,7 @@ export class RecommendationService {
           latitude: true,
           longitude: true,
           average_rating_stars: true,
+          category_id: true,
         },
       });
     } catch (error: any) {
@@ -293,6 +297,7 @@ export class RecommendationService {
           distanceKm,
           formattedDistance: formatDistanceDisplay(distanceKm),
           averageRating: Number(m.average_rating_stars || 0),
+          categoryId: m.category_id || null,
         });
       }
     }
@@ -316,12 +321,14 @@ export class RecommendationService {
    * @param longitude พิกัดลองจิจูด
    * @param radiusKm รัศมีการค้นหา (Default 10 km)
    * @param customWeights ค่าน้ำหนักปรับแต่งเพิ่มเติม (ถ้ามี)
+   * @param userPreferredCategories หมวดหมู่ที่ผู้ใช้สนใจ (ถ้ามี)
    */
   public async getScoredMerchantCandidates(
     latitude: number,
     longitude: number,
     radiusKm = 10,
-    customWeights?: Partial<RecommendationWeights>
+    customWeights?: Partial<RecommendationWeights>,
+    userPreferredCategories?: string[]
   ): Promise<ScoredMerchantCandidate[]> {
     // 1. ดึงร้านค้าผู้สมัครในรัศมี (Approved & Haversine filtered)
     const candidates = await this.getNearbyMerchantCandidates(latitude, longitude, radiusKm);
@@ -351,6 +358,8 @@ export class RecommendationService {
           distanceKm: candidate.distanceKm,
           averageRating: safeRating,
           transactionCount24h,
+          merchantCategoryId: candidate.categoryId,
+          userPreferredCategories,
         },
         customWeights,
         radiusKm
@@ -399,7 +408,8 @@ export class RecommendationService {
       latitude,
       longitude,
       radiusKm,
-      customWeights
+      customWeights,
+      userPreferredCategories
     );
 
     // 2. หากไม่พบร้านค้าในบริเวณดังกล่าว คืนผลลัพธ์ทันทีโดยไม่เรียก AI
@@ -430,6 +440,7 @@ export class RecommendationService {
       averageRating: c.averageRating,
       transactionCount24h: c.transactionCount24h,
       baseScore: c.totalScore,
+      categoryId: c.categoryId,
     }));
 
     // 6. เรียกใช้ Gemini Recommendation Adapter
@@ -457,6 +468,7 @@ export class RecommendationService {
           formattedDistance: original.formattedDistance,
           averageRating: original.averageRating,
           transactionCount24h: original.transactionCount24h,
+          categoryId: original.categoryId,
           baseScore: original.totalScore,
           finalScore: item.finalScore,
           recommendationReason: item.recommendationReason,

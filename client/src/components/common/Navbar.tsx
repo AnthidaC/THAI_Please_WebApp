@@ -12,7 +12,10 @@ export const Navbar: React.FC = () => {
 
   // เมนูแยกตามบทบาท (ประชาชน / ร้านค้า / ผู้ดูแลระบบ) — ไม่รวมเมนูหลายบทบาทไว้ด้วยกัน
   const role = resolveNavRole(user?.role, location.pathname);
-  const navItems = NAV_BY_ROLE[role];
+  const isMerchant = role === 'MERCHANT';
+  // แสดงแถบนำทางของร้านค้าเฉพาะผู้ใช้ร้านค้าที่ผ่านการยืนยันตัวตนแล้วเท่านั้น (Authenticated Merchant)
+  const isMerchantAuthenticated = isMerchant && isAuthenticated;
+  const navItems = isMerchant && !isMerchantAuthenticated ? [] : NAV_BY_ROLE[role];
   const RoleIcon = ROLE_LABEL[role].icon;
   const isAdmin = role === 'ADMIN';
 
@@ -32,10 +35,12 @@ export const Navbar: React.FC = () => {
             <div className="min-w-0">
               <span className="font-bold text-sm sm:text-base text-ink tracking-tight flex items-center space-x-1.5 leading-none">
                 <span className="truncate">THAI Please</span>
-                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-brand-blue bg-brand-blue-light px-1.5 sm:px-2 py-0.5 rounded-pill border border-blue-200 whitespace-nowrap shrink-0">
-                  <RoleIcon className="h-3 w-3 shrink-0" />
-                  <span className="hidden xs:inline">{ROLE_LABEL[role].label}</span>
-                </span>
+                {(!isMerchant || isMerchantAuthenticated) && (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-brand-blue bg-brand-blue-light px-1.5 sm:px-2 py-0.5 rounded-pill border border-blue-200 whitespace-nowrap shrink-0">
+                    <RoleIcon className="h-3 w-3 shrink-0" />
+                    <span className="hidden xs:inline">{ROLE_LABEL[role].label}</span>
+                  </span>
+                )}
               </span>
               <span className="text-[10px] sm:text-[11px] text-ink-muted block mt-0.5 truncate">
                 กระเป๋าเงินดิจิทัล &amp; ระบบชำระเงินร่วม

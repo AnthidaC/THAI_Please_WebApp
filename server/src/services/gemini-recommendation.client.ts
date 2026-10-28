@@ -75,7 +75,7 @@ export class GeminiRecommendationClient implements IAiRecommendationClient {
     const candidatesList = candidates
       .map(
         (c, idx) =>
-          `#${idx + 1} id="${c.merchantId}", name="${c.shopName}", dist="${c.formattedDistance}", rating=${c.averageRating}, tx24h=${c.transactionCount24h}, baseScore=${c.baseScore}`
+          `#${idx + 1} id="${c.merchantId}", name="${c.shopName}", cat="${c.categoryId || 'NONE'}", dist="${c.formattedDistance}", rating=${c.averageRating}, tx24h=${c.transactionCount24h}, baseScore=${c.baseScore}`
       )
       .join('\n');
 

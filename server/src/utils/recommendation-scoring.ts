@@ -6,29 +6,48 @@ import { calculateDistanceScore } from './recommendation-distance';
  * ยังไม่ใช่น้ำหนักทางธุรกิจที่ได้รับการอนุมัติอย่างเป็นทางการจากทีม Product
  */
 export interface RecommendationWeights {
-  /** น้ำหนักระยะทางระหว่างผู้ใช้กับร้านค้า (Provisional Default: 0.40) */
+  /** น้ำหนักระยะทางระหว่างผู้ใช้กับร้านค้า (Provisional Default: 0.40 / Proposed: 0.35) */
   distance: number;
-  /** น้ำหนักคะแนนรีวิวเฉลี่ยของร้านค้า (Provisional Default: 0.35) */
+  /** น้ำหนักคะแนนรีวิวเฉลี่ยของร้านค้า (Provisional Default: 0.35 / Proposed: 0.25) */
   rating: number;
-  /** น้ำหนักความนิยมตามจำนวนธุรกรรมใน 24 ชั่วโมง (Provisional Default: 0.25) */
+  /** น้ำหนักความนิยมตามจำนวนธุรกรรมใน 24 ชั่วโมง (Provisional Default: 0.25 / Proposed: 0.15) */
   popularity: number;
   /**
    * น้ำหนักความตรงตามหมวดหมู่ที่ผู้ใช้สนใจ
-   * [DISABLED PENDING APPROVAL]: ถูกปิดการใช้งาน (0.00 เสมอ) จนกว่าจะมีการอนุมัติ Master Category Taxonomy
+   * [DISABLED PENDING APPROVAL]: ค่าเริ่มต้น 0.00 เสมอ จนกว่าจะได้รับอนุมัติแยกต่างหาก (Proposed Target: 0.25)
    */
   categoryPreference: number;
 }
 
 /**
- * ค่าน้ำหนักชั่วคราวเริ่มต้น (Provisional Default Weights)
+ * ค่าน้ำหนักชั่วคราวเริ่มต้นที่ใช้งานอยู่ในปัจจุบัน (Provisional Default Active Weights)
  * สัดส่วน: ระยะทาง 40%, เรตติ้ง 35%, ความนิยม 24 ชม. 25%, หมวดหมู่ 0% (ปิดใช้งาน)
  */
 export const PROVISIONAL_DEFAULT_WEIGHTS: Readonly<RecommendationWeights> = Object.freeze({
   distance: 0.40,
   rating: 0.35,
   popularity: 0.25,
-  categoryPreference: 0.00, // ปิดการใช้งานชั่วคราว
+  categoryPreference: 0.00, // ปิดการใช้งาน (Active default)
 });
+
+/**
+ * ค่าน้ำหนักเป้าหมายที่เตรียมไว้สำหรับ Phase 2 (Proposed Target Weights)
+ * สัดส่วนตามข้อกำหนด: Distance 35%, Category 25%, Rating 25%, Popularity 15%
+ * [READY BUT INACTIVE]: จัดเตรียมไว้พร้อมใช้งาน แต่ยังไม่เปิดใช้งานเป็นค่าเริ่มต้นจนกว่าจะได้รับอนุมัติ
+ */
+export const PROPOSED_TARGET_WEIGHTS: Readonly<RecommendationWeights> = Object.freeze({
+  distance: 0.35,
+  categoryPreference: 0.25,
+  rating: 0.25,
+  popularity: 0.15,
+});
+
+/**
+ * คะแนนหมวดหมู่ที่เป็นกลาง (Neutral Category Score)
+ * ใช้เป็น Fallback เมื่อร้านค้าไม่มี category_id (null) หรือผู้ใช้งานยังไม่ได้กำหนด preferences
+ * เพื่อป้องกันการตัดคะแนนร้านค้าที่ไม่มีหมวดหมู่ หรือลงโทษผู้ใช้ที่ไม่ได้เลือกหมวดหมู่
+ */
+export const NEUTRAL_CATEGORY_SCORE = 0.50;
 
 /**
  * รายละเอียดการแจกแจงคะแนนย่อยแต่ละปัจจัย (Score Breakdown)
@@ -37,7 +56,7 @@ export interface ScoreBreakdown {
   distanceScore: number;       // 0.000 - 1.000
   ratingScore: number;         // 0.000 - 1.000
   popularityScore: number;     // 0.000 - 1.000
-  categoryScore: number;       // 0.000 (เสมอ - Disabled)
+  categoryScore: number;       // 0.000 เมื่อปิดใช้งาน หรือ 0.000 - 1.000 เมื่อเปิดใช้งาน
   activeWeights: RecommendationWeights; // น้ำหนักที่ผ่านการ Normalize แล้ว
 }
 
@@ -61,35 +80,77 @@ export interface MerchantScoringInput {
   distanceKm: number;
   averageRating?: number | null;
   transactionCount24h?: number | null;
+  merchantCategoryId?: string | null;
+  userPreferredCategories?: string[];
 }
 
 /**
  * ปรับผลรวมของค่าน้ำหนักที่ใช้งาน (Active Weights) ให้รวมกันได้ 1.00 เสมอ
- * - บังคับ categoryPreference ให้เป็น 0.00 จนกว่าจะมีการอนุมัติ Taxonomy
+ * - ค่าเริ่มต้น enableCategoryScoring = false เพื่อปิดการใช้งาน categoryPreference (0.00) จนกว่าจะได้รับอนุมัติ
  * - จัดการกรณีค่าน้ำหนักติดลบ หรือผลรวมเป็น 0 โดย Fallback กลับสู่ค่าเริ่มต้น
  */
 export const normalizeRecommendationWeights = (
-  customWeights?: Partial<RecommendationWeights>
+  customWeights?: Partial<RecommendationWeights>,
+  enableCategoryScoring = false
 ): RecommendationWeights => {
-  const rawDistance = Math.max(0, customWeights?.distance ?? PROVISIONAL_DEFAULT_WEIGHTS.distance);
-  const rawRating = Math.max(0, customWeights?.rating ?? PROVISIONAL_DEFAULT_WEIGHTS.rating);
-  const rawPopularity = Math.max(0, customWeights?.popularity ?? PROVISIONAL_DEFAULT_WEIGHTS.popularity);
-  // หมวดหมู่ปิดใช้งานชั่วคราวเสมอ
-  const categoryPreference = 0.00;
+  const baseDefaults = enableCategoryScoring ? PROPOSED_TARGET_WEIGHTS : PROVISIONAL_DEFAULT_WEIGHTS;
 
-  const sum = rawDistance + rawRating + rawPopularity;
+  const rawDistance = Math.max(0, customWeights?.distance ?? baseDefaults.distance);
+  const rawRating = Math.max(0, customWeights?.rating ?? baseDefaults.rating);
+  const rawPopularity = Math.max(0, customWeights?.popularity ?? baseDefaults.popularity);
 
-  // หากผลรวมผิดพลาดหรือเป็น 0 ให้ใช้ค่า Provisional Defaults
+  // ปิดการใช้งาน categoryPreference เป็น 0.00 เสมอ เว้นแต่จะระบุ enableCategoryScoring = true อย่างชัดเจน
+  const rawCategory = enableCategoryScoring
+    ? Math.max(0, customWeights?.categoryPreference ?? baseDefaults.categoryPreference)
+    : 0.00;
+
+  const sum = rawDistance + rawRating + rawPopularity + rawCategory;
+
+  // หากผลรวมผิดพลาดหรือเป็น 0 ให้ใช้ค่าเริ่มต้น
   if (sum <= 0 || isNaN(sum) || !isFinite(sum)) {
-    return { ...PROVISIONAL_DEFAULT_WEIGHTS };
+    return { ...baseDefaults };
   }
 
   return {
     distance: Math.round((rawDistance / sum) * 10000) / 10000,
     rating: Math.round((rawRating / sum) * 10000) / 10000,
     popularity: Math.round((rawPopularity / sum) * 10000) / 10000,
-    categoryPreference: 0.00,
+    categoryPreference: enableCategoryScoring
+      ? Math.round((rawCategory / sum) * 10000) / 10000
+      : 0.00,
   };
+};
+
+/**
+ * คำนวณคะแนนความตรงตามหมวดหมู่แบบ Normalization (0.00 - 1.00)
+ * จัดการกรณี null category และผู้ใช้ที่ไม่มี preferences อย่างปลอดภัย (Safe Fallback)
+ * @param merchantCategoryId รหัสหมวดหมู่ของร้านค้า (Nullable)
+ * @param userPreferredCategories รายการรหัสหมวดหมู่ที่ผู้ใช้สนใจ
+ */
+export const calculateNormalizedCategoryScore = (
+  merchantCategoryId?: string | null,
+  userPreferredCategories?: string[]
+): number => {
+  // หากร้านค้าไม่มีหมวดหมู่ (null) หรือผู้ใช้งานไม่ได้ตั้งค่าหมวดหมู่ ให้ได้คะแนน Neutral (0.50)
+  if (
+    !merchantCategoryId ||
+    merchantCategoryId.trim() === '' ||
+    !userPreferredCategories ||
+    userPreferredCategories.length === 0
+  ) {
+    return NEUTRAL_CATEGORY_SCORE;
+  }
+
+  const normalizedMerchant = merchantCategoryId.trim().toUpperCase();
+  const normalizedUserList = userPreferredCategories.map((c) => c.trim().toUpperCase());
+
+  // ตรงหมวดหมู่ที่เลือก ให้คะแนนเต็ม 1.00
+  if (normalizedUserList.includes(normalizedMerchant)) {
+    return 1.00;
+  }
+
+  // ผู้ใช้เลือกหมวดหมู่ไว้ แต่ร้านไม่ตรงกับที่เลือก ให้คะแนน 0.00
+  return 0.00;
 };
 
 /**
@@ -163,9 +224,10 @@ export const calculateNormalizedPopularityScore = (
 export const scoreMerchant = (
   input: MerchantScoringInput,
   customWeights?: Partial<RecommendationWeights>,
-  maxRadiusKm = 10
+  maxRadiusKm = 10,
+  enableCategoryScoring = false
 ): ScoredMerchantResult => {
-  const activeWeights = normalizeRecommendationWeights(customWeights);
+  const activeWeights = normalizeRecommendationWeights(customWeights, enableCategoryScoring);
 
   const distanceKm = typeof input.distanceKm === 'number' && isFinite(input.distanceKm)
     ? Math.max(0, input.distanceKm)
@@ -180,9 +242,16 @@ export const scoreMerchant = (
   const distanceScore = calculateNormalizedDistanceScore(distanceKm, maxRadiusKm);
   const ratingScore = calculateNormalizedRatingScore(input.averageRating);
   const popularityScore = calculateNormalizedPopularityScore(input.transactionCount24h);
-  const categoryScore = 0.00; // ปิดใช้งานชั่วคราว
+  
+  // คำนวณคะแนนหมวดหมู่พร้อม Safe Neutral Fallback (0.50 สำหรับ null category หรือ unconfigured user)
+  const categoryScore = calculateNormalizedCategoryScore(
+    input.merchantCategoryId,
+    input.userPreferredCategories
+  );
 
   // รวมคะแนนแบบถ่วงน้ำหนัก
+  // หมายเหตุ: เมื่อ enableCategoryScoring = false (Active Default), activeWeights.categoryPreference จะเป็น 0.00 เสมอ
+  // ทำให้ categoryScore ไม่มีผลกระทบต่อคะแนนรวมจนกว่าจะได้รับการอนุมัติอย่างเป็นทางการ
   const rawTotal =
     distanceScore * activeWeights.distance +
     ratingScore * activeWeights.rating +
@@ -198,7 +267,7 @@ export const scoreMerchant = (
       distanceScore,
       ratingScore,
       popularityScore,
-      categoryScore,
+      categoryScore: activeWeights.categoryPreference > 0 ? categoryScore : 0.00,
       activeWeights,
     },
     distanceKm,

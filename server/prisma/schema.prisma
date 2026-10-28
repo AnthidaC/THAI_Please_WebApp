@@ -156,6 +156,8 @@ model merchants {
   merchant_id          String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   tax_id               String                @unique(map: "uq_merchants_tax_id") @db.VarChar(20)
   shop_name            String                @db.VarChar(100)
+  category_id          String?               @db.VarChar(50)
+  category             categories?           @relation(fields: [category_id], references: [category_id], onDelete: Restrict, onUpdate: NoAction, map: "fk_merchants_category")
   latitude             Decimal               @db.Decimal(10, 8)
   longitude            Decimal               @db.Decimal(11, 8)
   average_rating_stars Decimal               @default(0.0) @db.Decimal(2, 1)
@@ -173,6 +175,7 @@ model merchants {
   merchant_profile_audit_logs merchant_profile_audit_logs[]
 
   @@index([latitude, longitude], map: "idx_merchants_location")
+  @@index([category_id], map: "idx_merchants_category_id")
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
@@ -260,6 +263,7 @@ model reviews {
   rating_stars         Int
   review_text          String?
   is_verified_purchase Boolean      @default(true)
+  is_anonymous         Boolean      @default(false)
   created_at           DateTime     @default(now()) @db.Timestamptz(6)
   updated_at           DateTime     @default(now()) @db.Timestamptz(6)
   merchants            merchants    @relation(fields: [merchant_id], references: [merchant_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_reviews_merchant")
@@ -353,14 +357,16 @@ model user_badge_history {
 model user_category_preferences {
   preference_id     String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   user_id           String   @db.Uuid
-  category_id       String   @db.VarChar(50)
-  preference_weight Decimal  @default(1.00) @db.Decimal(3, 2)
-  created_at        DateTime @default(now()) @db.Timestamptz(6)
-  updated_at        DateTime @default(now()) @db.Timestamptz(6)
-  users             User     @relation(fields: [user_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_user_category_preferences_user")
+  category_id       String     @db.VarChar(50)
+  category          categories @relation(fields: [category_id], references: [category_id], onDelete: Cascade, onUpdate: NoAction, map: "fk_user_category_preferences_category")
+  preference_weight Decimal    @default(1.00) @db.Decimal(3, 2)
+  created_at        DateTime   @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime   @default(now()) @db.Timestamptz(6)
+  users             User       @relation(fields: [user_id], references: [user_id], onDelete: NoAction, onUpdate: NoAction, map: "fk_user_category_preferences_user")
 
   @@unique([user_id, category_id], map: "uq_user_category_preferences_user_category")
   @@index([user_id], map: "idx_user_category_preferences_user")
+  @@index([category_id], map: "idx_user_category_preferences_category_id")
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
@@ -478,6 +484,8 @@ model MerchantApplication {
   tax_id               String                            @db.VarChar(20)
   shop_name            String                            @db.VarChar(100)
   contact_name         String                            @db.VarChar(100)
+  category_id          String?                           @db.VarChar(50)
+  category             categories?                       @relation(fields: [category_id], references: [category_id], onDelete: Restrict, onUpdate: NoAction, map: "fk_merchant_applications_category")
   email                String                            @db.VarChar(254)
   phone                String                            @db.VarChar(30)
   password_hash        String                            @db.VarChar(255)
@@ -498,6 +506,7 @@ model MerchantApplication {
 
   @@index([status, created_at], map: "idx_merchant_applications_status_created")
   @@index([email], map: "idx_merchant_applications_email")
+  @@index([category_id], map: "idx_merchant_applications_category_id")
   @@map("merchant_applications")
 }
 
@@ -615,3 +624,14 @@ model payment_qr_codes {
 
   @@index([expires_at])
 }
+
+model categories {
+  category_id               String                      @id @db.VarChar(50)
+  category_name_th          String                      @db.VarChar(100)
+  is_active                 Boolean                     @default(true)
+  created_at                DateTime                    @default(now()) @db.Timestamptz(6)
+  merchants                 merchants[]
+  merchant_applications     MerchantApplication[]
+  user_category_preferences user_category_preferences[]
+}
+

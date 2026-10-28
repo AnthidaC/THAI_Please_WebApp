@@ -25,6 +25,12 @@ import {
 } from '../../../services/recommendationApi';
 import { geocodingService } from '../../../services/geocodingService';
 import { useAuthStore } from '../../../stores/authStore';
+import {
+  CANONICAL_CATEGORY_LIST,
+  CANONICAL_CATEGORIES,
+  getCategoryDisplayName,
+  isValidCategoryId,
+} from '../../../constants/categories';
 
 /**
  * ข้อมูลร้านค้าแนะนำสำหรับแสดงผลในการ์ด (UI Card Model)
@@ -33,6 +39,7 @@ export interface RecommendedMerchant {
   id: string;
   name: string;
   category: string;
+  categoryId?: string | null;
   distanceKm: number;
   formattedDistance: string;
   ratingStars: number;
@@ -70,15 +77,9 @@ export type GeoStatus =
   | 'timeout' // หมดเวลาค้นหาพิกัด (TIMEOUT)
   | 'unsupported'; // เบราว์เซอร์ไม่รองรับ Geolocation
 
-
-
 const CATEGORIES = [
   'ทั้งหมด',
-  'สตรีทฟู้ด',
-  'อาหารจานด่วน',
-  'เครื่องดื่ม & กาแฟ',
-  'อาหารตามสั่ง',
-  'ขนมหวาน & เบเกอรี่',
+  ...CANONICAL_CATEGORY_LIST.map((c) => c.nameTh),
 ];
 
 const RADIUS_OPTIONS = [
@@ -95,7 +96,8 @@ const RADIUS_OPTIONS = [
 const mapApiItemToCard = (item: RecommendedMerchantItem): RecommendedMerchant => ({
   id: item.merchantId,
   name: item.shopName,
-  category: 'ร้านอาหาร & บริการ Co-pay',
+  category: getCategoryDisplayName(item.categoryId),
+  categoryId: item.categoryId ?? null,
   distanceKm: item.distanceKm,
   formattedDistance: item.formattedDistance || `${item.distanceKm.toFixed(1)} กม.`,
   ratingStars: Number(item.averageRating) || 0,
@@ -244,9 +246,15 @@ export const CitizenNearMePage: React.FC = () => {
   const filteredMerchants = useMemo(() => {
     let list = [...rawMerchants];
 
-    // กรองตามหมวดหมู่
+    // กรองตามหมวดหมู่ (ตรวจสอบทั้งชื่อภาษาไทยและ Canonical Category ID)
     if (selectedCategory !== 'ทั้งหมด') {
-      list = list.filter((m) => m.category === selectedCategory);
+      list = list.filter((m) => {
+        if (m.category === selectedCategory) return true;
+        if (m.categoryId && isValidCategoryId(m.categoryId)) {
+          return CANONICAL_CATEGORIES[m.categoryId]?.nameTh === selectedCategory || m.categoryId === selectedCategory;
+        }
+        return false;
+      });
     }
 
     // กรองตามคำค้นหา

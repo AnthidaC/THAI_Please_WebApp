@@ -40,6 +40,7 @@ export interface CreateReviewPayload {
   transactionId: string;
   ratingStars: number;
   reviewText?: string | null;
+  isAnonymous?: boolean;
 }
 
 /**
@@ -53,6 +54,7 @@ export interface ReviewSubmissionResult {
   ratingStars: number;
   reviewText: string | null;
   isVerifiedPurchase: boolean;
+  isAnonymous?: boolean;
   newMerchantAverageRating: number;
   totalMerchantReviews: number;
   createdAt: string;
@@ -69,11 +71,17 @@ export interface ExistingReviewItem {
   ratingStars: number;
   reviewText: string | null;
   isVerifiedPurchase: boolean;
+  isAnonymous?: boolean;
   createdAt: string;
 }
 
 export interface TransactionReviewCheckResult {
   reviewed: boolean;
+  isEligible?: boolean;
+  eligibilityStatus?: 'ELIGIBLE' | 'ALREADY_REVIEWED' | 'EXPIRED' | 'NOT_ELIGIBLE';
+  message?: string | null;
+  verificationTimestamp?: string;
+  expiresAt?: string;
   review: ExistingReviewItem | null;
 }
 
@@ -89,6 +97,7 @@ export interface UserReviewHistoryItem {
   ratingStars: number;
   reviewText: string | null;
   isVerifiedPurchase: boolean;
+  isAnonymous?: boolean;
   totalAmount?: number;
   citizenPaidAmount?: number;
   transactionDate?: string;
