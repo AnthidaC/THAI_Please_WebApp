@@ -2,13 +2,8 @@ import api from '../lib/axios';
 import { AuthResponse, ApiResponse, User } from '../types';
 
 export const authApi = {
-  login: async (credentials: { email: string; password: string }): Promise<AuthResponse> => {
-    const response = await api.post<AuthResponse>('/auth/login', credentials);
-    return response.data;
-  },
-
-  register: async (userData: { email: string; password: string; name?: string }): Promise<AuthResponse> => {
-    const response = await api.post<AuthResponse>('/auth/register', userData);
+  demoCitizenLogin: async (userId?: string): Promise<AuthResponse> => {
+    const response = await api.post<AuthResponse>('/auth/demo-citizen-login', userId ? { userId } : {});
     return response.data;
   },
 

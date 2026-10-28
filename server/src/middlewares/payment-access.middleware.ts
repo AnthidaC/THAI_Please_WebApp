@@ -9,15 +9,8 @@ export const authenticatePaymentSession = async (req: Request, res: Response, ne
     const header = req.headers.authorization;
     if (!header?.startsWith('Bearer ')) throw new Error('Missing session');
     const token = header.slice(7).trim();
-    // Development only: map demo tokens to test entities
+    // Merchant demo tokens remain limited to development. Citizen sessions must be signed JWTs.
     if (env.NODE_ENV === 'development') {
-      if (token === 'demo-token-citizen' || token === 'demo-token-citizen-new') {
-        const demoUser = await prisma.user.findFirst({ select: { user_id: true } });
-        if (!demoUser) throw new Error('No demo user');
-        req.user = { userId: demoUser.user_id, role: 'USER', isDemo: true };
-        next();
-        return;
-      }
       if (token === 'demo-token-merchant' || token === 'demo-token') {
         const demoMerchant = await prisma.merchants.findFirst({
           where: { shop_name: { contains: 'ข้าวมันไก่' } },
