@@ -1,13 +1,16 @@
 import * as Slider from '@radix-ui/react-slider';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import type { PointerEvent as ReactPointerEvent } from 'react';
 import type { ConditionTypeUnit } from '../../services/admin/gamificationApi';
 import {
   BADGE_TIER_IDENTITIES,
   BADGE_TIER_MAX,
+  beginBadgePointerInteraction,
   calculateBadgeProgressPreview,
+  endBadgePointerInteraction,
   formatBadgeThreshold,
+  getBadgeSliderMax,
   getBadgeThresholdUnitLabel,
-  getSuggestedBadgeSliderMax,
   increaseBadgeSliderMax,
   scaleBadgeThresholds,
   validateBadgeThresholds,
@@ -46,9 +49,11 @@ const BadgeTierThresholdSlider = ({
   const baseId = id ?? `badge-tier-threshold-${generatedId}`;
   const [proportional, setProportional] = useState(false);
   const [expandedMax, setExpandedMax] = useState(0);
+  const [frozenSliderMax, setFrozenSliderMax] = useState<number | null>(null);
   const [localPreviewProgress, setLocalPreviewProgress] = useState('0');
   const [scalingError, setScalingError] = useState('');
   const scalingBaseline = useRef<string[] | null>(null);
+  const pointerInteraction = useRef<{ pointerId: number; frozenMax: number } | null>(null);
   const lastValidSliderValues = useRef<number[]>([1, 2, 3, 4]);
   const inert = disabled || readOnly;
   const tierValidation = useMemo(() => validateBadgeThresholds(values), [values]);
@@ -56,8 +61,7 @@ const BadgeTierThresholdSlider = ({
   useEffect(() => {
     if (tierValidation.valid) lastValidSliderValues.current = values.map(Number);
   }, [tierValidation.valid, values]);
-  const suggestedMax = getSuggestedBadgeSliderMax(values);
-  const sliderMax = Math.max(suggestedMax, expandedMax);
+  const sliderMax = getBadgeSliderMax(values, expandedMax, frozenSliderMax);
   const unitLabel = getBadgeThresholdUnitLabel(measurementUnit, conditionKey);
   const progressValue = previewProgress ?? localPreviewProgress;
   const parsedProgress = progressValue.trim() === '' ? Number.NaN : Number(progressValue);
@@ -124,6 +128,28 @@ const BadgeTierThresholdSlider = ({
     scalingBaseline.current = null;
   };
 
+  const beginPointerInteraction = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const current = pointerInteraction.current;
+    const next = beginBadgePointerInteraction(current, event.pointerId, sliderMax);
+    if (next !== current) {
+      pointerInteraction.current = next;
+      setFrozenSliderMax(next.frozenMax);
+    }
+  };
+
+  const endPointerInteraction = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const current = pointerInteraction.current;
+    const next = endBadgePointerInteraction(current, event.pointerId);
+    if (next !== current) {
+      pointerInteraction.current = next;
+      setFrozenSliderMax(next?.frozenMax ?? null);
+    }
+  };
+
+  useEffect(() => () => {
+    pointerInteraction.current = null;
+  }, []);
+
   const finishNumericEdit = (index: number, value: string) => {
     if (index !== 3 || !proportional || !Number.isSafeInteger(Number(value))) {
       endScalingGesture();
@@ -165,6 +191,10 @@ const BadgeTierThresholdSlider = ({
             disabled={sliderDisabled}
             onValueChange={applySliderValues}
             onValueCommit={endScalingGesture}
+            onPointerDownCapture={beginPointerInteraction}
+            onPointerUpCapture={endPointerInteraction}
+            onPointerCancelCapture={endPointerInteraction}
+            onLostPointerCapture={endPointerInteraction}
             aria-label="เกณฑ์ปลดล็อกเหรียญตรา"
           >
             <Slider.Track className="relative h-1.5 grow overflow-hidden rounded-full bg-slate-200">

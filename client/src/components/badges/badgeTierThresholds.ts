@@ -67,7 +67,9 @@ export const validateBadgeThresholds = (values: readonly string[]): BadgeThresho
 };
 
 const niceCeiling = (value: number): number => {
-  const bounded = Math.min(BADGE_TIER_MAX, Math.max(4, Math.ceil(value)));
+  const bounded = Number.isFinite(value)
+    ? Math.min(BADGE_TIER_MAX, Math.max(4, Math.ceil(value)))
+    : value === Number.POSITIVE_INFINITY ? BADGE_TIER_MAX : 4;
   if (bounded === BADGE_TIER_MAX) return BADGE_TIER_MAX;
 
   const magnitude = 10 ** Math.floor(Math.log10(bounded));
@@ -82,10 +84,39 @@ export const getSuggestedBadgeSliderMax = (values: readonly string[]): number =>
   return niceCeiling(Math.max(4, safeHighest * 1.25));
 };
 
+const normalizeSliderMax = (value: number): number => Number.isSafeInteger(value)
+  ? Math.min(BADGE_TIER_MAX, Math.max(4, value))
+  : 4;
+
+export const getBadgeSliderMax = (
+  values: readonly string[],
+  expandedMax: number,
+  frozenMax: number | null
+): number => frozenMax === null
+  ? Math.max(getSuggestedBadgeSliderMax(values), normalizeSliderMax(expandedMax))
+  : normalizeSliderMax(frozenMax);
+
+export interface BadgePointerInteraction {
+  pointerId: number;
+  frozenMax: number;
+}
+
+export const beginBadgePointerInteraction = (
+  current: BadgePointerInteraction | null,
+  pointerId: number,
+  sliderMax: number
+): BadgePointerInteraction => current ?? { pointerId, frozenMax: normalizeSliderMax(sliderMax) };
+
+export const endBadgePointerInteraction = (
+  current: BadgePointerInteraction | null,
+  pointerId: number
+): BadgePointerInteraction | null => current?.pointerId === pointerId ? null : current;
+
 export const increaseBadgeSliderMax = (currentMax: number): number => {
-  if (currentMax >= BADGE_TIER_MAX) return BADGE_TIER_MAX;
-  const expanded = niceCeiling(Math.max(currentMax + 1, currentMax * 1.25));
-  return expanded > currentMax ? expanded : Math.min(BADGE_TIER_MAX, currentMax + 1);
+  const boundedMax = normalizeSliderMax(currentMax);
+  if (boundedMax >= BADGE_TIER_MAX) return BADGE_TIER_MAX;
+  const expanded = niceCeiling(Math.max(boundedMax + 1, boundedMax * 1.25));
+  return expanded > boundedMax ? expanded : Math.min(BADGE_TIER_MAX, boundedMax + 1);
 };
 
 export type ProportionalScaleResult = { values: string[]; error: null } | { values: null; error: string };
@@ -137,7 +168,7 @@ export const calculateBadgeProgressPreview = (
   values: readonly string[],
   progress: number
 ): BadgeProgressPreview | null => {
-  if (!validateBadgeThresholds(values).valid || !Number.isSafeInteger(progress) || progress < 0) return null;
+  if (!validateBadgeThresholds(values).valid || !Number.isSafeInteger(progress) || progress < 0 || progress > BADGE_TIER_MAX) return null;
   const thresholds = values.map(Number);
   let unlockedIndex = -1;
   thresholds.forEach((threshold, index) => {
