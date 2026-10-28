@@ -720,7 +720,7 @@ export class PaymentService {
       });
       if (claim.count !== 1) throw new Error('QR นี้ถูกชำระแล้ว ถูกยกเลิก หรือหมดอายุ กรุณาตรวจสอบประวัติ');
 
-      await tx.$queryRaw`SELECT wallet_id FROM public.wallets WHERE wallet_id = ${wallet.walletId}::uuid FOR UPDATE`;
+      await tx.$queryRaw`SELECT wallet_id FROM wallets WHERE wallet_id = ${wallet.walletId}::uuid FOR UPDATE`;
       const currentWallet = await tx.wallets.findUnique({
         where: { wallet_id: wallet.walletId },
         include: { campaigns: true },

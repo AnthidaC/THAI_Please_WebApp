@@ -1,8 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
-import { env } from '../config/env';
 import { verifyToken } from '../utils/jwt';
 
-/** Protects management endpoints from the citizen fallback used by demo APIs. */
+/** Allows management endpoints only for valid JWT sessions with the Admin role. */
 export const authenticateAdmin = (
   req: Request,
   res: Response,
@@ -15,12 +14,6 @@ export const authenticateAdmin = (
 
   if (!token) {
     res.status(401).json({ status: 'error', message: 'Authentication required' });
-    return;
-  }
-
-  if (env.NODE_ENV === 'development' && token === 'demo-token-admin') {
-    req.user = { userId: 'admin-001', role: 'ADMIN' };
-    next();
     return;
   }
 

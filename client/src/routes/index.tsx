@@ -4,6 +4,7 @@ import { APP_ROUTES } from '../constants/routes';
 import { RootLayout } from '../layouts/RootLayout';
 import { AuthLayout } from '../layouts/AuthLayout';
 import { AdminRoute } from './AdminRoute';
+import { ProtectedRoute } from './ProtectedRoute';
 import { PublicRoute } from './PublicRoute';
 
 import { HomePage } from '../pages/home/HomePage';
@@ -43,50 +44,27 @@ export const router = createBrowserRouter([
       },
       // Citizen Flow
       {
-        path: APP_ROUTES.CITIZEN_WALLET,
-        element: <CitizenWalletPage />,
-      },
-      {
-        path: APP_ROUTES.CITIZEN_SCAN_COPAY,
-        element: <CitizenScanCopayPage />,
-      },
-      {
-        path: APP_ROUTES.CITIZEN_SLIP,
-        element: <CitizenPaymentSlipPage />,
-      },
-      {
-        path: APP_ROUTES.CITIZEN_TRANSACTIONS,
-        element: <CitizenTransactionsPage />,
-      },
-      {
-        path: APP_ROUTES.CITIZEN_ACHIEVEMENTS,
-        element: <CitizenAchievementsPage />,
-      },
-      {
-        path: APP_ROUTES.CITIZEN_REVIEW,
-        element: <CitizenReviewPage />,
-      },
-      {
-        path: APP_ROUTES.CITIZEN_NEAR_ME,
-        element: <CitizenNearMePage />,
-      },
-      {
-        path: APP_ROUTES.CITIZEN_MERCHANT_DETAIL,
-        element: <CitizenMerchantDetailPage />,
-      },
-      {
-        path: APP_ROUTES.PROFILE,
-        element: <CitizenProfilePage />,
+        element: <ProtectedRoute allowedRoles={['USER']} />,
+        children: [
+          { path: APP_ROUTES.CITIZEN_WALLET, element: <CitizenWalletPage /> },
+          { path: APP_ROUTES.CITIZEN_SCAN_COPAY, element: <CitizenScanCopayPage /> },
+          { path: APP_ROUTES.CITIZEN_SLIP, element: <CitizenPaymentSlipPage /> },
+          { path: APP_ROUTES.CITIZEN_TRANSACTIONS, element: <CitizenTransactionsPage /> },
+          { path: APP_ROUTES.CITIZEN_ACHIEVEMENTS, element: <CitizenAchievementsPage /> },
+          { path: APP_ROUTES.CITIZEN_REVIEW, element: <CitizenReviewPage /> },
+          { path: APP_ROUTES.CITIZEN_NEAR_ME, element: <CitizenNearMePage /> },
+          { path: APP_ROUTES.CITIZEN_MERCHANT_DETAIL, element: <CitizenMerchantDetailPage /> },
+          { path: APP_ROUTES.PROFILE, element: <CitizenProfilePage /> },
+        ],
       },
 
       // Merchant Flow
       {
-        path: APP_ROUTES.MERCHANT_POS_QR,
-        element: <MerchantPosQrPage />,
-      },
-      {
-        path: APP_ROUTES.MERCHANT_SALES,
-        element: <MerchantSalesHistoryPage />,
+        element: <ProtectedRoute allowedRoles={['MERCHANT']} />,
+        children: [
+          { path: APP_ROUTES.MERCHANT_POS_QR, element: <MerchantPosQrPage /> },
+          { path: APP_ROUTES.MERCHANT_SALES, element: <MerchantSalesHistoryPage /> },
+        ],
       },
 
       // Admin routes

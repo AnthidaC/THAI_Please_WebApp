@@ -3,7 +3,7 @@ import {
   getNearbyRecommendations,
   recordRecommendationClick,
 } from '../controllers/recommendation.controller';
-import { authenticate } from '../middlewares/auth.middleware';
+import { authenticate, requireCitizen } from '../middlewares/auth.middleware';
 import { verifyToken } from '../utils/jwt';
 import { sendError } from '../utils/response';
 
@@ -67,6 +67,6 @@ router.get('/near-me', optionalAuthenticate, getNearbyRecommendations);
  * POST /api/recommendations/:recommendationId/click
  * บันทึกสถิติการคลิกการ์ดคำแนะนำร้านค้า (ต้องผ่านการยืนยันตัวตน Authenticated Only)
  */
-router.post('/:recommendationId/click', authenticate, recordRecommendationClick);
+router.post('/:recommendationId/click', authenticate, requireCitizen, recordRecommendationClick);
 
 export default router;

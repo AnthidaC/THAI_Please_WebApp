@@ -172,3 +172,11 @@ Retroactive policy: reconciliation grants tiers the user qualifies for **now**. 
 6. Review and activate Badges in the Admin UI. Do not activate a Badge whose condition is still unimplemented.
 
 Until the migration is deployed, `user_badges.badge_tier_id` does not exist and Badge-related reads fail with `P2022`. Handler and award-engine unit tests do not need the database; concurrency and transaction behaviour must be verified against an isolated database.
+
+## 9. Admin Badge tier contract
+
+Every new Badge Series has four canonical tier identities: `Bronze`/1, `Silver`/2, `Gold`/3, and `Platinum`/4. The Admin API requires all four, positive integer thresholds within the existing PostgreSQL `INTEGER` range, and strictly increasing thresholds. No schema migration is needed.
+
+The Admin editor maps stored tiers by level, preserves each `tier_id` and icon URL, and updates existing rows in place. It does not insert or delete tiers during an edit. A tier with a current or historical award cannot have its definition changed, and an active Badge must be deactivated first. Existing series with missing, extra, or noncanonical levels cannot be edited or activated automatically; the Admin UI reports the stored structure, and a reviewed conversion must map the old rows and awards without deleting history.
+
+Slider scale is derived from the largest threshold and can be expanded. Proportional mode applies only when Platinum changes; direct edits to lower levels remain local. All current measurement units use integer thresholds because `badge_tiers.required_count` is `INTEGER`; the `amount` unit therefore represents whole baht, matching the `total_spending` handler. The progress preview is calculated in the browser and does not read Citizen awards.

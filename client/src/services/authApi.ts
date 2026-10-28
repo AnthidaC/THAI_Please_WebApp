@@ -1,14 +1,12 @@
 import api from '../lib/axios';
-import { AuthResponse, ApiResponse, User } from '../types';
+import { AuthResponse, ApiResponse, DemoLoginRole, User } from '../types';
 
 export const authApi = {
-  login: async (credentials: { email: string; password: string }): Promise<AuthResponse> => {
-    const response = await api.post<AuthResponse>('/auth/login', credentials);
-    return response.data;
-  },
-
-  register: async (userData: { email: string; password: string; name?: string }): Promise<AuthResponse> => {
-    const response = await api.post<AuthResponse>('/auth/register', userData);
+  demoLogin: async (role: DemoLoginRole, accountId?: string): Promise<AuthResponse> => {
+    const response = await api.post<AuthResponse>('/auth/demo-login', {
+      role,
+      ...(accountId ? { accountId } : {}),
+    });
     return response.data;
   },
 
