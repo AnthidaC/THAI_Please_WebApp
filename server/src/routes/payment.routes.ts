@@ -8,6 +8,7 @@ import {
   validateDiscount,
 } from '../controllers/payment.controller';
 import { authenticatePaymentSession as authenticate, requirePaymentMerchant } from '../middlewares/payment-access.middleware';
+import { requireCitizen } from '../middlewares/auth.middleware';
 import { validate } from '../middlewares/validate.middleware';
 import {
   generateQrSchema,
@@ -27,13 +28,14 @@ router.get('/qr/:reference/stream', authenticate, requirePaymentMerchant, stream
 router.get('/qr/:reference/status', authenticate, requirePaymentMerchant, getQrPaymentStatus);
 
 // GET /api/payment/qr/:reference
-router.get('/qr/:reference', authenticate, getQrDetails);
+router.get('/qr/:reference', authenticate, requireCitizen, getQrDetails);
 
 
 // POST /api/payment/discount/validate
 router.post(
   '/discount/validate',
   authenticate,
+  requireCitizen,
   validate(validateDiscountSchema),
   validateDiscount
 );
@@ -42,6 +44,7 @@ router.post(
 router.post(
   '/qr/checkout',
   authenticate,
+  requireCitizen,
   validate(checkoutCopaySchema),
   checkoutCopay
 );

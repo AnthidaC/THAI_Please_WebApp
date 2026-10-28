@@ -177,7 +177,7 @@ export const gamificationService = {
   }),
   updateCampaign: (id: string, input: any) => withDatabaseErrors(async () => {
     await prisma.$transaction(async (tx: any) => {
-      await tx.$queryRaw`SELECT campaign_id FROM public.campaigns WHERE campaign_id = ${id}::uuid FOR UPDATE`;
+      await tx.$queryRaw`SELECT campaign_id FROM campaigns WHERE campaign_id = ${id}::uuid FOR UPDATE`;
       const current = await tx.campaigns.findUnique({ where: { campaign_id: id }, include: campaignInclude });
       if (!current) throw new GamificationServiceError('Record not found', 404);
 
@@ -267,7 +267,23 @@ export const gamificationService = {
               });
             }
           } else {
-            await tx.campaign_periods.create({ data: { campaign_id: id, ...data } });
+            const created = await tx.campaign_periods.create({ data: { campaign_id: id, ...data } });
+            const wallets = await tx.wallets.findMany({
+              where: { campaign_id: id },
+              select: { wallet_id: true },
+            });
+            if (wallets.length) {
+              await tx.wallet_period_quotas.createMany({
+                data: wallets.map((wallet: any) => ({
+                  wallet_id: wallet.wallet_id,
+                  period_id: created.period_id,
+                  quota_limit: period.periodQuotaLimit,
+                  quota_used: 0,
+                  quota_remaining: period.periodQuotaLimit,
+                })),
+                skipDuplicates: true,
+              });
+            }
           }
         }
       }

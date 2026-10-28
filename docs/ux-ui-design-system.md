@@ -70,8 +70,8 @@ THAI Please Layouts
 ### Layout 1: Gateway Layout (ประตูเข้าสู่ระบบ)
 - **สไตล์:** Clean Split Screen หรือ Centered Card สไตล์ Coinbase Onboarding
 - **เส้นทาง:**
-  - `1.1` ประชาชนล็อกอินผ่าน ThaiD / NDID [Dev 1]
-  - `1.2` ร้านค้าและเจ้าหน้าที่ล็อกอินด้วยบัญชี / รหัสผ่าน [Dev 1]
+  - `1.1` เลือกเข้าสู่ระบบด้วยบัญชีจำลองประชาชน ร้านค้า หรือผู้ดูแลที่กำหนดไว้สำหรับ global testing [Dev 1]
+  - `1.2` การยืนยันตัวตนด้วยบัญชีจริงยังไม่อยู่ในขอบเขตของระบบนี้ [Dev 1]
 - **กฎ UX:** ช่องกรอกข้อมูลขนาดใหญ่ ป้ายกำกับชัดเจน ปุ่มล็อกอินรูปทรง Pill เด่นชัด
 
 ---
@@ -127,7 +127,7 @@ THAI Please Layouts
 
 | นักพัฒนา | หน้าที่หลักและ Layout ที่ต้องดูแล | ไฟล์หน้าเพจที่แนะนำ |
 | :--- | :--- | :--- |
-| **Dev 1** | **Gateway & Admin/Gov Dashboard:** <br>• 1.1 - 1.2 Login (ThaiD/Merchant) <br>• 2.1 ตรวจสอบสิทธิ์ <br>• 3.1 & 3.3.3 ทะเบียนร้านค้า <br>• 4.1 & 4.4 Social Impact Dashboard (Heatmap) | `pages/gateway/*`<br>`pages/admin/verification/*`<br>`pages/admin/impact-dashboard/*` |
+| **Dev 1** | **Gateway & Admin/Gov Dashboard:** <br>• 1.1 - 1.2 Login (global test mock accounts) <br>• 2.1 ตรวจสอบสิทธิ์ <br>• 3.1 & 3.3.3 ทะเบียนร้านค้า <br>• 4.1 & 4.4 Social Impact Dashboard (Heatmap) | `pages/gateway/*`<br>`pages/admin/verification/*`<br>`pages/admin/impact-dashboard/*` |
 | **Dev 2** | **Fintech Core (Wallet, Payment & Security):** <br>• 2.2 Wallet & Co-pay Scanner / Slip <br>• 2.5.1 ประวัติธุรกรรม <br>• 3.2 Dynamic QR รับเงิน <br>• 3.3.1 สถิติการขายร้านค้า <br>• 4.2 ระบบตรวจทุจริต GPS | `pages/citizen/wallet/*`<br>`pages/citizen/scan-copay/*`<br>`pages/merchant/pos-qr/*`<br>`pages/admin/fraud-alerts/*` |
 | **Dev 3** | **Location & Community (AI Near-Me & Reviews):** <br>• 2.3 AI ค้นหาร้านค้าใกล้เคียง & แผนที่ <br>• 2.4.3 Referral แนะนำเพื่อน <br>• 2.5.2 รีวิวร้านค้า 24 ชม. <br>• 3.3.2 สรุปคะแนนร้านค้า | `pages/citizen/near-me/*`<br>`pages/citizen/reviews/*`<br>`pages/merchant/reviews/*` |
 | **Dev 4** | **Gamification & Engagement:** <br>• 2.4.1 กระดานภารกิจ (Quests) & Badges <br>• 2.4.2 หน้ารวมคูปองส่วนลด <br>• 4.3 หลังบ้านจัดการแคมเปญ & ของรางวัล | `pages/citizen/quests/*`<br>`pages/citizen/coupons/*`<br>`pages/admin/campaigns/*` |

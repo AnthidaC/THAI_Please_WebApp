@@ -12,6 +12,13 @@ import {
 import { bangkokDateTimeToIso, generateMonthlyCampaignPeriods, isoToBangkokDateTime } from './campaignPeriodDates';
 import { adminGamificationErrorMessage } from './adminGamificationError';
 import { moneyToCents, periodQuotasMatchCampaignTotal, sumMoneyCents } from './campaignQuota';
+import BadgeTierThresholdSlider from '../../../components/badges/BadgeTierThresholdSlider';
+import {
+  BADGE_TIER_IDENTITIES,
+  getDefaultBadgeThresholds,
+  hasCanonicalBadgeTierStructure,
+  validateBadgeThresholds,
+} from '../../../components/badges/badgeTierThresholds';
 
 export type ManagedResource = 'campaigns' | 'missions' | 'rewards' | 'badges';
 type ManagedRecord = CampaignRecord | MissionRecord | RewardRecord | BadgeRecord;
@@ -121,27 +128,28 @@ const initialCampaignPeriods = (record: ManagedRecord | null): CampaignPeriodDra
 interface BadgeTierDraft {
   key: string;
   tierId?: string;
-  tierName: string;
-  tierLevel: string;
   requiredCount: string;
   iconUrl: string;
   earnedCount: number;
 }
 
-const initialBadgeTiers = (record: ManagedRecord | null): BadgeTierDraft[] => {
+const initialBadgeTiers = (
+  record: ManagedRecord | null,
+  measurementUnit: ConditionTypeRecord['measurementUnit'] | undefined,
+  conditionKey: string | undefined
+): BadgeTierDraft[] => {
   const item = record as BadgeRecord | null;
-  if (item && Array.isArray(item.tiers) && item.tiers.length > 0) {
-    return item.tiers.map((tier: BadgeTierRecord) => ({
-      key: tier.id,
-      tierId: tier.id,
-      tierName: tier.name,
-      tierLevel: String(tier.level),
-      requiredCount: String(tier.requiredCount),
-      iconUrl: tier.iconUrl ?? '',
-      earnedCount: tier.earnedCount,
-    }));
-  }
-  return [{ key: 'new-tier-1', tierName: 'ทองแดง', tierLevel: '1', requiredCount: '5', iconUrl: '', earnedCount: 0 }];
+  const defaults = getDefaultBadgeThresholds(measurementUnit, conditionKey);
+  return BADGE_TIER_IDENTITIES.map((identity, index) => {
+    const tier: BadgeTierRecord | undefined = item?.tiers.find((stored) => stored.level === identity.level);
+    return {
+      key: tier?.id ?? `new-badge-tier-${identity.level}`,
+      ...(tier?.id && { tierId: tier.id }),
+      requiredCount: tier ? String(tier.requiredCount) : String(defaults[index]),
+      iconUrl: tier?.iconUrl ?? '',
+      earnedCount: tier?.earnedCount ?? 0,
+    };
+  });
 };
 
 const titles: Record<ManagedResource, { create: string; edit: string; description: string }> = {
@@ -172,16 +180,25 @@ const missionTypeOptions = [
 ];
 
 export const RecordEditorDialog: React.FC<Props> = ({ resource, record, campaigns, rewards, saving, conditionTypes, conditionTypesError, onManageConditionTypes, onClose, onSave }) => {
-  const [values, setValues] = useState(() => initialValues(resource, record));
+  const initialFormValues = initialValues(resource, record);
+  const initialBadgeCondition = conditionTypes.find((condition) => condition.key === initialFormValues.conditionType);
+  const [values, setValues] = useState(initialFormValues);
   const [periods, setPeriods] = useState(() => initialCampaignPeriods(record));
   const [periodsEnabled, setPeriodsEnabled] = useState(() => Boolean((record as CampaignRecord | null)?.periods?.length));
   const [monthCount, setMonthCount] = useState('');
   const [monthlyQuota, setMonthlyQuota] = useState('');
-  const [badgeTiers, setBadgeTiers] = useState(() => initialBadgeTiers(record));
+  const [badgeTiers, setBadgeTiers] = useState(() => initialBadgeTiers(record, initialBadgeCondition?.measurementUnit, initialBadgeCondition?.key));
+  const [badgeThresholdsEdited, setBadgeThresholdsEdited] = useState(false);
   const [error, setError] = useState('');
   const dialogRef = useRef<HTMLElement>(null);
   const content = titles[resource];
   const selectedConditionType = conditionTypes.find((condition) => condition.key === values.conditionType);
+  const badgeRecord = resource === 'badges' ? record as BadgeRecord | null : null;
+  const badgeTierStructureCompatible = !badgeRecord || (
+    badgeRecord.tierStructureCompatible && hasCanonicalBadgeTierStructure(badgeRecord.tiers)
+  );
+  const badgeTiersActive = badgeRecord?.status === 'active';
+  const badgeThresholdValidation = validateBadgeThresholds(badgeTiers.map((tier) => tier.requiredCount));
   const hasPersistedPeriod = periods.some((period) => Boolean(period.periodId));
   const hasLockedPeriod = periods.some((period) => !period.isEditable);
   const configuredPeriodQuotaCents = sumMoneyCents(periods.map((period) => period.periodQuotaLimit));
@@ -226,7 +243,21 @@ export const RecordEditorDialog: React.FC<Props> = ({ resource, record, campaign
     };
   }, [onClose, saving]);
 
-  const set = (key: string, value: string) => setValues((current) => ({ ...current, [key]: value }));
+  const set = (key: string, value: string) => {
+    setValues((current) => ({ ...current, [key]: value }));
+    if (resource === 'badges' && key === 'conditionType' && !record && !badgeThresholdsEdited) {
+      const condition = conditionTypes.find((item) => item.key === value);
+      const defaults = getDefaultBadgeThresholds(condition?.measurementUnit, condition?.key);
+      setBadgeTiers((current) => current.map((tier, index) => ({ ...tier, requiredCount: String(defaults[index]) })));
+    }
+  };
+  const updateBadgeThresholds = (thresholds: string[]) => {
+    setBadgeThresholdsEdited(true);
+    setBadgeTiers((current) => current.map((tier, index) => ({
+      ...tier,
+      requiredCount: thresholds[index] ?? tier.requiredCount,
+    })));
+  };
   const showValidationError = (message: string, fieldId?: string) => {
     setError(message);
     requestAnimationFrame(() => document.getElementById(fieldId ?? 'record-dialog-error')?.focus());
@@ -272,34 +303,21 @@ export const RecordEditorDialog: React.FC<Props> = ({ resource, record, campaign
     event.preventDefault();
     setError('');
     if (resource === 'badges') {
-      const orderedTiers = badgeTiers.map((tier) => ({
-        ...tier,
-        level: Number(tier.tierLevel),
-        requiredCount: Number(tier.requiredCount),
-      })).sort((left, right) => left.level - right.level);
+      if (!badgeTierStructureCompatible) {
+        showValidationError('เหรียญตรานี้มีระดับเดิมที่ไม่ตรงกับ 4 ระดับมาตรฐาน จึงป้องกันการบันทึกไว้ก่อน กรุณาตรวจสอบแผนปรับข้อมูลโดยรักษาประวัติเดิม');
+        return;
+      }
       if (!conditionTypes.some((condition) => condition.key === values.conditionType)) {
         showValidationError('กรุณาเลือกประเภทเงื่อนไขจากรายการ หรือเพิ่มประเภทใหม่ในหน้าจัดการประเภทเงื่อนไข', 'badge-condition');
         return;
       }
-      const invalidTier = orderedTiers.find((tier) => !tier.tierName.trim() || !Number.isInteger(tier.level) || tier.level < 1 || tier.level > 1000 || !Number.isInteger(tier.requiredCount) || tier.requiredCount < 1);
-      if (invalidTier) {
-        const field = !invalidTier.tierName.trim() ? 'name' : !Number.isInteger(invalidTier.level) || invalidTier.level < 1 || invalidTier.level > 1000 ? 'level' : 'count';
-        showValidationError('กรอกชื่อระดับ ลำดับระดับที่เป็นจำนวนเต็มบวก และเกณฑ์ที่เป็นจำนวนเต็มบวกให้ครบทุกระดับ', `badge-tier-${invalidTier.key}-${field}`);
-        return;
-      }
-      const duplicateLevel = orderedTiers.find((tier, index) => orderedTiers.some((other, otherIndex) => other.level === tier.level && otherIndex !== index));
-      if (duplicateLevel) {
-        showValidationError('ลำดับระดับต้องไม่ซ้ำกัน', `badge-tier-${duplicateLevel.key}-level`);
-        return;
-      }
-      const duplicateThreshold = orderedTiers.find((tier, index) => orderedTiers.some((other, otherIndex) => other.requiredCount === tier.requiredCount && otherIndex !== index));
-      if (duplicateThreshold) {
-        showValidationError('เกณฑ์ของแต่ละระดับต้องไม่ซ้ำกัน', `badge-tier-${duplicateThreshold.key}-count`);
-        return;
-      }
-      const unorderedIndex = orderedTiers.findIndex((tier, index) => index > 0 && tier.requiredCount <= orderedTiers[index - 1].requiredCount);
-      if (unorderedIndex >= 0) {
-        showValidationError('เกณฑ์ต้องเพิ่มขึ้นตามลำดับระดับอย่างเคร่งครัด', `badge-tier-${orderedTiers[unorderedIndex].key}-count`);
+      if (!badgeThresholdValidation.valid) {
+        const invalidIndex = badgeThresholdValidation.errors.findIndex(Boolean);
+        const tier = BADGE_TIER_IDENTITIES[Math.max(0, invalidIndex)];
+        showValidationError(
+          badgeThresholdValidation.message ?? 'ตรวจสอบเกณฑ์ทั้ง 4 ระดับอีกครั้ง',
+          `badge-tier-thresholds-${tier.name.toLowerCase()}`
+        );
         return;
       }
     }
@@ -398,10 +416,10 @@ export const RecordEditorDialog: React.FC<Props> = ({ resource, record, campaign
           badgeName: values.name.trim(),
           description: values.description.trim() || null,
           ...(!record && { conditionType: values.conditionType.trim() }),
-          tiers: badgeTiers.map((tier) => ({
+          tiers: badgeTiers.map((tier, index) => ({
             ...(tier.tierId && { tierId: tier.tierId }),
-            tierName: tier.tierName.trim(),
-            tierLevel: Number(tier.tierLevel),
+            tierName: BADGE_TIER_IDENTITIES[index].name,
+            tierLevel: BADGE_TIER_IDENTITIES[index].level,
             requiredCount: Number(tier.requiredCount),
             iconUrl: tier.iconUrl.trim() || null,
           })),
@@ -615,52 +633,63 @@ export const RecordEditorDialog: React.FC<Props> = ({ resource, record, campaign
                 </Field>
 
                 <section aria-labelledby="badge-tiers-heading" className="space-y-3 rounded-2xl border border-hairline bg-surface-soft/60 p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <h3 id="badge-tiers-heading" className="text-sm font-semibold text-ink">ระดับเหรียญตรา</h3>
-                      <p className="mt-1 text-xs leading-5 text-ink-muted">กำหนดเกณฑ์ของแต่ละระดับ โดยระดับที่สูงขึ้นต้องใช้ความคืบหน้ามากขึ้น</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setBadgeTiers((current) => {
-                        const nextLevel = Math.max(0, ...current.map((tier) => Number(tier.tierLevel) || 0)) + 1;
-                        const nextCount = Math.max(0, ...current.map((tier) => Number(tier.requiredCount) || 0)) + 1;
-                        return [...current, { key: crypto.randomUUID(), tierName: `ระดับ ${nextLevel}`, tierLevel: String(nextLevel), requiredCount: String(nextCount), iconUrl: '', earnedCount: 0 }];
-                      })}
-                      disabled={badgeTiers.length >= 50}
-                      className="inline-flex min-h-10 items-center justify-center rounded-pill border border-blue-200 bg-white px-4 text-sm font-semibold text-brand-blue transition hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-100"
-                    >
-                      เพิ่มระดับ
-                    </button>
+                  <div>
+                    <h3 id="badge-tiers-heading" className="text-sm font-semibold text-ink">เกณฑ์ปลดล็อกเหรียญตรา 4 ระดับ</h3>
+                    <p className="mt-1 text-xs leading-5 text-ink-muted">ลำดับและชื่อระดับเป็นมาตรฐานเดียวกัน ปรับได้เฉพาะเกณฑ์และรูปไอคอน</p>
                   </div>
-                  {badgeTiers.map((tier) => {
-                    const earned = tier.earnedCount > 0;
-                    const updateTier = (field: 'tierName' | 'tierLevel' | 'requiredCount' | 'iconUrl', value: string) => {
-                      setBadgeTiers((current) => current.map((item) => item.key === tier.key ? { ...item, [field]: value } : item));
-                    };
-                    return (
-                      <article key={tier.key} className="rounded-xl border border-hairline bg-white p-3 sm:p-4">
-                        <div className="grid gap-3 sm:grid-cols-2">
-                          <Field label="ชื่อระดับ" htmlFor={`badge-tier-${tier.key}-name`}>
-                            <input id={`badge-tier-${tier.key}-name`} name={`tier_${tier.key}_name`} autoComplete="off" required maxLength={50} disabled={earned} value={tier.tierName} onChange={(event) => updateTier('tierName', event.target.value)} className={inputClass} />
+
+                  {badgeRecord && !badgeTierStructureCompatible && (
+                    <div role="alert" className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-3 text-sm text-amber-950">
+                      <p className="font-semibold">เหรียญตรานี้มีโครงสร้างระดับเดิมที่ไม่ครบหรือไม่ตรงกับมาตรฐาน 4 ระดับ ระบบจึงปิดการแก้ไขและไม่ลบข้อมูลเดิม</p>
+                      <ul className="mt-2 list-inside list-disc space-y-1 text-xs leading-5">
+                        {badgeRecord.tiers.map((tier) => <li key={tier.id}>{tier.name} · ระดับ {tier.level} · เกณฑ์ {tier.requiredCount.toLocaleString('th-TH')}</li>)}
+                      </ul>
+                      <p className="mt-2 text-xs leading-5">ต้องตรวจสอบรหัสระดับและประวัติการปลดล็อก แล้วจัดทำแผนปรับข้อมูลแบบรักษารายการเดิมก่อนแก้เหรียญตรานี้</p>
+                    </div>
+                  )}
+
+                  {badgeTiersActive && badgeTierStructureCompatible && (
+                    <p role="status" className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs leading-5 text-blue-900">
+                      ปิดใช้งานเหรียญตราก่อนแก้เกณฑ์หรือรูปไอคอน
+                    </p>
+                  )}
+
+                  <BadgeTierThresholdSlider
+                    id="badge-tier-thresholds"
+                    values={badgeTiers.map((tier) => tier.requiredCount)}
+                    onChange={updateBadgeThresholds}
+                    measurementUnit={selectedConditionType?.measurementUnit}
+                    conditionKey={values.conditionType}
+                    conditionName={selectedConditionType?.displayName}
+                    disabled={!badgeTierStructureCompatible || badgeTiersActive}
+                    lockedTiers={badgeTiers.map((tier) => tier.earnedCount > 0)}
+                  />
+
+                  <fieldset disabled={!badgeTierStructureCompatible || badgeTiersActive} className="space-y-2">
+                    <legend className="text-xs font-semibold text-ink-body">รูปไอคอนของแต่ละระดับ (ไม่บังคับ)</legend>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {BADGE_TIER_IDENTITIES.map((identity, index) => {
+                        const tier = badgeTiers[index];
+                        const iconId = `badge-tier-${identity.level}-icon`;
+                        return (
+                          <Field key={identity.level} label={`ไอคอนระดับ${identity.label}`} htmlFor={iconId}>
+                            <input
+                              id={iconId}
+                              name={`badgeTier${identity.level}IconUrl`}
+                              autoComplete="off"
+                              type="url"
+                              maxLength={2048}
+                              disabled={tier.earnedCount > 0}
+                              value={tier.iconUrl}
+                              onChange={(event) => setBadgeTiers((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, iconUrl: event.target.value } : item))}
+                              className={inputClass}
+                              placeholder="https://…"
+                            />
                           </Field>
-                          <Field label="ลำดับระดับ" htmlFor={`badge-tier-${tier.key}-level`}>
-                            <input id={`badge-tier-${tier.key}-level`} name={`tier_${tier.key}_level`} autoComplete="off" required type="number" min="1" max="1000" step="1" disabled={earned} value={tier.tierLevel} onChange={(event) => updateTier('tierLevel', event.target.value)} className={inputClass} />
-                          </Field>
-                          <Field label="จำนวนที่ต้องทำ" htmlFor={`badge-tier-${tier.key}-count`}>
-                            <input id={`badge-tier-${tier.key}-count`} name={`tier_${tier.key}_count`} autoComplete="off" required type="number" min="1" max="2147483647" step="1" disabled={earned} value={tier.requiredCount} onChange={(event) => updateTier('requiredCount', event.target.value)} className={inputClass} />
-                          </Field>
-                          <Field label="URL รูปไอคอน (ไม่บังคับ)" htmlFor={`badge-tier-${tier.key}-icon`}>
-                            <input id={`badge-tier-${tier.key}-icon`} name={`tier_${tier.key}_icon_url`} autoComplete="off" type="url" maxLength={2048} disabled={earned} value={tier.iconUrl} onChange={(event) => updateTier('iconUrl', event.target.value)} className={inputClass} placeholder="https://…" />
-                          </Field>
-                        </div>
-                        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-                          {earned ? <p className="text-xs text-amber-800">มีผู้ปลดล็อกแล้ว {tier.earnedCount.toLocaleString('th-TH')} คน ระบบจะเก็บระดับนี้ไว้และไม่ให้แก้ไข</p> : <p className="text-xs text-ink-muted">ยังไม่มีผู้ใช้ปลดล็อกระดับนี้</p>}
-                          <button type="button" disabled={badgeTiers.length === 1 || earned} onClick={() => setBadgeTiers((current) => current.filter((item) => item.key !== tier.key))} aria-label={`ลบระดับ ${tier.tierName}`} className="min-h-10 rounded-pill px-3 text-sm font-semibold text-status-error transition hover:bg-red-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-red-100 disabled:cursor-not-allowed disabled:opacity-40">ลบระดับ</button>
-                        </div>
-                      </article>
-                    );
-                  })}
+                        );
+                      })}
+                    </div>
+                  </fieldset>
                 </section>
                 <p role="status" className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-ink-body">เหรียญตราใหม่จะมีสถานะรอพัฒนาและปิดใช้งาน ต้องมีตัวประมวลผลในระบบหลังบ้านและพร้อมใช้งานก่อนเปิดให้ประชาชน</p>
               </>
@@ -668,7 +697,13 @@ export const RecordEditorDialog: React.FC<Props> = ({ resource, record, campaign
           </div>
           <footer className="flex flex-col-reverse gap-2 border-t border-hairline bg-white px-5 py-4 sm:flex-row sm:justify-end sm:px-7">
             <button type="button" onClick={onClose} disabled={saving} className="rounded-pill border border-hairline px-5 py-2.5 text-sm font-semibold text-ink-body transition hover:bg-surface-soft focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-100 disabled:opacity-50">ยกเลิก</button>
-            <button type="submit" disabled={saving || (resource === 'campaigns' && periodsEnabled && !periodQuotaMatches)} className="rounded-pill bg-brand-blue px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-blue-hover focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-200 disabled:cursor-wait disabled:opacity-60">
+            <button
+              type="submit"
+              disabled={saving
+                || (resource === 'campaigns' && periodsEnabled && !periodQuotaMatches)
+                || (resource === 'badges' && (!badgeThresholdValidation.valid || !badgeTierStructureCompatible))}
+              className="rounded-pill bg-brand-blue px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-blue-hover focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-200 disabled:cursor-wait disabled:opacity-60"
+            >
               {saving ? 'กำลังบันทึก…' : record ? 'บันทึกการแก้ไข' : 'สร้างรายการ'}
             </button>
           </footer>

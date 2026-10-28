@@ -29,4 +29,11 @@ export const APP_ROUTES = {
   ADMIN_CAMPAIGNS: '/admin/campaigns',
 } as const;
 
+export const homeRouteForRole = (role: string | undefined): string => {
+  if (role === 'ADMIN') return APP_ROUTES.ADMIN_DASHBOARD;
+  if (role === 'MERCHANT') return APP_ROUTES.MERCHANT_POS_QR;
+  if (role === 'USER') return APP_ROUTES.CITIZEN_WALLET;
+  return APP_ROUTES.HOME;
+};
+
 export type AppRoute = typeof APP_ROUTES[keyof typeof APP_ROUTES];

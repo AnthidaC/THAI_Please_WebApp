@@ -175,15 +175,23 @@ async function main() {
       return safeAssessment;
     };
     const walletRace = await Promise.allSettled([checkout(firstQr.qrReference), checkout(secondQr.qrReference)]);
-    assert.equal(walletRace.filter(result => result.status === 'fulfilled').length, 1);
+    assert.equal(walletRace.filter(result => result.status === 'fulfilled').length, 2);
     const afterRace = await db.wallets.findUniqueOrThrow({ where: { wallet_id: wallet.wallet_id } });
-    assert.equal(Number(afterRace.balance), 910);
-    assert.equal(Number(afterRace.daily_quota_used), 180);
+    assert.equal(Number(afterRace.balance), 830);
+    assert.equal(Number(afterRace.daily_quota_used), 200);
+    assert.equal(Number(afterRace.total_quota_remaining), 2800);
+    const walletRaceTransactions = await db.transactions.findMany({
+      where: { qr_reference: { in: [firstQr.qrReference, secondQr.qrReference] } },
+      select: { government_copay_amount: true, citizen_paid_amount: true },
+    });
+    assert.equal(walletRaceTransactions.length, 2);
+    assert.equal(walletRaceTransactions.reduce((total, transaction) => total + Number(transaction.government_copay_amount), 0), 80);
+    assert.equal(walletRaceTransactions.reduce((total, transaction) => total + Number(transaction.citizen_paid_amount), 0), 120);
     const expired = await newQr();
     await paymentService._simulateExpireQr(expired.qrReference);
     await assert.rejects(paymentService.getQrDetails(expired.qrReference), /หมดอายุ/);
     fraudService.evaluateTransaction = originalFraud;
-    console.log('PASS: simultaneous checkout, transaction rollback releases QR, concurrent top-ups preserve balances');
+    console.log('PASS: simultaneous checkout, rollback releases QR, and concurrent payments preserve quota and balances');
 
     await db.transactions.createMany({ data: [
       { user_id: user.user_id, merchant_id: merchant.merchant_id, total_amount: 10, citizen_paid_amount: 4, government_copay_amount: 6, status: 'SUCCESS', created_at: new Date('2001-01-01T16:59:59Z') },
@@ -198,7 +206,11 @@ async function main() {
       campaign_id: campaign.campaign_id, period_name: 'Test period', period_quota_limit: 1000,
       start_date: new Date(Date.now() - 86400000), end_date: new Date(Date.now() + 86400000),
     } });
-    await db.wallets.update({ where: { wallet_id: wallet.wallet_id }, data: { total_quota_remaining: 5 } });
+    await db.wallets.update({ where: { wallet_id: wallet.wallet_id }, data: {
+      total_quota_remaining: 5,
+      daily_quota_used: 0,
+      last_quota_reset_date: new Date(`${thaiDateKey()}T00:00:00Z`),
+    } });
     const cappedQr = await newQr();
     const preview = await paymentService.getQrDetails(cappedQr.qrReference, user.user_id);
     assert.equal(preview.copaySplit!.governmentCopayAmount, 5);
