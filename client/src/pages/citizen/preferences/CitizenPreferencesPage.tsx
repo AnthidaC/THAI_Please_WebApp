@@ -63,6 +63,7 @@ export const CitizenPreferencesPage: React.FC = () => {
     },
     onSuccess: (data) => {
       queryClient.setQueryData(['user-preferences'], data);
+      queryClient.invalidateQueries({ queryKey: ['recommendations'] });
       setSuccessToast('บันทึกการตั้งค่าประเภทร้านค้าที่สนใจเรียบร้อยแล้ว');
       setErrorMessage(null);
       setTimeout(() => setSuccessToast(null), 4000);

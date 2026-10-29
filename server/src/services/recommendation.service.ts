@@ -6,10 +6,12 @@ import {
 } from '../utils/recommendation-distance';
 import {
   RecommendationWeights,
+  ACTIVE_RECOMMENDATION_WEIGHTS,
   PROVISIONAL_DEFAULT_WEIGHTS,
   ScoreBreakdown,
   scoreMerchant,
   rankScoredMerchants,
+  UserPreferenceInput,
 } from '../utils/recommendation-scoring';
 import { recommendationPopularityService } from './recommendation-popularity.service';
 import { CandidateMerchant } from './ai-recommendation.client';
@@ -58,7 +60,7 @@ export interface GetRecommendationsOptions {
   longitude: number;
   radiusKm?: number;
   limit?: number;
-  userPreferredCategories?: string[];
+  userPreferredCategories?: UserPreferenceInput[];
   customWeights?: Partial<RecommendationWeights>;
 }
 
@@ -314,7 +316,7 @@ export class RecommendationService {
    * 2. หากไม่พบร้านค้า ให้คืนอาร์เรย์ว่างทันทีโดยไม่ยิง Query 24h Popularity
    * 3. Batch-fetch 24h popularity ผ่าน recommendationPopularityService
    * 4. แปลง Prisma Decimal ratings เป็น Number อย่างปลอดภัย
-   * 5. คำนวณคะแนน Multi-factor ด้วย scoreMerchant()
+   * 5. คำนวณคะแนน Multi-factor ด้วย scoreMerchant() (Active Weights: 35/25/25/15)
    * 6. จัดอันดับแบบ Deterministic ด้วย rankScoredMerchants()
    *
    * @param latitude พิกัดละติจูด
@@ -328,7 +330,7 @@ export class RecommendationService {
     longitude: number,
     radiusKm = 10,
     customWeights?: Partial<RecommendationWeights>,
-    userPreferredCategories?: string[]
+    userPreferredCategories?: UserPreferenceInput[]
   ): Promise<ScoredMerchantCandidate[]> {
     // 1. ดึงร้านค้าผู้สมัครในรัศมี (Approved & Haversine filtered)
     const candidates = await this.getNearbyMerchantCandidates(latitude, longitude, radiusKm);
@@ -362,7 +364,8 @@ export class RecommendationService {
           userPreferredCategories,
         },
         customWeights,
-        radiusKm
+        radiusKm,
+        true // enableCategoryScoring = true (Active Rule-based scoring)
       );
 
       return {
@@ -403,7 +406,7 @@ export class RecommendationService {
 
     const safeLimit = Math.max(1, Math.min(limit, 10));
 
-    // 1. ดึงและคำนวณคะแนนร้านค้าผู้สมัคร (Stage 1 Rule-based Scoring)
+    // 1. ดึงและคำนวณคะแนนร้านค้าผู้สมัคร (Stage 1 Rule-based Scoring พร้อม Category Relevance)
     const scoredCandidates = await this.getScoredMerchantCandidates(
       latitude,
       longitude,
@@ -482,8 +485,6 @@ export class RecommendationService {
     const limitedRecommendations = finalRecommendations.slice(0, safeLimit);
 
     // 9. บันทึกสถิติ Recommendation Served (ส่งมอบคำแนะนำ) เฉพาะผู้ใช้ที่ยืนยันตัวตนแล้ว (Authenticated Citizen)
-    // [TELEMETRY PRINCIPLE]: การบันทึกสถิติทำงานแบบ Non-blocking หากล้มเหลวจะไม่ขัดขวางการแสดงผลคำแนะนำแก่ผู้ใช้
-    // [DISCLAIMER]: สถิตินี้คือ "Recommendation Served" (คำแนะนำที่เซิร์ฟเวอร์ส่งมอบ) ไม่ใช่ "Visible Impression" (การมองเห็นจริงบนหน้าจอ)
     let recommendationIdMap = new Map<string, string>();
 
     if (options.userId && typeof options.userId === 'string' && options.userId.trim().length > 0) {
@@ -541,9 +542,10 @@ export const getScoredMerchantCandidates = (
   latitude: number,
   longitude: number,
   radiusKm = 10,
-  customWeights?: Partial<RecommendationWeights>
+  customWeights?: Partial<RecommendationWeights>,
+  userPreferredCategories?: UserPreferenceInput[]
 ): Promise<ScoredMerchantCandidate[]> => {
-  return recommendationService.getScoredMerchantCandidates(latitude, longitude, radiusKm, customWeights);
+  return recommendationService.getScoredMerchantCandidates(latitude, longitude, radiusKm, customWeights, userPreferredCategories);
 };
 
 export const getRecommendations = (
