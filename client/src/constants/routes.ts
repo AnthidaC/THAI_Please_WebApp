@@ -1,8 +1,15 @@
 export const APP_ROUTES = {
   HOME: '/',
   LOGIN: '/login',
+  MERCHANT_LOGIN: '/merchant/login',
+  MERCHANT_REGISTER: '/merchant/register',
+  STAFF_LOGIN: '/staff/login',
   REGISTER: '/register',
   DASHBOARD: '/dashboard',
+  MERCHANT_HOME: '/merchant/home',
+  MERCHANT_APPLICATION_STATUS: '/merchant/application-status',
+  MERCHANT_PROFILE: '/merchant/profile',
+  CITIZEN_BENEFITS_REGISTER: '/citizen/register-benefits',
   PROFILE: '/profile',
 
   // เส้นทางประชาชน (Citizen Flow)
@@ -26,6 +33,10 @@ export const APP_ROUTES = {
   // เส้นทางผู้ดูแลระบบ (Admin Flow)
   ADMIN_ROOT: '/admin',
   ADMIN_DASHBOARD: '/admin/dashboard',
+  ADMIN_MERCHANT_APPLICATIONS: '/admin/merchant-applications',
+  ADMIN_MERCHANT_LOCATION_REQUESTS: '/admin/merchant-location-requests',
+  ADMIN_MERCHANTS: '/admin/merchants',
+  ADMIN_SOCIAL_IMPACT: '/admin/social-impact',
   ADMIN_FRAUD_ALERTS: '/admin/fraud-alerts',
   ADMIN_CAMPAIGNS: '/admin/campaigns',
 } as const;

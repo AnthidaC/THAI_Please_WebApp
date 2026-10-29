@@ -76,7 +76,7 @@ test('UpdatePreferencesPayload: Rejects duplicate category IDs in payload array'
   });
   assert.equal(duplicate.success, false);
   if (!duplicate.success) {
-    assert.match(duplicate.error.errors[0].message, /ซ้ำซ้อน/);
+    assert.match(duplicate.error.issues[0].message, /ซ้ำซ้อน/);
   }
 });
 

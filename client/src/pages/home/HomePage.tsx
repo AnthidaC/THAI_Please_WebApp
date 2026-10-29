@@ -1,111 +1,93 @@
 import React from 'react';
+import { ArrowRight, BadgeCheck, ChartNoAxesCombined, CheckCircle2, Gift, HandCoins, MapPinned, QrCode, ShieldCheck, Star, Store, Target, Trophy, UserRound } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import {
-  Wallet,
-  QrCode,
-  ArrowRight,
-  Sparkles,
-  Gift,
-  Target,
-} from 'lucide-react';
+import { homeContent } from '../../content/homeContent';
 import { APP_ROUTES } from '../../constants/routes';
+import { useAuthStore } from '../../stores/authStore';
+
+const highlightIcons = [HandCoins, MapPinned, Trophy, Star, ChartNoAxesCombined];
+const audienceIcons = [UserRound, Store, ShieldCheck];
 
 export const HomePage: React.FC = () => {
+  const isCitizen = useAuthStore((state) => state.isAuthenticated && state.user?.role === 'USER');
+
   return (
-    <div className="min-h-[85vh] bg-surface-soft py-6 md:py-8 px-4 pb-24 md:pb-12 font-sans text-ink">
-      <div className="max-w-4xl mx-auto space-y-8">
-        {/* Hero Section */}
-        <div className="rounded-card border border-hairline bg-white p-8 shadow-sm text-center">
-          <div className="inline-flex items-center space-x-1.5 rounded-pill bg-brand-blue-light px-3 py-1 text-xs font-semibold text-brand-blue border border-blue-200 mb-4">
-            <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
-            <span>แพลตฟอร์มดิจิทัลกระตุ้นเศรษฐกิจฐานราก</span>
-          </div>
-
-          <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-ink">
-            ไทยช่วยไทยพลีส (THAI Please)
-          </h1>
-          <p className="mt-3 text-sm text-ink-body max-w-xl mx-auto leading-relaxed">
-            ระบบกระเป๋าเงินดิจิทัล ชำระเงินร่วม (Co-pay 60/40) สแกน Dynamic QR หน้าร้าน
-            พร้อมระบบตรวจจับการทุจริตพิกัด GPS & Semi-AI Anomaly Engine มาตรฐานสากล
-          </p>
-
-          <div className="mt-6 flex flex-wrap justify-center gap-3">
-            <Link
-              to={APP_ROUTES.CITIZEN_WALLET}
-              className="touch-manipulation inline-flex items-center space-x-2 rounded-pill bg-brand-blue px-6 py-3 text-sm font-semibold text-white shadow-md transition hover:bg-brand-blue-hover active:scale-95 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-200 motion-reduce:transition-none motion-reduce:active:scale-100"
-            >
-              <Wallet className="h-4 w-4" aria-hidden="true" />
-              <span>เข้าสู่กระเป๋าเงิน (Citizen Wallet)</span>
-              <ArrowRight className="h-4 w-4 ml-1" aria-hidden="true" />
-            </Link>
-            <Link
-              to={APP_ROUTES.CITIZEN_SCAN_COPAY}
-              className="touch-manipulation inline-flex items-center space-x-2 rounded-pill border border-hairline bg-white px-5 py-3 text-sm font-semibold text-ink shadow-sm transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-200 motion-reduce:transition-none"
-            >
-              <QrCode className="h-4 w-4 text-brand-blue" aria-hidden="true" />
-              <span>สแกนชำระเงินร่วม (Co-pay 60/40)</span>
-            </Link>
+    <div className="bg-surface-soft font-sans text-ink">
+    <section className="border-b border-hairline bg-white px-4 py-12 sm:py-16 lg:py-20">
+      <div className="mx-auto grid max-w-6xl items-center gap-10 lg:grid-cols-[1.1fr_0.9fr]">
+        <div>
+          <p className="inline-flex min-h-11 items-center gap-2 rounded-pill border border-blue-200 bg-brand-blue-light px-4 text-base font-semibold text-brand-blue"><BadgeCheck aria-hidden="true" className="h-5 w-5" />{homeContent.hero.eyebrow}</p>
+          <h1 className="mt-5 text-4xl font-extrabold tracking-tight text-ink sm:text-5xl">{homeContent.hero.title}<span className="mt-2 block text-2xl font-bold text-brand-blue sm:text-3xl">({homeContent.hero.englishName})</span></h1>
+          <p className="mt-5 max-w-2xl text-lg leading-relaxed text-ink-body">{homeContent.hero.description}</p>
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+            <Link to="/register" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-pill bg-brand-blue px-6 text-base font-semibold text-white transition hover:bg-brand-blue-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-blue">{homeContent.hero.primaryCta}<ArrowRight aria-hidden="true" className="h-5 w-5" /></Link>
+            <Link to="/login" className="inline-flex min-h-12 items-center justify-center rounded-pill border border-brand-blue bg-white px-6 text-base font-semibold text-brand-blue transition hover:bg-brand-blue-light focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-blue">{homeContent.hero.secondaryCta}</Link>
           </div>
         </div>
+        <div className="rounded-card border border-hairline bg-surface-soft p-6 sm:p-8"><div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-blue text-white"><QrCode aria-hidden="true" className="h-7 w-7" /></div><p className="mt-6 text-lg font-bold text-ink">{homeContent.hero.panelTitle}</p><p className="mt-2 text-base leading-relaxed text-ink-body">{homeContent.hero.panelDescription}</p><div className="mt-6 grid grid-cols-2 gap-3 border-t border-hairline pt-6">{homeContent.hero.paymentSplit.map((item) => <div key={item.label}><p className="text-2xl font-bold text-brand-blue">{item.value}</p><p className="text-sm text-ink-body">{item.label}</p></div>)}</div></div>
+      </div>
+    </section>
 
-        <Link
-          to={APP_ROUTES.CITIZEN_MISSIONS}
-          className="group touch-manipulation flex min-h-20 w-full items-center justify-between gap-4 rounded-card border border-blue-200 bg-white p-4 shadow-sm transition-colors hover:border-blue-300 hover:bg-blue-50/40 active:bg-blue-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-200 sm:p-5 motion-reduce:transition-none"
-        >
-          <span className="flex min-w-0 items-center gap-3.5">
-            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-brand-blue-light text-brand-blue">
-              <Target className="h-6 w-6" aria-hidden="true" />
-            </span>
-            <span className="min-w-0">
-              <span className="block text-pretty text-base font-bold text-ink">ภารกิจของคุณ</span>
-              <span className="mt-1 block break-words text-sm leading-relaxed text-ink-body">
-                ติดตามความคืบหน้าและดูภารกิจที่กำลังเปิดทั้งหมด
+    {isCitizen && (
+      <section className="space-y-4 px-4 py-6 sm:py-8" aria-label="ภารกิจและสิทธิพิเศษสำหรับประชาชน">
+        <div className="mx-auto max-w-6xl space-y-4">
+          <Link
+            to={APP_ROUTES.CITIZEN_MISSIONS}
+            className="group touch-manipulation flex min-h-20 w-full items-center justify-between gap-4 rounded-card border border-blue-200 bg-white p-4 shadow-sm transition-colors hover:border-blue-300 hover:bg-blue-50/40 active:bg-blue-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-200 sm:p-5 motion-reduce:transition-none"
+          >
+            <span className="flex min-w-0 items-center gap-3.5">
+              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-brand-blue-light text-brand-blue">
+                <Target className="h-6 w-6" aria-hidden="true" />
+              </span>
+              <span className="min-w-0">
+                <span className="block text-pretty text-base font-bold text-ink">ภารกิจของคุณ</span>
+                <span className="mt-1 block break-words text-sm leading-relaxed text-ink-body">
+                  ติดตามความคืบหน้าและดูภารกิจที่กำลังเปิดทั้งหมด
+                </span>
               </span>
             </span>
-          </span>
-          <span className="inline-flex shrink-0 items-center gap-2 text-sm font-bold text-brand-blue">
-            <span className="hidden sm:inline">ดูภารกิจทั้งหมด</span>
-            <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none" aria-hidden="true" />
-          </span>
-        </Link>
+            <span className="inline-flex shrink-0 items-center gap-2 text-sm font-bold text-brand-blue">
+              <span className="hidden sm:inline">ดูภารกิจทั้งหมด</span>
+              <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none" aria-hidden="true" />
+            </span>
+          </Link>
 
-        <section aria-labelledby="citizen-activities-heading">
-          <div className="mb-4">
-            <h2 id="citizen-activities-heading" className="text-base font-bold text-ink">
-              สิทธิพิเศษจากการแนะนำ
-            </h2>
-            <p className="mt-1 text-sm text-ink-muted">
-              ติดตามการแนะนำร้านค้าและคูปองของคุณที่นี่
-            </p>
-          </div>
-          <div className="grid grid-cols-1 gap-4">
-            <article className="flex w-full flex-col justify-between rounded-card border border-emerald-200 bg-white p-5 shadow-sm sm:p-6">
-              <div className="flex items-start gap-3.5">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-800 text-white">
-                  <Gift className="h-6 w-6" aria-hidden="true" />
-                </div>
-                <div className="min-w-0">
-                  <h3 className="text-pretty text-base font-bold leading-snug text-ink">
-                    ชวนเพื่อนรับคูปอง
-                  </h3>
-                  <p className="mt-1.5 text-sm leading-relaxed text-ink-body">
-                    แนะนำร้านค้าให้เพื่อน แล้วติดตามสถานะการแนะนำและคูปองของคุณ
-                  </p>
-                </div>
+          <article className="flex w-full flex-col justify-between rounded-card border border-emerald-200 bg-white p-5 shadow-sm sm:p-6">
+            <div className="flex items-start gap-3.5">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-800 text-white">
+                <Gift className="h-6 w-6" aria-hidden="true" />
               </div>
-              <Link
-                to={APP_ROUTES.CITIZEN_REFERRALS}
-                className="touch-manipulation mt-5 inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-emerald-800 px-4 py-3 text-sm font-bold text-white transition-colors hover:bg-emerald-900 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200 motion-reduce:transition-none"
-              >
-                <Gift className="h-4 w-4" aria-hidden="true" />
-                <span>แนะนำเพื่อน</span>
-                <ArrowRight className="h-4 w-4" aria-hidden="true" />
-              </Link>
-            </article>
-          </div>
-        </section>
+              <div className="min-w-0">
+                <h2 className="text-pretty text-base font-bold leading-snug text-ink">ชวนเพื่อนรับคูปอง</h2>
+                <p className="mt-1.5 text-sm leading-relaxed text-ink-body">
+                  แนะนำร้านค้าให้เพื่อน แล้วติดตามสถานะการแนะนำและคูปองของคุณ
+                </p>
+              </div>
+            </div>
+            <Link
+              to={APP_ROUTES.CITIZEN_REFERRALS}
+              className="touch-manipulation mt-5 inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-emerald-800 px-4 py-3 text-sm font-bold text-white transition-colors hover:bg-emerald-900 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200 motion-reduce:transition-none"
+            >
+              <Gift className="h-4 w-4" aria-hidden="true" />
+              <span>แนะนำเพื่อน</span>
+              <ArrowRight className="h-4 w-4" aria-hidden="true" />
+            </Link>
+          </article>
+        </div>
+      </section>
+    )}
 
-      </div>
+    <section className="px-4 py-12 sm:py-16" aria-labelledby="challenge-title"><div className="mx-auto max-w-6xl"><p className="text-base font-semibold text-brand-blue">{homeContent.sections.challengeEyebrow}</p><h2 id="challenge-title" className="mt-2 text-3xl font-bold text-ink">{homeContent.sections.challengeTitle}</h2><div className="mt-7 grid gap-4 md:grid-cols-3">{homeContent.challenges.map((challenge) => <article key={challenge} className="rounded-card border border-hairline bg-white p-6"><CheckCircle2 aria-hidden="true" className="h-6 w-6 text-brand-blue" /><p className="mt-4 text-lg leading-relaxed text-ink-body">{challenge}</p></article>)}</div></div></section>
+
+    <section id="highlights" className="scroll-mt-24 border-y border-hairline bg-white px-4 py-12 sm:py-16" aria-labelledby="highlight-title"><div className="mx-auto max-w-6xl"><p className="text-base font-semibold text-brand-blue">{homeContent.sections.highlightEyebrow}</p><h2 id="highlight-title" className="mt-2 text-3xl font-bold text-ink">{homeContent.sections.highlightTitle}</h2><div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{homeContent.highlights.map((highlight, index) => { const Icon = highlightIcons[index]; return <article key={highlight.title} className="rounded-card border border-hairline bg-surface-soft p-6"><div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-blue-light text-brand-blue"><Icon aria-hidden="true" className="h-6 w-6" /></div><h3 className="mt-5 text-xl font-bold text-ink">{highlight.title}</h3><p className="mt-2 text-base leading-relaxed text-ink-body">{highlight.description}</p></article>; })}</div></div></section>
+
+    <section className="px-4 py-12 sm:py-16" aria-labelledby="steps-title"><div className="mx-auto max-w-6xl"><p className="text-base font-semibold text-brand-blue">{homeContent.sections.stepsEyebrow}</p><h2 id="steps-title" className="mt-2 text-3xl font-bold text-ink">{homeContent.sections.stepsTitle}</h2><ol className="mt-8 grid gap-5 md:grid-cols-3">{homeContent.steps.map((step, index) => <li key={step.title} className="rounded-card border border-hairline bg-white p-6"><span className="flex h-12 w-12 items-center justify-center rounded-full bg-brand-blue text-lg font-bold text-white">{index + 1}</span><h3 className="mt-5 text-xl font-bold text-ink">{step.title}</h3><p className="mt-2 text-base leading-relaxed text-ink-body">{step.description}</p></li>)}</ol></div></section>
+
+    <section className="bg-brand-blue px-4 py-12 text-white sm:py-16" aria-labelledby="impact-title"><div className="mx-auto max-w-6xl"><p className="text-base font-semibold text-blue-100">{homeContent.sections.impactEyebrow}</p><h2 id="impact-title" className="mt-2 text-3xl font-bold">{homeContent.sections.impactTitle}</h2><p className="mt-3 text-base text-blue-100">{homeContent.sections.impactNotice}</p><div className="mt-8 grid gap-4 sm:grid-cols-2">{homeContent.metrics.map((metric) => <div key={metric.label} className="rounded-card border border-white/30 bg-white/10 p-6"><p className="text-3xl font-bold">{metric.value}</p><p className="mt-2 text-base text-blue-100">{metric.label}</p></div>)}</div></div></section>
+
+    <section className="px-4 py-12 sm:py-16" aria-labelledby="audience-title"><div className="mx-auto max-w-6xl"><p className="text-base font-semibold text-brand-blue">{homeContent.sections.audienceEyebrow}</p><h2 id="audience-title" className="mt-2 text-3xl font-bold text-ink">{homeContent.sections.audienceTitle}</h2><div className="mt-8 grid gap-4 lg:grid-cols-3">{homeContent.audiences.map(({ title, description, to, label }, index) => { const Icon = audienceIcons[index]; return <article key={title} className="flex flex-col rounded-card border border-hairline bg-white p-6"><Icon aria-hidden="true" className="h-7 w-7 text-brand-blue" /><h3 className="mt-5 text-xl font-bold text-ink">{title}</h3><p className="mt-2 flex-1 text-base leading-relaxed text-ink-body">{description}</p><Link to={to} className="mt-6 inline-flex min-h-12 items-center justify-center gap-2 rounded-pill border border-brand-blue px-4 text-base font-semibold text-brand-blue transition hover:bg-brand-blue-light focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-blue">{label}<ArrowRight aria-hidden="true" className="h-5 w-5" /></Link></article>; })}</div></div></section>
+
+    <section id="faq" className="scroll-mt-24 border-t border-hairline bg-white px-4 py-12 sm:py-16" aria-labelledby="faq-title"><div className="mx-auto max-w-4xl"><p className="text-base font-semibold text-brand-blue">{homeContent.sections.faqEyebrow}</p><h2 id="faq-title" className="mt-2 text-3xl font-bold text-ink">{homeContent.sections.faqTitle}</h2><div className="mt-7 divide-y divide-hairline rounded-card border border-hairline">{homeContent.faqs.map((faq) => <details key={faq.question} className="bg-white px-5 first:rounded-t-card last:rounded-b-card"><summary className="flex min-h-14 cursor-pointer items-center py-3 text-left text-base font-semibold text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-blue">{faq.question}</summary><p className="pb-5 text-base leading-relaxed text-ink-body">{faq.answer}</p></details>)}</div></div></section>
     </div>
   );
 };

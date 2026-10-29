@@ -15,11 +15,11 @@ const iconUrl = z.string().trim().url('URL รูปไอคอนไม่ถ�
 export const badgeTierSchema = z.object({
   tierId: z.string().uuid('รหัสระดับไม่ถูกต้อง').optional(),
   tierName: z.string().trim().min(1, 'กรุณาระบุชื่อระดับ').max(50, 'ชื่อระดับยาวเกินไป'),
-  tierLevel: z.coerce.number({ invalid_type_error: 'ลำดับระดับต้องเป็นจำนวนเต็ม 1 ถึง 4' })
+  tierLevel: z.coerce.number({ error: 'ลำดับระดับต้องเป็นจำนวนเต็ม 1 ถึง 4' })
     .int('ลำดับระดับต้องเป็นจำนวนเต็ม 1 ถึง 4')
     .min(1, 'ลำดับระดับต้องเป็น 1 ถึง 4')
     .max(4, 'ลำดับระดับต้องเป็น 1 ถึง 4'),
-  requiredCount: z.coerce.number({ invalid_type_error: 'เกณฑ์ต้องเป็นจำนวนเต็มบวก' })
+  requiredCount: z.coerce.number({ error: 'เกณฑ์ต้องเป็นจำนวนเต็มบวก' })
     .int('เกณฑ์ต้องเป็นจำนวนเต็มบวก')
     .positive('เกณฑ์ต้องมากกว่า 0')
     .max(2_147_483_647, 'เกณฑ์เกินขอบเขตที่ระบบรองรับ'),

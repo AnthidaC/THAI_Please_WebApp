@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 export const validateReferralCodeParamSchema = z.object({
   code: z
-    .string({ required_error: 'กรุณาระบุรหัสแนะนำเพื่อน' })
+    .string({ message: 'กรุณาระบุรหัสแนะนำเพื่อน' })
     .trim()
     .min(3, 'รหัสแนะนำเพื่อนต้องมีอย่างน้อย 3 ตัวอักษร')
     .max(50, 'รหัสแนะนำเพื่อนต้องไม่เกิน 50 ตัวอักษร')

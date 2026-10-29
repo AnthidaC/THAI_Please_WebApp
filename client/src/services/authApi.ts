@@ -7,6 +7,11 @@ export interface DemoMerchantAccount {
 }
 
 export const authApi = {
+  login: async (credentials: { email: string; password: string }): Promise<AuthResponse> => {
+    const response = await api.post<AuthResponse>('/auth/login', credentials);
+    return response.data;
+  },
+
   listDemoMerchants: async (): Promise<DemoMerchantAccount[]> => {
     const response = await api.get<ApiResponse<DemoMerchantAccount[]>>('/auth/demo-merchants');
     return response.data.data;
@@ -17,6 +22,16 @@ export const authApi = {
       role,
       ...(accountId ? { accountId } : {}),
     });
+    return response.data;
+  },
+
+  loginMerchant: async (credentials: { email: string; password: string }): Promise<AuthResponse> => {
+    const response = await api.post<AuthResponse>('/merchant-applications/login', credentials);
+    return response.data;
+  },
+
+  loginStaff: async (credentials: { email: string; password: string }): Promise<AuthResponse> => {
+    const response = await api.post<AuthResponse>('/staff/login', credentials);
     return response.data;
   },
 

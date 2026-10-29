@@ -99,6 +99,7 @@ This starts:
    cd server
    cp .env.example .env
    ```
+   Set `JWT_SECRET` to a unique random value of at least 32 characters before starting the server.
 2. Install dependencies:
    ```bash
    npm install
@@ -113,6 +114,66 @@ This starts:
    npm run dev
    ```
    Server will be running at `http://localhost:5000`
+
+### Merchant onboarding and staff review (staging)
+
+Merchant applications are stored in PostgreSQL, and verification files are uploaded to a **private**
+Supabase Storage bucket. Create a private bucket (public access disabled) named
+`merchant-applications`, then configure `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and
+`MERCHANT_DOCUMENTS_BUCKET` in the server environment. The API verifies that the bucket is private
+before uploading or creating document links. Review links expire after 60 seconds.
+
+Apply the onboarding migration before starting the API:
+
+```bash
+cd server
+npx prisma migrate deploy
+npx prisma generate
+```
+
+Create the first authorized account using `npm run staff:bootstrap` with
+`BOOTSTRAP_STAFF_EMAIL`, `BOOTSTRAP_STAFF_PASSWORD` (at least 12 characters),
+`BOOTSTRAP_STAFF_NAME`, and `BOOTSTRAP_STAFF_ROLE` (`ADMIN` or `STAFF`) set only in the
+operator's environment. The bootstrap command refuses to overwrite an existing account; there is
+no public staff registration.
+
+In PowerShell, provide those variables only for the bootstrap process/session:
+
+```powershell
+$env:BOOTSTRAP_STAFF_EMAIL = "admin@example.org"
+$env:BOOTSTRAP_STAFF_PASSWORD = "use-a-unique-secret-of-at-least-12-characters"
+$env:BOOTSTRAP_STAFF_NAME = "System Administrator"
+$env:BOOTSTRAP_STAFF_ROLE = "ADMIN"
+npm run staff:bootstrap
+Remove-Item Env:BOOTSTRAP_STAFF_EMAIL, Env:BOOTSTRAP_STAFF_PASSWORD, Env:BOOTSTRAP_STAFF_NAME, Env:BOOTSTRAP_STAFF_ROLE
+```
+
+The review API activates a merchant only after an authorized staff member approves its pending
+application. Rejections require a recorded reason. Do not use real identity or bank documents in
+staging, and do not enable production collection until access, retention/deletion, privacy notice,
+and incident-response policies have been approved. Demo fast-login buttons are UI-only and cannot
+authenticate API requests.
+
+### Merchant profile and location changes
+
+Approved merchants can edit their store name, contact details, login email, phone number, and
+address from the Merchant Web App. Their tax ID is read-only. Basic profile changes take effect
+immediately. A merchant-submitted location change remains pending and the currently approved
+coordinates continue to be used for QR payments and fraud checks until authorized staff approves it.
+Staff can also edit an approved merchant's profile and coordinates directly; those changes take
+effect immediately and are written to the merchant profile audit log. Pending location changes are
+reviewed separately at `/admin/merchant-location-requests`.
+
+Deploy the `20261024010000_merchant_profile_editing` Prisma migration before using these pages.
+
+### Admin social impact dashboard
+
+The admin-only dashboard at `/admin/social-impact` refreshes aggregate totals and location bins
+every 15 seconds. It reports SUCCESS and FLAGGED transactions with a positive total amount,
+including flagged payments awaiting fraud review because the customer payment has already been
+charged. The heatmap uses the merchant-side location recorded at payment time (falling back to the
+merchant's current location) and groups coordinates to approximately 1 km; it never plots
+citizen location data. Deploy the `20261024020000_social_impact_dashboard` migration before use.
 
 ---
 
@@ -142,3 +203,28 @@ npm run dev:server   # Starts backend
 npm run dev:client   # Starts frontend
 npm run db:studio    # Opens Prisma Studio UI
 ```
+
+### Development Login Test Accounts
+
+Run the seed only against a development database. In PowerShell:
+
+```bash
+$env:NODE_ENV = 'development'
+npm --prefix server run db:seed:dev
+```
+
+In Bash:
+
+```bash
+NODE_ENV=development npm --prefix server run db:seed:dev
+```
+
+The local server `npm run dev` sets `NODE_ENV=development` for its process. Test accounts use the password `DevOnlyPass123!`:
+
+- Approved merchant: `dev-merchant-approved@example.test`
+- Pending merchant: `dev-merchant-pending@example.test`
+- Rejected merchant: `dev-merchant-rejected@example.test`
+- Staff login test account: `dev-staff@example.test` (stored with the supported `ADMIN` role)
+- Admin: `dev-admin@example.test`
+
+The seed hashes passwords before storing them. Do not use these accounts or credentials outside a local development database.

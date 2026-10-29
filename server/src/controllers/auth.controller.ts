@@ -2,7 +2,8 @@ import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../utils/prisma';
 import { signToken, TokenPayload } from '../utils/jwt';
 import { cache } from '../utils/redis';
-import { DEMO_LOGIN_ROLES, DemoLoginRole } from '../validations/auth.validation';
+import { CredentialLoginOutcome, loginWithCredentials } from '../services/authLogin.service';
+import { authLoginSchema, DEMO_LOGIN_ROLES, DemoLoginRole } from '../validations/auth.validation';
 
 interface DemoAccount {
   id: string;
@@ -52,6 +53,31 @@ export const createDemoLoginHandler = (options: DemoLoginOptions) => async (
     next(error);
   }
 };
+
+export const createAuthLoginHandler = (
+  login: (email: string, password: string) => Promise<CredentialLoginOutcome>,
+) => async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { email, password } = authLoginSchema.parse(req.body);
+    const outcome = await login(email, password);
+    if (outcome.kind === 'application-status') {
+      const isPending = outcome.applicationStatus === 'PENDING';
+      res.status(403).json({
+        status: 'error',
+        code: `MERCHANT_APPLICATION_${outcome.applicationStatus}`,
+        applicationStatus: outcome.applicationStatus,
+        data: { token: outcome.token },
+        message: isPending ? 'ใบสมัครร้านค้าอยู่ระหว่างตรวจสอบ' : 'ใบสมัครร้านค้าถูกปฏิเสธ',
+      });
+      return;
+    }
+    res.json({ status: 'success', data: outcome.data });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const authLogin = createAuthLoginHandler(loginWithCredentials);
 
 const testAccountName = /(?:^|[^\p{L}\p{N}])(?:test|demo|synthetic)(?=$|[^\p{L}\p{N}])/iu;
 const selectableDemoMerchantName = 'ร้านข้าวมันไก่ป้าณี (วิสาหกิจชุมชน)';

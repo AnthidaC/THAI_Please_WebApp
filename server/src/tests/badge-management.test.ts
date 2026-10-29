@@ -60,7 +60,7 @@ assert.equal(badgeCreateSchema.safeParse({
 assert.ok(badgeCreateSchema.safeParse({
   ...validBadge,
   tiers: validBadge.tiers.map((tier, index) => index === 3 ? { ...tier, requiredCount: 'not-a-number' } : tier),
-}).error?.errors.every((issue) => issue.message.length > 0), 'invalid numeric input returns structured validation issues');
+}).error?.issues.every((issue) => issue.message.length > 0), 'invalid numeric input returns structured validation issues');
 assert.equal(badgeUpdateSchema.safeParse({ conditionType: 'new_type' }).success, false, 'condition type must be immutable');
 assert.equal(badgeUpdateSchema.safeParse({ badgeName: 'Updated Badge Name' }).success, true, 'metadata updates do not require tier data');
 assert.equal(badgeUpdateSchema.safeParse({}).success, false, 'empty updates must be rejected');

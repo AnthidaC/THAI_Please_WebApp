@@ -6,7 +6,7 @@ import { CANONICAL_CATEGORY_IDS, CanonicalCategoryId } from '../constants/catego
  */
 export const preferenceItemSchema = z.object({
   categoryId: z
-    .string({ required_error: 'กรุณาระบุรหัสหมวดหมู่' })
+    .string({ error: 'กรุณาระบุรหัสหมวดหมู่' })
     .trim()
     .transform((val) => val.toUpperCase())
     .refine(
@@ -16,7 +16,7 @@ export const preferenceItemSchema = z.object({
       }
     ),
   preferenceWeight: z
-    .number({ invalid_type_error: 'ค่าน้ำหนักต้องเป็นตัวเลข' })
+    .number({ error: 'ค่าน้ำหนักต้องเป็นตัวเลข' })
     .min(0.0, 'ค่าน้ำหนักต้องไม่ต่ำกว่า 0.00')
     .max(9.99, 'ค่าน้ำหนักต้องไม่เกิน 9.99 (ตาม Decimal(3,2) ใน Schema)')
     .optional()

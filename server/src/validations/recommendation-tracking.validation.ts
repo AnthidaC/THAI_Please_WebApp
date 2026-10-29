@@ -7,7 +7,7 @@ import { z } from 'zod';
  */
 export const recommendationTrackingParamSchema = z.object({
   recommendationId: z
-    .string({ required_error: 'กรุณาระบุรหัสคำแนะนำ (recommendationId)' })
+    .string({ error: 'กรุณาระบุรหัสคำแนะนำ (recommendationId)' })
     .trim()
     .uuid('รูปแบบรหัสคำแนะนำไม่ถูกต้อง (ต้องเป็น UUID)'),
 });

@@ -9,6 +9,8 @@ interface AuthState {
   clearAuth: () => void;
 }
 
+const isLegacyDemoToken = (token: string | null): boolean => Boolean(token?.startsWith('demo-token-'));
+
 const getInitialUser = (): User | null => {
   try {
     const saved = localStorage.getItem('auth_user');
@@ -18,10 +20,22 @@ const getInitialUser = (): User | null => {
   }
 };
 
+const getInitialToken = (): string | null => {
+  const token = localStorage.getItem('auth_token');
+  if (isLegacyDemoToken(token)) {
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('auth_user');
+    return null;
+  }
+  return token;
+};
+
+const initialToken = getInitialToken();
+
 export const useAuthStore = create<AuthState>((set) => ({
   user: getInitialUser(),
-  token: localStorage.getItem('auth_token'),
-  isAuthenticated: !!localStorage.getItem('auth_token'),
+  token: initialToken,
+  isAuthenticated: !!initialToken,
   setAuth: (user, token) => {
     localStorage.setItem('auth_token', token);
     localStorage.setItem('auth_user', JSON.stringify(user));

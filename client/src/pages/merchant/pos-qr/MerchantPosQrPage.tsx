@@ -318,18 +318,17 @@ export const MerchantPosQrPage: React.FC = () => {
           }
         } else if (res.status === 'EXPIRED') {
           setSecondsRemaining(0);
-          eventSource?.close();
         }
       } catch {
         // ignore network error
       }
     };
 
+    void checkPaymentStatusFallback();
     const pollInterval = setInterval(checkPaymentStatusFallback, 3000);
 
     return () => {
       active = false;
-      if (eventSource) eventSource.close();
       clearInterval(pollInterval);
     };
   }, [qrResult, paidInfo, isExpired, soundEnabled, queryClient]);

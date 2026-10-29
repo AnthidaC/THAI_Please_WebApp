@@ -35,10 +35,7 @@ export const getRecommendationsQuerySchema = z.object({
   latitude: z.preprocess(
     preprocessEmptyStringToUndefined,
     z.coerce
-      .number({
-        required_error: 'กรุณาระบุพิกัดละติจูด (latitude)',
-        invalid_type_error: 'พิกัดละติจูดต้องเป็นตัวเลขที่ถูกต้อง',
-      })
+      .number({ error: 'พิกัดละติจูดต้องเป็นตัวเลขที่ถูกต้อง' })
       .min(-90, 'พิกัดละติจูดต้องอยู่ระหว่าง -90 ถึง 90 องศา')
       .max(90, 'พิกัดละติจูดต้องอยู่ระหว่าง -90 ถึง 90 องศา')
       .refine((val) => !isNaN(val) && isFinite(val), {
@@ -49,10 +46,7 @@ export const getRecommendationsQuerySchema = z.object({
   longitude: z.preprocess(
     preprocessEmptyStringToUndefined,
     z.coerce
-      .number({
-        required_error: 'กรุณาระบุพิกัดลองจิจูด (longitude)',
-        invalid_type_error: 'พิกัดลองจิจูดต้องเป็นตัวเลขที่ถูกต้อง',
-      })
+      .number({ error: 'พิกัดลองจิจูดต้องเป็นตัวเลขที่ถูกต้อง' })
       .min(-180, 'พิกัดลองจิจูดต้องอยู่ระหว่าง -180 ถึง 180 องศา')
       .max(180, 'พิกัดลองจิจูดต้องอยู่ระหว่าง -180 ถึง 180 องศา')
       .refine((val) => !isNaN(val) && isFinite(val), {
@@ -64,7 +58,7 @@ export const getRecommendationsQuerySchema = z.object({
     preprocessEmptyStringToUndefined,
     z.coerce
       .number({
-        invalid_type_error: 'รัศมีการค้นหาต้องเป็นตัวเลข',
+        error: 'รัศมีการค้นหาต้องเป็นตัวเลข',
       })
       .min(
         PROVISIONAL_RECOMMENDATION_CONFIG.minRadiusKm,
@@ -84,7 +78,7 @@ export const getRecommendationsQuerySchema = z.object({
     preprocessEmptyStringToUndefined,
     z.coerce
       .number({
-        invalid_type_error: 'จำนวนรายการที่ต้องการต้องเป็นตัวเลข',
+        error: 'จำนวนรายการที่ต้องการต้องเป็นตัวเลข',
       })
       .int('จำนวนรายการที่ต้องการต้องเป็นจำนวนเต็ม')
       .min(

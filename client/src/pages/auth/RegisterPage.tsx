@@ -2,8 +2,13 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { UserPlus } from 'lucide-react';
 import { APP_ROUTES } from '../../constants/routes';
+import { CitizenRegistrationForm } from './CitizenRegistrationForm';
 
-export const RegisterPage: React.FC = () => (
+interface RegisterPageContentProps {
+  isDevelopment: boolean;
+}
+
+const RegistrationUnavailable: React.FC = () => (
   <div className="space-y-5 font-sans">
     <div className="text-center">
       <div className="mb-3 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-md shadow-emerald-600/20">
@@ -22,4 +27,12 @@ export const RegisterPage: React.FC = () => (
       <Link to={APP_ROUTES.LOGIN} className="font-semibold text-brand-blue hover:underline">เข้าสู่ระบบ</Link>
     </div>
   </div>
+);
+
+export const RegisterPageContent: React.FC<RegisterPageContentProps> = ({ isDevelopment }) => (
+  isDevelopment ? <CitizenRegistrationForm /> : <RegistrationUnavailable />
+);
+
+export const RegisterPage: React.FC = () => (
+  <RegisterPageContent isDevelopment={import.meta.env.DEV} />
 );

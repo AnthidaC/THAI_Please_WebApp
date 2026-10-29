@@ -1,5 +1,15 @@
 const { PrismaClient } = require('@prisma/client');
+const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 const prisma = new PrismaClient();
+
+const DEMO = {
+  citizenId: '1101700203456',
+  merchantEmail: 'noodle.shop@thaiplease.go.th',
+  merchantPassword: 'DemoMerchant123!',
+  staffEmail: 'admin.super@thaiplease.go.th',
+  staffPassword: 'DemoAdmin123!',
+};
 
 async function main() {
   console.log('Seeding demo data...');
@@ -31,8 +41,81 @@ async function main() {
   });
   console.log('Campaign ready:', campaign.campaign_name);
 
-  // 2. User & Wallet
-  const user = await prisma.user.findFirst();
+  // 2. Identities used by the real login endpoints (not fake client tokens)
+  const staff = await prisma.staff_accounts.upsert({
+    where: { email: DEMO.staffEmail },
+    update: {
+      full_name: 'System Administrator (Demo)',
+      password_hash: await bcrypt.hash(DEMO.staffPassword, 10),
+      role: 'ADMIN',
+      is_active: true,
+    },
+    create: {
+      email: DEMO.staffEmail,
+      full_name: 'System Administrator (Demo)',
+      password_hash: await bcrypt.hash(DEMO.staffPassword, 10),
+      role: 'ADMIN',
+      is_active: true,
+    },
+  });
+
+  const merchant = await prisma.merchants.upsert({
+    where: { tax_id: '0105566123456' },
+    update: {
+      shop_name: 'Noodle Shop Demo',
+      latitude: 13.7563,
+      longitude: 100.5018,
+      is_approved: true,
+      approved_by_admin_id: staff.staff_id,
+    },
+    create: {
+      tax_id: '0105566123456',
+      shop_name: 'Noodle Shop Demo',
+      latitude: 13.7563,
+      longitude: 100.5018,
+      is_approved: true,
+      approved_by_admin_id: staff.staff_id,
+    },
+  });
+
+  await prisma.merchantApplication.upsert({
+    where: { merchant_id: merchant.merchant_id },
+    update: {
+      email: DEMO.merchantEmail,
+      password_hash: await bcrypt.hash(DEMO.merchantPassword, 10),
+      status: 'APPROVED',
+      reviewed_by_staff_id: staff.staff_id,
+      reviewed_at: new Date(),
+    },
+    create: {
+      business_type: 'INDIVIDUAL',
+      tax_id: merchant.tax_id,
+      shop_name: merchant.shop_name,
+      contact_name: 'Demo Merchant',
+      email: DEMO.merchantEmail,
+      phone: '0812345678',
+      password_hash: await bcrypt.hash(DEMO.merchantPassword, 10),
+      address: 'Bangkok',
+      latitude: 13.7563,
+      longitude: 100.5018,
+      status: 'APPROVED',
+      merchant_id: merchant.merchant_id,
+      reviewed_by_staff_id: staff.staff_id,
+      reviewed_at: new Date(),
+    },
+  });
+
+  const citizenIdHash = crypto.createHash('sha256').update(DEMO.citizenId).digest('hex');
+  const user = await prisma.user.upsert({
+    where: { citizen_id_hash: citizenIdHash },
+    update: { full_name: 'Somchai Citizen Demo', province_code: '10', is_registered_thai_plus: true },
+    create: {
+      citizen_id_hash: citizenIdHash,
+      full_name: 'Somchai Citizen Demo',
+      province_code: '10',
+      is_registered_thai_plus: true,
+    },
+  });
   if (user) {
     await prisma.wallets.updateMany({
       where: { user_id: user.user_id },
@@ -45,9 +128,6 @@ async function main() {
       },
     });
   }
-
-  // 3. Merchant
-  const merchant = await prisma.merchants.findFirst();
 
   // 4. Fraud check for existing tx d504c4c0-bb3a-482c-a810-6dbc2e50925d
   const txSusp = await prisma.transactions.findUnique({
