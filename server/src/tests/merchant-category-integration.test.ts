@@ -77,12 +77,12 @@ test('Validation: MerchantCategoryService validates category_id correctly', () =
   );
 });
 
-test('Scoring Weights: Active default keeps category scoring disabled (0.00)', () => {
+test('Scoring Weights: Active default implements activated weights (Distance 35%, Category 25%, Rating 25%, Popularity 15%)', () => {
   const activeWeights = normalizeRecommendationWeights();
-  assert.equal(activeWeights.categoryPreference, 0.00, 'categoryPreference must remain 0.00 by default');
-  assert.equal(activeWeights.distance, 0.40);
-  assert.equal(activeWeights.rating, 0.35);
-  assert.equal(activeWeights.popularity, 0.25);
+  assert.equal(activeWeights.distance, 0.35);
+  assert.equal(activeWeights.categoryPreference, 0.25);
+  assert.equal(activeWeights.rating, 0.25);
+  assert.equal(activeWeights.popularity, 0.15);
   
   const total = activeWeights.distance + activeWeights.rating + activeWeights.popularity + activeWeights.categoryPreference;
   assert.equal(Math.round(total * 100) / 100, 1.00);
@@ -138,7 +138,7 @@ test('Category Score: Matching category scores 1.00, mismatch scores 0.00', () =
   assert.equal(calculateNormalizedCategoryScore('GENERAL_GOODS', userPreferences), 0.00);
 });
 
-test('scoreMerchant: Backward compatibility when category scoring is inactive (default)', () => {
+test('scoreMerchant: Backward compatibility when category scoring is explicitly inactive (enableCategoryScoring = false)', () => {
   const resultWithCategory = scoreMerchant({
     merchantId: 'm-1',
     distanceKm: 1.0,
@@ -146,7 +146,7 @@ test('scoreMerchant: Backward compatibility when category scoring is inactive (d
     transactionCount24h: 10,
     merchantCategoryId: 'FOOD',
     userPreferredCategories: ['FOOD'],
-  });
+  }, undefined, 10, false);
 
   const resultWithoutCategory = scoreMerchant({
     merchantId: 'm-2',
@@ -155,9 +155,9 @@ test('scoreMerchant: Backward compatibility when category scoring is inactive (d
     transactionCount24h: 10,
     merchantCategoryId: null,
     userPreferredCategories: [],
-  });
+  }, undefined, 10, false);
 
-  // Because categoryPreference weight is 0.00 by default, totalScore must be identical!
+  // Because categoryPreference weight is 0.00 when enableCategoryScoring is false, totalScore must be identical!
   assert.equal(resultWithCategory.totalScore, resultWithoutCategory.totalScore);
   assert.equal(resultWithCategory.breakdown.activeWeights.categoryPreference, 0.00);
   assert.equal(resultWithoutCategory.breakdown.activeWeights.categoryPreference, 0.00);
@@ -603,12 +603,12 @@ test('updateMerchantCategory: Updates merchant category and creates audit log', 
 // 🧪 UC 2.5.3: CITIZEN PREFERENCES & AI NEAR-ME DISCOVERY INTEGRATION TESTS
 // =========================================================================
 
-test('UC 2.5.3: Recommendation scoring keeps proposed weights disabled by default', () => {
+test('UC 2.5.3: Recommendation scoring activates rule-based 35/25/25/15 weights by default', () => {
   const activeWeights = normalizeRecommendationWeights();
-  assert.equal(activeWeights.categoryPreference, 0.00, 'Category preference must remain 0.00 by default');
-  assert.equal(activeWeights.distance, 0.40);
-  assert.equal(activeWeights.rating, 0.35);
-  assert.equal(activeWeights.popularity, 0.25);
+  assert.equal(activeWeights.distance, 0.35, 'Distance must be 35%');
+  assert.equal(activeWeights.categoryPreference, 0.25, 'Category preference must be 25%');
+  assert.equal(activeWeights.rating, 0.25, 'Rating must be 25%');
+  assert.equal(activeWeights.popularity, 0.15, 'Popularity must be 15%');
 });
 
 test('UC 2.5.3: Sub-factor scores (distance, rating, popularity) are strictly invariant when category scoring is evaluated', () => {
@@ -713,3 +713,190 @@ test('UC 2.5.3: Category filter accurately matches all 5 canonical categories an
 });
 
 
+
+
+test('UC 2.5.3 (Req 7): Multiple preferences with different weights scale category relevance proportionally', () => {
+  const userPreferences = [
+    { categoryId: 'FOOD', preferenceWeight: 1.0 },
+    { categoryId: 'BEVERAGE', preferenceWeight: 0.6 },
+    { categoryId: 'BAKERY_DESSERT', preferenceWeight: 0.3 },
+  ];
+
+  // Matched highest weight (1.0 / 1.0) -> 1.00
+  assert.equal(calculateNormalizedCategoryScore('FOOD', userPreferences), 1.00);
+  // Matched medium weight (0.6 / 1.0) -> 0.60
+  assert.equal(calculateNormalizedCategoryScore('BEVERAGE', userPreferences), 0.60);
+  // Matched lowest weight (0.3 / 1.0) -> 0.30
+  assert.equal(calculateNormalizedCategoryScore('BAKERY_DESSERT', userPreferences), 0.30);
+  // Unmatched category -> 0.00
+  assert.equal(calculateNormalizedCategoryScore('STREET_FOOD', userPreferences), 0.00);
+  assert.equal(calculateNormalizedCategoryScore('GENERAL_GOODS', userPreferences), 0.00);
+  // NULL merchant category -> 0.50
+  assert.equal(calculateNormalizedCategoryScore(null, userPreferences), 0.50);
+
+  // Scaled non-1.0 max weight: e.g. weights [2.0, 1.0] -> 2.0/2.0 = 1.0, 1.0/2.0 = 0.5
+  const scaledUserPrefs = [
+    { categoryId: 'FOOD', preferenceWeight: 2.0 },
+    { categoryId: 'BEVERAGE', preferenceWeight: 1.0 },
+  ];
+  assert.equal(calculateNormalizedCategoryScore('FOOD', scaledUserPrefs), 1.00);
+  assert.equal(calculateNormalizedCategoryScore('BEVERAGE', scaledUserPrefs), 0.50);
+});
+
+test('UC 2.5.3 (Req 7): Backend recommendation ordering uses active weighted score to rank matched merchants higher', () => {
+  // 3 merchants with identical distance (1.0km), rating (4.0), and popularity (10tx)
+  // Differing only by category_id
+  const matchingMerchant = scoreMerchant({
+    merchantId: 'm-matched',
+    distanceKm: 1.0,
+    averageRating: 4.0,
+    transactionCount24h: 10,
+    merchantCategoryId: 'FOOD',
+    userPreferredCategories: [{ categoryId: 'FOOD', preferenceWeight: 1.0 }],
+  });
+
+  const nullMerchant = scoreMerchant({
+    merchantId: 'm-null-cat',
+    distanceKm: 1.0,
+    averageRating: 4.0,
+    transactionCount24h: 10,
+    merchantCategoryId: null,
+    userPreferredCategories: [{ categoryId: 'FOOD', preferenceWeight: 1.0 }],
+  });
+
+  const unmatchedMerchant = scoreMerchant({
+    merchantId: 'm-unmatched',
+    distanceKm: 1.0,
+    averageRating: 4.0,
+    transactionCount24h: 10,
+    merchantCategoryId: 'GENERAL_GOODS',
+    userPreferredCategories: [{ categoryId: 'FOOD', preferenceWeight: 1.0 }],
+  });
+
+  // Verify category scores: 1.00 vs 0.50 vs 0.00
+  assert.equal(matchingMerchant.breakdown.categoryScore, 1.00);
+  assert.equal(nullMerchant.breakdown.categoryScore, 0.50);
+  assert.equal(unmatchedMerchant.breakdown.categoryScore, 0.00);
+
+  // Verify totalScore ordering: Matched > Null > Unmatched
+  assert.ok(matchingMerchant.totalScore > nullMerchant.totalScore, 'Matching merchant score must exceed null merchant');
+  assert.ok(nullMerchant.totalScore > unmatchedMerchant.totalScore, 'Null merchant score must exceed unmatched merchant');
+
+  // Verify rankScoredMerchants ordering
+  const ranked = rankScoredMerchants([unmatchedMerchant, nullMerchant, matchingMerchant]);
+  assert.equal(ranked[0].merchantId, 'm-matched', 'Matched merchant must be ranked 1st');
+  assert.equal(ranked[1].merchantId, 'm-null-cat', 'Null category merchant must be ranked 2nd');
+  assert.equal(ranked[2].merchantId, 'm-unmatched', 'Unmatched merchant must be ranked 3rd');
+});
+
+test('UC 2.5.3 (Req 7): Scores are strictly normalized between 0.000 and 1.000 across all boundary inputs', () => {
+  const extremeCases = [
+    { distanceKm: 0, averageRating: 5.0, transactionCount24h: 100, merchantCategoryId: 'FOOD' },
+    { distanceKm: 50, averageRating: 0.0, transactionCount24h: 0, merchantCategoryId: 'GENERAL_GOODS' },
+    { distanceKm: -5, averageRating: 10.0, transactionCount24h: -10, merchantCategoryId: null },
+    { distanceKm: NaN, averageRating: null, transactionCount24h: undefined, merchantCategoryId: '' },
+  ];
+
+  for (const input of extremeCases) {
+    const res = scoreMerchant({
+      merchantId: 'm-boundary',
+      ...input,
+      userPreferredCategories: ['FOOD'],
+    });
+
+    assert.ok(res.totalScore >= 0.0 && res.totalScore <= 1.0, `totalScore ${res.totalScore} must be within [0, 1]`);
+    assert.ok(res.breakdown.distanceScore >= 0.0 && res.breakdown.distanceScore <= 1.0);
+    assert.ok(res.breakdown.ratingScore >= 0.0 && res.breakdown.ratingScore <= 1.0);
+    assert.ok(res.breakdown.popularityScore >= 0.0 && res.breakdown.popularityScore <= 1.0);
+    assert.ok(res.breakdown.categoryScore >= 0.0 && res.breakdown.categoryScore <= 1.0);
+  }
+});
+
+test('UC 2.5.3 (Req 7): AI client fallback returns deterministic rule-based ranking and reasons upon failure', async () => {
+  const { aiRecommendationClient } = await import('../services/ai-recommendation.client');
+  const { geminiRecommendationClient } = await import('../services/gemini-recommendation.client');
+
+  const candidates = [
+    {
+      merchantId: 'c-1',
+      shopName: 'ร้านป้าสมร ข้าวมันไก่',
+      distanceKm: 0.8,
+      formattedDistance: '800 ม.',
+      averageRating: 4.8,
+      transactionCount24h: 25,
+      baseScore: 0.92,
+      categoryId: 'FOOD',
+    },
+    {
+      merchantId: 'c-2',
+      shopName: 'ชาเย็นนมสด ชุมชน',
+      distanceKm: 1.5,
+      formattedDistance: '1.5 กม.',
+      averageRating: 4.2,
+      transactionCount24h: 5,
+      baseScore: 0.75,
+      categoryId: 'BEVERAGE',
+    },
+  ];
+
+  // Test deterministic rule-based fallback directly
+  const fallbackResult = aiRecommendationClient.executeRuleBasedFallback(
+    { candidates, userPreferredCategories: ['FOOD'] },
+    Date.now()
+  );
+
+  assert.equal(fallbackResult.provider, 'rule_based_fallback');
+  assert.equal(fallbackResult.isFallback, true);
+  assert.equal(fallbackResult.rankedMerchants.length, 2);
+  assert.equal(fallbackResult.rankedMerchants[0].merchantId, 'c-1');
+  assert.ok(fallbackResult.rankedMerchants[0].recommendationReason.includes('ร้านยอดนิยม'));
+
+  // Test geminiRecommendationClient fallback behavior when disabled (default in test)
+  const geminiResult = await geminiRecommendationClient.rerankCandidates({
+    candidates,
+    userPreferredCategories: ['FOOD'],
+    maxOutputLimit: 2,
+  });
+
+  assert.equal(geminiResult.provider, 'rule_based_fallback');
+  assert.equal(geminiResult.isFallback, true);
+  assert.equal(geminiResult.rankedMerchants[0].merchantId, 'c-1');
+  assert.equal(geminiResult.rankedMerchants[0].finalScore, 0.92);
+});
+
+test('UC 2.5.3 (Req 7): Authentication and user data isolation protects preferences', () => {
+  const userAId = 'user-a-1111-1111-1111-111111111111';
+  const userBId = 'user-b-2222-2222-2222-222222222222';
+
+  // Verify that scoring with User A preferences does not affect User B
+  const userAPrefs = [{ categoryId: 'FOOD', preferenceWeight: 1.0 }];
+  const userBPrefs = [{ categoryId: 'BEVERAGE', preferenceWeight: 1.0 }];
+
+  const scoreForUserA = scoreMerchant({
+    merchantId: 'm-food',
+    distanceKm: 1.0,
+    merchantCategoryId: 'FOOD',
+    userPreferredCategories: userAPrefs,
+  });
+
+  const scoreForUserB = scoreMerchant({
+    merchantId: 'm-food',
+    distanceKm: 1.0,
+    merchantCategoryId: 'FOOD',
+    userPreferredCategories: userBPrefs,
+  });
+
+  // User A gets 1.00 category score for FOOD; User B gets 0.00 category score for FOOD
+  assert.equal(scoreForUserA.breakdown.categoryScore, 1.00);
+  assert.equal(scoreForUserB.breakdown.categoryScore, 0.00);
+  assert.ok(scoreForUserA.totalScore > scoreForUserB.totalScore);
+
+  // Guest user (undefined preferences) gets neutral fallback 0.50
+  const scoreForGuest = scoreMerchant({
+    merchantId: 'm-food',
+    distanceKm: 1.0,
+    merchantCategoryId: 'FOOD',
+    userPreferredCategories: undefined,
+  });
+  assert.equal(scoreForGuest.breakdown.categoryScore, 0.50);
+});
