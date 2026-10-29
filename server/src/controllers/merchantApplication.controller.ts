@@ -28,6 +28,16 @@ export const loginMerchant = async (
 ): Promise<void> => {
   try {
     const data = await merchantApplicationService.login(req.body.email, req.body.password);
+    if ('applicationStatus' in data) {
+      const isPending = data.applicationStatus === 'PENDING';
+      res.status(403).json({
+        status: 'error',
+        code: `MERCHANT_APPLICATION_${data.applicationStatus}`,
+        applicationStatus: data.applicationStatus,
+        message: isPending ? 'ใบสมัครร้านค้าอยู่ระหว่างตรวจสอบ' : 'ใบสมัครร้านค้าถูกปฏิเสธ',
+      });
+      return;
+    }
     res.json({ status: 'success', data });
   } catch (error) {
     next(error);
@@ -64,6 +74,23 @@ export const getMerchantApplication = async (
     const applicationId = parseApplicationId(id);
     const application = await merchantApplicationService.getDetails(applicationId);
     res.json({ status: 'success', data: application });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getOwnMerchantApplicationStatus = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const applicationId = req.user?.userId;
+    if (!applicationId || req.user?.tokenScope !== 'MERCHANT_APPLICATION_STATUS') {
+      throw new HttpError(403, 'Merchant application status access required');
+    }
+    const status = await merchantApplicationService.getOwnStatus(applicationId);
+    res.json({ status: 'success', data: status });
   } catch (error) {
     next(error);
   }

@@ -4,6 +4,7 @@ import {
   decideMerchantApplication,
   getOwnMerchantProfile,
   getMerchantApplication,
+  getOwnMerchantApplicationStatus,
   listMerchantApplications,
   loginMerchant,
   submitMerchantApplication,
@@ -35,6 +36,7 @@ const loginLimit = rateLimit({
 
 router.post('/login', loginLimit, validate(merchantLoginSchema), loginMerchant);
 router.post('/applications', applicationSubmissionLimit, merchantDocumentUpload, validate(merchantApplicationSchema), submitMerchantApplication);
+router.get('/me/status', authenticate, getOwnMerchantApplicationStatus);
 router.get('/profile', authenticate, requireApprovedMerchant, getOwnMerchantProfile);
 router.patch(
   '/profile',

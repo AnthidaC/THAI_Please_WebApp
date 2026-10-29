@@ -199,12 +199,18 @@ export const merchantApplicationService = {
 
   async login(email: string, password: string) {
     const application = await prisma.merchantApplication.findFirst({
-      where: { email, status: 'APPROVED', merchant_id: { not: null } },
+      where: { email },
+      orderBy: { created_at: 'desc' },
       include: { merchant: true },
     });
-    if (!application || !application.merchant?.is_approved
-      || !(await comparePassword(password, application.password_hash))) {
-      throw new HttpError(401, 'อีเมลหรือรหัสผ่านไม่ถูกต้อง หรือบัญชียังไม่ได้รับอนุมัติ');
+    if (!application || !(await comparePassword(password, application.password_hash))) {
+      throw new HttpError(401, 'อีเมลหรือรหัสผ่านไม่ถูกต้อง');
+    }
+
+    if (application.status === 'PENDING') return { applicationStatus: 'PENDING' as const };
+    if (application.status === 'REJECTED') return { applicationStatus: 'REJECTED' as const };
+    if (application.status !== 'APPROVED' || !application.merchant?.is_approved) {
+      throw new HttpError(401, 'อีเมลหรือรหัสผ่านไม่ถูกต้อง');
     }
 
     const merchant = application.merchant;
@@ -220,6 +226,21 @@ export const merchantApplicationService = {
         merchantRejectionReason: application.rejection_reason,
       },
       token: signToken({ userId: merchant.merchant_id, role: 'MERCHANT' }),
+    };
+  },
+
+  async getOwnStatus(applicationId: string) {
+    const application = await prisma.merchantApplication.findUnique({
+      where: { application_id: applicationId },
+      select: { status: true, rejection_reason: true, created_at: true },
+    });
+    if (!application || !['PENDING', 'APPROVED', 'REJECTED'].includes(application.status)) {
+      throw new HttpError(404, 'Merchant application status not found');
+    }
+    return {
+      status: application.status,
+      rejectionReason: application.status === 'REJECTED' ? application.rejection_reason : null,
+      submittedAt: application.created_at.toISOString(),
     };
   },
 

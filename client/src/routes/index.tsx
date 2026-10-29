@@ -14,6 +14,7 @@ import { MerchantRegisterPage } from '../pages/auth/MerchantRegisterPage';
 import { DashboardPage } from '../pages/admin/dashboard/DashboardPage';
 import { NotFoundPage } from '../pages/notFound/NotFoundPage';
 import { MerchantHomePage } from '../pages/merchant/home/MerchantHomePage';
+import { MerchantApplicationStatusPage } from '../pages/merchant/home/MerchantApplicationStatusPage';
 import { CitizenBenefitsRegisterPage } from '../pages/citizen/CitizenBenefitsRegisterPage';
 import { MerchantProfilePage } from '../pages/merchant/profile/MerchantProfilePage';
 
@@ -73,6 +74,12 @@ export const router = createBrowserRouter([
       },
 
       // Merchant Flow
+      {
+        element: <ProtectedRoute allowedRoles={['MERCHANT_APPLICATION_STATUS']} />,
+        children: [
+          { path: APP_ROUTES.MERCHANT_APPLICATION_STATUS, element: <MerchantApplicationStatusPage /> },
+        ],
+      },
       {
         element: <ProtectedRoute allowedRoles={['MERCHANT']} />,
         children: [

@@ -203,3 +203,28 @@ npm run dev:server   # Starts backend
 npm run dev:client   # Starts frontend
 npm run db:studio    # Opens Prisma Studio UI
 ```
+
+### Development Login Test Accounts
+
+Run the seed only against a development database. In PowerShell:
+
+```bash
+$env:NODE_ENV = 'development'
+npm --prefix server run db:seed:dev
+```
+
+In Bash:
+
+```bash
+NODE_ENV=development npm --prefix server run db:seed:dev
+```
+
+The local server `npm run dev` sets `NODE_ENV=development` for its process. Test accounts use the password `DevOnlyPass123!`:
+
+- Approved merchant: `dev-merchant-approved@example.test`
+- Pending merchant: `dev-merchant-pending@example.test`
+- Rejected merchant: `dev-merchant-rejected@example.test`
+- Staff login test account: `dev-staff@example.test` (stored with the supported `ADMIN` role)
+- Admin: `dev-admin@example.test`
+
+The seed hashes passwords before storing them. Do not use these accounts or credentials outside a local development database.

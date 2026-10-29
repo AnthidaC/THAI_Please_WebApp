@@ -25,6 +25,16 @@ export const authenticate = async (
       return;
     }
 
+    if (payload.tokenScope === 'MERCHANT_APPLICATION_STATUS') {
+      const requestPath = req.originalUrl.split('?')[0];
+      if (payload.role !== 'MERCHANT_APPLICATION_STATUS'
+        || req.method !== 'GET'
+        || requestPath !== '/api/merchant-applications/me/status') {
+        res.status(403).json({ status: 'error', message: 'Token is restricted to merchant application status' });
+        return;
+      }
+    }
+
     req.user = payload;
     next();
   } catch {

@@ -2,6 +2,12 @@ import api from '../lib/axios';
 
 export type MerchantApplicationStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 
+export interface OwnMerchantApplicationStatus {
+  status: MerchantApplicationStatus;
+  rejectionReason: string | null;
+  submittedAt: string;
+}
+
 export interface MerchantApplicationDocument {
   id: string;
   type: string;
@@ -42,6 +48,11 @@ interface ApiResponse<T> {
   data: T;
   message?: string;
 }
+
+export const getOwnMerchantApplicationStatus = async (): Promise<OwnMerchantApplicationStatus> => {
+  const response = await api.get<ApiResponse<OwnMerchantApplicationStatus>>('/merchant-applications/me/status');
+  return response.data.data;
+};
 
 export const submitMerchantApplication = async (formData: FormData): Promise<{ applicationId: string; status: string }> => {
   const response = await api.post<ApiResponse<{ applicationId: string; status: string }>>(

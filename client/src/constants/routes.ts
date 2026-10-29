@@ -7,6 +7,7 @@ export const APP_ROUTES = {
   REGISTER: '/register',
   DASHBOARD: '/dashboard',
   MERCHANT_HOME: '/merchant/home',
+  MERCHANT_APPLICATION_STATUS: '/merchant/application-status',
   MERCHANT_PROFILE: '/merchant/profile',
   CITIZEN_BENEFITS_REGISTER: '/citizen/register-benefits',
   PROFILE: '/profile',
