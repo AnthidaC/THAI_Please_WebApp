@@ -140,7 +140,7 @@ export const AdminFraudAlertsPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-surface-soft pb-24 md:pb-12 font-sans text-ink">
       {/* Header & Refresh */}
-      <div className="bg-white border-b border-hairline px-3.5 sm:px-6 lg:px-8 py-3 sm:py-3.5 mb-4 shadow-2xs">
+      <div className="mx-auto max-w-7xl px-3.5 sm:px-6 lg:px-8 pt-4 sm:pt-6 pb-2">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 sm:gap-3">
           <div className="flex items-center space-x-2.5 min-w-0">
             <div className="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-2xl bg-red-50 text-status-error border border-red-100 shadow-xs">

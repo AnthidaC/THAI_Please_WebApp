@@ -1,19 +1,41 @@
 import type { LucideIcon } from 'lucide-react';
-import { Home, Wallet, ScanLine, Store, User, QrCode, ShieldAlert, TrendingUp, Star, Megaphone } from 'lucide-react';
+import {
+  Home,
+  Wallet,
+  ScanLine,
+  Store,
+  User,
+  QrCode,
+  ShieldAlert,
+  TrendingUp,
+  Star,
+  Megaphone,
+  LayoutDashboard,
+} from 'lucide-react';
 import { APP_ROUTES } from '../../constants/routes';
 
 /**
  * การตั้งค่าเมนูนำทางแยกตามบทบาทผู้ใช้ (Role-based Navigation)
  *
- * แถบเมนู (โดยเฉพาะแถบล่างบนมือถือ) จะเปลี่ยนไปตามบทบาทของผู้ใช้งาน
+ * แถบเมนูทั้งบน Desktop และ Mobile Bottom Bar จะเปลี่ยนไปตามบทบาทของผู้ใช้งาน
  * ห้ามรวมเมนูของหลายบทบาทไว้ในแถบเดียวกัน
  *
- * สำหรับบทบาทประชาชน (CITIZEN) ลำดับเมนูประกอบด้วย 5 ลำดับ:
- * 1. หน้าหลัก (Home)
- * 2. กระเป๋าเงิน (Wallet)
- * 3. สแกนจ่าย (Scan Pay) - ปุ่มหลักตรงกลาง
- * 4. แนะนำร้าน (Recommended Stores)
- * 5. โปรไฟล์ส่วนตัว (Profile) - มีทางไปหน้าเกมและหน้าตั้งค่าอยู่ภายใน
+ * 1. CITIZEN (ประชาชน): 5 เมนู
+ *    - หน้าแรก (Home)
+ *    - กระเป๋าเงิน (Wallet)
+ *    - สแกนจ่าย (Scan Pay) - ปุ่มหลักตรงกลาง
+ *    - แนะนำร้าน (Recommended Stores)
+ *    - โปรไฟล์ส่วนตัว (Profile)
+ *
+ * 2. MERCHANT (ร้านค้า): 3 เมนู
+ *    - สถิติยอดขาย (Sales History)
+ *    - สร้าง QR รับเงิน (POS Dynamic QR) - ปุ่มหลักตรงกลาง
+ *    - รีวิวร้านค้า (Merchant Reviews)
+ *
+ * 3. ADMIN (ผู้ดูแลระบบ): 3 เมนู
+ *    - แดชบอร์ดผู้ดูแล (Admin Dashboard)
+ *    - ตรวจจับทุจริต (Fraud Alerts & Monitoring)
+ *    - แคมเปญและสิทธิประโยชน์ (Campaigns & Missions)
  */
 export type NavRole = 'CITIZEN' | 'MERCHANT' | 'ADMIN';
 
@@ -23,7 +45,62 @@ export interface NavItem {
   fullLabel?: string; // ชื่อเต็ม (จอใหญ่)
   icon: LucideIcon;
   primary?: boolean; // ปุ่มเด่นตรงกลางแถบล่าง (ธุรกรรมที่ใช้บ่อยที่สุด)
+  badge?: string; // ป้ายกำกับเสริม (ถ้ามี)
 }
+
+export interface RoleConfig {
+  role: NavRole;
+  label: string;
+  portalLabel: string;
+  icon: LucideIcon;
+  badgeClass: string;
+  dotClass: string;
+  activeNavClass: string;
+  mobileActiveColor: string;
+  avatarBgClass: string;
+}
+
+export const ROLE_CONFIG: Record<NavRole, RoleConfig> = {
+  CITIZEN: {
+    role: 'CITIZEN',
+    label: 'ประชาชน',
+    portalLabel: 'ประชาชน (Citizen)',
+    icon: User,
+    badgeClass: 'bg-blue-50 text-brand-blue border-blue-200/80 ring-1 ring-blue-500/10',
+    dotClass: 'bg-brand-blue',
+    activeNavClass: 'bg-brand-blue text-white shadow-xs',
+    mobileActiveColor: 'text-brand-blue',
+    avatarBgClass: 'bg-brand-blue text-white',
+  },
+  MERCHANT: {
+    role: 'MERCHANT',
+    label: 'ร้านค้า',
+    portalLabel: 'ร้านค้า (Merchant)',
+    icon: Store,
+    badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200/80 ring-1 ring-emerald-500/10',
+    dotClass: 'bg-emerald-600',
+    activeNavClass: 'bg-emerald-600 text-white shadow-xs',
+    mobileActiveColor: 'text-emerald-700',
+    avatarBgClass: 'bg-emerald-600 text-white',
+  },
+  ADMIN: {
+    role: 'ADMIN',
+    label: 'ผู้ดูแลระบบ',
+    portalLabel: 'ผู้ดูแลระบบ (Admin)',
+    icon: ShieldAlert,
+    badgeClass: 'bg-rose-50 text-rose-700 border-rose-200/80 ring-1 ring-rose-500/10',
+    dotClass: 'bg-rose-600',
+    activeNavClass: 'bg-slate-900 text-white shadow-xs',
+    mobileActiveColor: 'text-rose-700',
+    avatarBgClass: 'bg-rose-600 text-white',
+  },
+};
+
+export const ROLE_LABEL: Record<NavRole, { label: string; icon: LucideIcon }> = {
+  CITIZEN: { label: ROLE_CONFIG.CITIZEN.label, icon: ROLE_CONFIG.CITIZEN.icon },
+  MERCHANT: { label: ROLE_CONFIG.MERCHANT.label, icon: ROLE_CONFIG.MERCHANT.icon },
+  ADMIN: { label: ROLE_CONFIG.ADMIN.label, icon: ROLE_CONFIG.ADMIN.icon },
+};
 
 export const NAV_BY_ROLE: Record<NavRole, NavItem[]> = {
   CITIZEN: [
@@ -39,20 +116,15 @@ export const NAV_BY_ROLE: Record<NavRole, NavItem[]> = {
     { to: APP_ROUTES.MERCHANT_REVIEWS, label: 'รีวิวร้านค้า', fullLabel: 'รีวิวร้านค้า', icon: Star },
   ],
   ADMIN: [
+    { to: APP_ROUTES.ADMIN_DASHBOARD, label: 'แดชบอร์ด', fullLabel: 'แดชบอร์ดผู้ดูแล', icon: LayoutDashboard },
     { to: APP_ROUTES.ADMIN_FRAUD_ALERTS, label: 'ตรวจทุจริต', fullLabel: 'ตรวจจับทุจริต', icon: ShieldAlert },
     { to: APP_ROUTES.ADMIN_CAMPAIGNS, label: 'แคมเปญ', fullLabel: 'แคมเปญและสิทธิประโยชน์', icon: Megaphone },
   ],
 };
 
-export const ROLE_LABEL: Record<NavRole, { label: string; icon: LucideIcon }> = {
-  CITIZEN: { label: 'ประชาชน', icon: Wallet },
-  MERCHANT: { label: 'ร้านค้า', icon: Store },
-  ADMIN: { label: 'ผู้ดูแลระบบ', icon: ShieldAlert },
-};
-
 /**
  * ระบุบทบาทที่ใช้แสดงเมนู
- * ปัจจุบัน User type มีแค่ 'USER' | 'ADMIN' จึงอนุมานบทบาทร้านค้า/ประชาชนจากโซนของหน้า (path)
+ * ปัจจุบัน User type มีแค่ 'USER' | 'ADMIN' | 'MERCHANT' จึงอนุมานบทบาทร้านค้า/ประชาชนจาก role และ path
  */
 export const resolveNavRole = (userRole: string | undefined, pathname: string): NavRole => {
   if (userRole === 'ADMIN' || pathname.startsWith('/admin')) return 'ADMIN';
