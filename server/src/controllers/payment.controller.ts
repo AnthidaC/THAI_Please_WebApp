@@ -11,8 +11,9 @@ export const generateDynamicQr = async (req: Request, res: Response): Promise<vo
     const qrData = await paymentService.generateDynamicQr({
       merchantId,
       amount: Number(amount),
-      latitude: 0,
-      longitude: 0,
+      latitude: Number(latitude),
+      longitude: Number(longitude),
+      shopName,
     });
 
     sendSuccess(res, qrData, 'สร้าง Dynamic QR Code รับชำระเงินสำเร็จ', 201);
