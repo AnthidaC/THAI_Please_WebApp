@@ -1,5 +1,5 @@
 import type { PrismaClient } from '@prisma/client';
-import type { BadgeConditionHandler } from '../conditionRegistry';
+import type { BadgeConditionHandler, ProgressWindow } from '../conditionRegistry';
 import { ELIGIBLE_TRANSACTION_STATUSES } from './eligibleActivity';
 
 export type ReviewProgressClient = Pick<PrismaClient, 'reviews'>;
@@ -13,10 +13,11 @@ export const createReviewCountHandler = (
   client: ReviewProgressClient
 ): BadgeConditionHandler => ({
   conditionType: 'review_count',
-  getProgress: (userId) => client.reviews.count({
+  getProgress: (userId, window?: ProgressWindow) => client.reviews.count({
     where: {
       user_id: userId,
       is_verified_purchase: true,
+      ...(window && { created_at: { gte: window.startsAt, lte: window.endsAt } }),
       transactions: { status: { in: [...ELIGIBLE_TRANSACTION_STATUSES] } },
     },
   }),

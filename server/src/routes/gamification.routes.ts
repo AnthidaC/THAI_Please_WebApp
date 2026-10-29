@@ -23,6 +23,7 @@ import {
 import { authenticateAdmin } from '../middlewares/admin.middleware';
 import { authenticate, requireCitizen } from '../middlewares/auth.middleware';
 import { getMyBadge, listMyBadges } from '../controllers/badge.controller';
+import { listMyMissions } from '../controllers/citizenMission.controller';
 import {
   createAdminConditionType,
   getAdminConditionType,
@@ -78,5 +79,6 @@ router.post('/badges/:id/deactivate', authenticateAdmin, deactivateAdminBadge);
 // Citizen Badge progress. The user comes from the authenticated request context.
 router.get('/me/badges', authenticate, requireCitizen, listMyBadges);
 router.get('/me/badges/:badgeId', authenticate, requireCitizen, getMyBadge);
+router.get('/me/missions', authenticate, requireCitizen, listMyMissions);
 
 export default router;
