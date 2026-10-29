@@ -15,6 +15,7 @@ import { DashboardPage } from '../pages/admin/dashboard/DashboardPage';
 import { NotFoundPage } from '../pages/notFound/NotFoundPage';
 import { MerchantHomePage } from '../pages/merchant/home/MerchantHomePage';
 import { MerchantApplicationStatusPage } from '../pages/merchant/home/MerchantApplicationStatusPage';
+import { CitizenHomePage } from '../pages/citizen/CitizenHomePage';
 import { CitizenBenefitsRegisterPage } from '../pages/citizen/CitizenBenefitsRegisterPage';
 import { MerchantProfilePage } from '../pages/merchant/profile/MerchantProfilePage';
 
@@ -59,6 +60,7 @@ export const router = createBrowserRouter([
       {
         element: <ProtectedRoute allowedRoles={['USER']} />,
         children: [
+          { path: APP_ROUTES.CITIZEN_HOME, element: <CitizenHomePage /> },
           { path: APP_ROUTES.CITIZEN_WALLET, element: <CitizenWalletPage /> },
           { path: APP_ROUTES.CITIZEN_BENEFITS_REGISTER, element: <CitizenBenefitsRegisterPage /> },
           { path: APP_ROUTES.CITIZEN_SCAN_COPAY, element: <CitizenScanCopayPage /> },

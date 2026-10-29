@@ -9,7 +9,7 @@ export const CitizenMissionsPage: React.FC = () => (
     <div className="mx-auto max-w-5xl space-y-5 px-3.5 sm:px-6 lg:px-8">
       <header className="flex items-center gap-3 border-b border-hairline/80 pb-4">
         <Link
-          to={APP_ROUTES.HOME}
+          to={APP_ROUTES.CITIZEN_HOME}
           aria-label="กลับหน้าหลัก"
           className="touch-manipulation inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-pill border border-hairline bg-white px-3 text-xs font-semibold text-ink-body transition-colors hover:bg-surface-soft hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue focus-visible:ring-offset-2"
         >

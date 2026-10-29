@@ -164,7 +164,7 @@ export const ROLE_LABEL: Record<NavRole, { label: string; icon: LucideIcon }> = 
 
 export const NAV_BY_ROLE: Record<'CITIZEN' | 'MERCHANT' | 'ADMIN', RoleNavItem[]> = {
   CITIZEN: [
-    { to: APP_ROUTES.HOME, label: 'หน้าแรก', fullLabel: 'หน้าหลัก', icon: Home },
+    { to: APP_ROUTES.CITIZEN_HOME, label: 'หน้าแรก', fullLabel: 'หน้าหลัก', icon: Home },
     { to: APP_ROUTES.CITIZEN_WALLET, label: 'กระเป๋าเงิน', fullLabel: 'กระเป๋าเงิน', icon: Wallet },
     { to: APP_ROUTES.CITIZEN_SCAN_COPAY, label: 'สแกนจ่าย', fullLabel: 'สแกนจ่าย Co-pay', icon: ScanLine, primary: true },
     { to: APP_ROUTES.CITIZEN_NEAR_ME, label: 'แนะนำร้าน', fullLabel: 'แนะนำร้านค้า', icon: Store },

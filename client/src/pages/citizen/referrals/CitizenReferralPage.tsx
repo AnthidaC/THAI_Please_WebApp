@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   Users,
   Gift,
@@ -207,21 +207,13 @@ export const CitizenReferralPage: React.FC = () => {
       <section className="bg-white border-b border-hairline px-4 sm:px-6 lg:px-8 pt-5 pb-5 shadow-2xs">
         <div className="max-w-4xl mx-auto space-y-3">
           <nav className="flex items-center space-x-1.5 text-xs text-ink-muted">
-            <button
-              type="button"
-              onClick={() => navigate(APP_ROUTES.HOME)}
-              className="hover:text-ink transition"
-            >
+            <Link to={APP_ROUTES.CITIZEN_HOME} className="transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue focus-visible:ring-offset-2">
               หน้าหลัก
-            </button>
+            </Link>
             <ChevronRight className="h-3 w-3 text-ink-muted" />
-            <button
-              type="button"
-              onClick={() => navigate(APP_ROUTES.PROFILE)}
-              className="hover:text-ink transition"
-            >
+            <Link to={APP_ROUTES.PROFILE} className="transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue focus-visible:ring-offset-2">
               โปรไฟล์ &amp; การตั้งค่า
-            </button>
+            </Link>
             <ChevronRight className="h-3 w-3 text-ink-muted" />
             <span className="text-brand-blue font-semibold">ระบบชวนเพื่อน (Referral)</span>
           </nav>
@@ -265,7 +257,7 @@ export const CitizenReferralPage: React.FC = () => {
       </section>
 
       {/* 2. MAIN CONTENT AREA */}
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 space-y-6">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 space-y-6">
         {/* ============================================================== */}
         {/* STATE: LOADING SKELETON */}
         {/* ============================================================== */}
@@ -634,7 +626,7 @@ export const CitizenReferralPage: React.FC = () => {
                   {/* Visual Progress Bar */}
                   <div className="h-3.5 w-full bg-white/20 rounded-full overflow-hidden p-0.5">
                     <div
-                      className="h-full bg-gradient-to-r from-amber-400 to-amber-300 rounded-full transition-all duration-500 shadow-sm"
+                      className="h-full bg-gradient-to-r from-amber-400 to-amber-300 rounded-full transition-[width] duration-500 shadow-sm"
                       style={{ width: `${milestonePercent}%` }}
                     />
                   </div>
@@ -1053,7 +1045,7 @@ export const CitizenReferralPage: React.FC = () => {
             </div>
           </>
         )}
-      </main>
+      </div>
     </div>
   );
 };

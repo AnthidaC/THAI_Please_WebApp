@@ -1,6 +1,6 @@
 import React from 'react';
-import { ArrowRight, BadgeCheck, ChartNoAxesCombined, CheckCircle2, Gift, HandCoins, MapPinned, QrCode, ShieldCheck, Star, Store, Target, Trophy, UserRound } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { ArrowRight, BadgeCheck, ChartNoAxesCombined, CheckCircle2, HandCoins, MapPinned, QrCode, ShieldCheck, Star, Store, Trophy, UserRound } from 'lucide-react';
+import { Link, Navigate } from 'react-router-dom';
 import { homeContent } from '../../content/homeContent';
 import { APP_ROUTES } from '../../constants/routes';
 import { useAuthStore } from '../../stores/authStore';
@@ -9,7 +9,11 @@ const highlightIcons = [HandCoins, MapPinned, Trophy, Star, ChartNoAxesCombined]
 const audienceIcons = [UserRound, Store, ShieldCheck];
 
 export const HomePage: React.FC = () => {
-  const isCitizen = useAuthStore((state) => state.isAuthenticated && state.user?.role === 'USER');
+  const { isAuthenticated, user } = useAuthStore();
+
+  if (isAuthenticated && user?.role === 'USER') {
+    return <Navigate to={APP_ROUTES.CITIZEN_HOME} replace />;
+  }
 
   return (
     <div className="bg-surface-soft font-sans text-ink">
@@ -28,54 +32,6 @@ export const HomePage: React.FC = () => {
       </div>
     </section>
 
-    {isCitizen && (
-      <section className="space-y-4 px-4 py-6 sm:py-8" aria-label="ภารกิจและสิทธิพิเศษสำหรับประชาชน">
-        <div className="mx-auto max-w-6xl space-y-4">
-          <Link
-            to={APP_ROUTES.CITIZEN_MISSIONS}
-            className="group touch-manipulation flex min-h-20 w-full items-center justify-between gap-4 rounded-card border border-blue-200 bg-white p-4 shadow-sm transition-colors hover:border-blue-300 hover:bg-blue-50/40 active:bg-blue-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-200 sm:p-5 motion-reduce:transition-none"
-          >
-            <span className="flex min-w-0 items-center gap-3.5">
-              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-brand-blue-light text-brand-blue">
-                <Target className="h-6 w-6" aria-hidden="true" />
-              </span>
-              <span className="min-w-0">
-                <span className="block text-pretty text-base font-bold text-ink">ภารกิจของคุณ</span>
-                <span className="mt-1 block break-words text-sm leading-relaxed text-ink-body">
-                  ติดตามความคืบหน้าและดูภารกิจที่กำลังเปิดทั้งหมด
-                </span>
-              </span>
-            </span>
-            <span className="inline-flex shrink-0 items-center gap-2 text-sm font-bold text-brand-blue">
-              <span className="hidden sm:inline">ดูภารกิจทั้งหมด</span>
-              <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none" aria-hidden="true" />
-            </span>
-          </Link>
-
-          <article className="flex w-full flex-col justify-between rounded-card border border-emerald-200 bg-white p-5 shadow-sm sm:p-6">
-            <div className="flex items-start gap-3.5">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-800 text-white">
-                <Gift className="h-6 w-6" aria-hidden="true" />
-              </div>
-              <div className="min-w-0">
-                <h2 className="text-pretty text-base font-bold leading-snug text-ink">ชวนเพื่อนรับคูปอง</h2>
-                <p className="mt-1.5 text-sm leading-relaxed text-ink-body">
-                  แนะนำร้านค้าให้เพื่อน แล้วติดตามสถานะการแนะนำและคูปองของคุณ
-                </p>
-              </div>
-            </div>
-            <Link
-              to={APP_ROUTES.CITIZEN_REFERRALS}
-              className="touch-manipulation mt-5 inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-emerald-800 px-4 py-3 text-sm font-bold text-white transition-colors hover:bg-emerald-900 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200 motion-reduce:transition-none"
-            >
-              <Gift className="h-4 w-4" aria-hidden="true" />
-              <span>แนะนำเพื่อน</span>
-              <ArrowRight className="h-4 w-4" aria-hidden="true" />
-            </Link>
-          </article>
-        </div>
-      </section>
-    )}
 
     <section className="px-4 py-12 sm:py-16" aria-labelledby="challenge-title"><div className="mx-auto max-w-6xl"><p className="text-base font-semibold text-brand-blue">{homeContent.sections.challengeEyebrow}</p><h2 id="challenge-title" className="mt-2 text-3xl font-bold text-ink">{homeContent.sections.challengeTitle}</h2><div className="mt-7 grid gap-4 md:grid-cols-3">{homeContent.challenges.map((challenge) => <article key={challenge} className="rounded-card border border-hairline bg-white p-6"><CheckCircle2 aria-hidden="true" className="h-6 w-6 text-brand-blue" /><p className="mt-4 text-lg leading-relaxed text-ink-body">{challenge}</p></article>)}</div></div></section>
 
