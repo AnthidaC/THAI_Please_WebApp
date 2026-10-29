@@ -207,7 +207,7 @@ export class WalletService {
     } else {
       // Serialize day-boundary resets with checkout, which locks the same wallet row.
       wallet = await prisma.$transaction(async (tx) => {
-        await tx.$queryRaw`SELECT wallet_id FROM public.wallets WHERE wallet_id = ${wallet!.wallet_id}::uuid FOR UPDATE`;
+        await tx.$queryRaw`SELECT wallet_id FROM wallets WHERE wallet_id = ${wallet!.wallet_id}::uuid FOR UPDATE`;
         const current = await tx.wallets.findUnique({
           where: { wallet_id: wallet!.wallet_id },
           include: { campaigns: true },
@@ -358,7 +358,7 @@ export class WalletService {
     }
 
     const updatedWallet = await prisma.$transaction(async (tx: any) => {
-      await tx.$queryRaw`SELECT wallet_id FROM public.wallets WHERE wallet_id = ${wallet!.wallet_id}::uuid FOR UPDATE`;
+      await tx.$queryRaw`SELECT wallet_id FROM wallets WHERE wallet_id = ${wallet!.wallet_id}::uuid FOR UPDATE`;
       const currentWallet = await tx.wallets.findUnique({ where: { wallet_id: wallet!.wallet_id } });
       if (!currentWallet) throw new Error('ไม่พบข้อมูลกระเป๋าเงินของผู้ใช้');
       if (currentWallet.status === 'SUSPENDED' || currentWallet.eligibility_status === 'SUSPENDED') {

@@ -4,6 +4,7 @@ import {
   getQrDetails,
   getQrPaymentStatus,
   streamQrPaymentStatus,
+  streamMerchantPayments,
   checkoutCopay,
   validateDiscount,
 } from '../controllers/payment.controller';
@@ -19,6 +20,9 @@ const router = Router();
 
 // POST /api/payment/qr/generate
 router.post('/qr/generate', authenticate, requirePaymentMerchant, validate(generateQrSchema), generateDynamicQr);
+
+// GET /api/payment/merchant/stream (Server-Sent Events: แจ้งเตือนร้านค้าแบบครอบคลุมทั้งร้าน รองรับการสร้าง QR ต่อเนื่อง)
+router.get('/merchant/stream', authenticate, requirePaymentMerchant, streamMerchantPayments);
 
 // GET /api/payment/qr/:reference/stream (Server-Sent Events: แจ้งเตือน POS ร้านค้าแบบ Real-Time ทันที 0 ms)
 router.get('/qr/:reference/stream', authenticate, requirePaymentMerchant, streamQrPaymentStatus);
