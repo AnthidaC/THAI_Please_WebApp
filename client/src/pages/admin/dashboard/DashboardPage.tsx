@@ -17,7 +17,7 @@ import { APP_ROUTES } from '../../../constants/routes';
 
 export const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
-  const { user, token, clearAuth } = useAuthStore();
+  const { user, clearAuth } = useAuthStore();
 
   return (
     <div className="min-h-[85vh] bg-surface-soft py-6 md:py-8 px-4 pb-24 md:pb-12 font-sans text-ink">
@@ -94,10 +94,6 @@ export const DashboardPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="p-3 bg-gray-50 rounded-2xl border border-hairline text-[11px] font-mono text-ink-muted break-all">
-            <span className="font-semibold text-ink">Authorization Token: </span>
-            {token ? `${token.slice(0, 36)}...` : 'None'}
-          </div>
         </div>
 
         {/* ทางลัดเข้าใช้งานโมดูลงาน (Role Modules Quick Links) */}

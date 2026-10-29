@@ -4,6 +4,8 @@ import { env } from '../config/env';
 export interface TokenPayload {
   userId: string;
   role: string;
+  /** Restricts an unapproved merchant session to its own application status endpoint. */
+  tokenScope?: 'MERCHANT_APPLICATION_STATUS';
   /** Issued-at (seconds), set by jsonwebtoken. */
   iat?: number;
   /** Marks a mock account session. */

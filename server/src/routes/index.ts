@@ -9,6 +9,10 @@ import reviewRoutes from './review.routes';
 import recommendationRoutes from './recommendation.routes';
 import preferenceRoutes from './preference.routes';
 import referralRoutes from './referral.routes';
+import geoRoutes from './geo.routes';
+import merchantApplicationRoutes from './merchant-application.routes';
+import socialImpactRoutes from './social-impact.routes';
+import staffRoutes from './staff.routes';
 
 const router = Router();
 
@@ -27,6 +31,12 @@ router.use('/reviews', reviewRoutes);
 router.use('/recommendations', recommendationRoutes);
 router.use('/preferences', preferenceRoutes);
 router.use('/referrals', referralRoutes);
+router.use('/geo', geoRoutes);
+router.use('/merchant-applications', merchantApplicationRoutes);
+router.use('/admin/social-impact', socialImpactRoutes);
+router.use('/staff', staffRoutes);
+
+// ต้องอยู่ท้ายสุดเสมอ: mount ที่ '/' จะรับทุก path ที่ยังไม่ถูกจับก่อนหน้า
 router.use('/', gamificationRoutes);
 
 export default router;

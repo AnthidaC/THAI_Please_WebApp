@@ -1,147 +1,38 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
-import {
-  Wallet,
-  QrCode,
-  Store,
-  ShieldAlert,
-  ArrowRight,
-  Sparkles,
-  ShieldCheck,
-} from 'lucide-react';
-import { APP_ROUTES } from '../../constants/routes';
+import { ArrowRight, BadgeCheck, ChartNoAxesCombined, CheckCircle2, HandCoins, MapPinned, QrCode, ShieldCheck, Star, Store, Trophy, UserRound } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { homeContent } from '../../content/homeContent';
 
-export const HomePage: React.FC = () => {
-  const navigate = useNavigate();
+const highlightIcons = [HandCoins, MapPinned, Trophy, Star, ChartNoAxesCombined];
+const audienceIcons = [UserRound, Store, ShieldCheck];
 
-  return (
-    <div className="min-h-[85vh] bg-surface-soft py-6 md:py-8 px-4 pb-24 md:pb-12 font-sans text-ink">
-      <div className="max-w-4xl mx-auto space-y-8">
-        {/* Hero Section */}
-        <div className="rounded-card border border-hairline bg-white p-8 shadow-sm text-center">
-          <div className="inline-flex items-center space-x-1.5 rounded-pill bg-brand-blue-light px-3 py-1 text-xs font-semibold text-brand-blue border border-blue-200 mb-4">
-            <Sparkles className="h-3.5 w-3.5" />
-            <span>แพลตฟอร์มดิจิทัลกระตุ้นเศรษฐกิจฐานราก</span>
-          </div>
-
-          <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-ink">
-            ไทยช่วยไทยพลีส (THAI Please)
-          </h1>
-          <p className="mt-3 text-sm text-ink-body max-w-xl mx-auto leading-relaxed">
-            ระบบกระเป๋าเงินดิจิทัล ชำระเงินร่วม (Co-pay 60/40) สแกน Dynamic QR หน้าร้าน
-            พร้อมระบบตรวจจับการทุจริตพิกัด GPS & Semi-AI Anomaly Engine มาตรฐานสากล
-          </p>
-
-          <div className="mt-6 flex flex-wrap justify-center gap-3">
-            <button
-              onClick={() => navigate(APP_ROUTES.CITIZEN_WALLET)}
-              className="inline-flex items-center space-x-2 rounded-pill bg-brand-blue px-6 py-3 text-sm font-semibold text-white shadow-md transition hover:bg-brand-blue-hover active:scale-95"
-            >
-              <Wallet className="h-4 w-4" />
-              <span>เข้าสู่กระเป๋าเงิน (Citizen Wallet)</span>
-              <ArrowRight className="h-4 w-4 ml-1" />
-            </button>
-            <button
-              onClick={() => navigate(APP_ROUTES.CITIZEN_SCAN_COPAY)}
-              className="inline-flex items-center space-x-2 rounded-pill border border-hairline bg-white px-5 py-3 text-sm font-semibold text-ink shadow-sm hover:bg-gray-50 transition"
-            >
-              <QrCode className="h-4 w-4 text-brand-blue" />
-              <span>สแกนชำระเงินร่วม (Co-pay 60/40)</span>
-            </button>
-          </div>
-        </div>
-
-        {/* เมนูทางลัดตามบทบาท 3 กลุ่ม (Citizen, Merchant, Admin) */}
+export const HomePage: React.FC = () => (
+  <div className="bg-surface-soft font-sans text-ink">
+    <section className="border-b border-hairline bg-white px-4 py-12 sm:py-16 lg:py-20">
+      <div className="mx-auto grid max-w-6xl items-center gap-10 lg:grid-cols-[1.1fr_0.9fr]">
         <div>
-          <h2 className="text-base font-bold text-ink mb-4">โมดูลงาน Developer 2: Payment & Fraud Engine</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Card 1: ฝั่งประชาชน */}
-            <div
-              onClick={() => navigate(APP_ROUTES.CITIZEN_WALLET)}
-              className="rounded-card border border-hairline bg-white p-6 shadow-sm hover:shadow-md transition cursor-pointer group flex flex-col justify-between"
-            >
-              <div>
-                <div className="h-12 w-12 rounded-2xl bg-brand-blue-light text-brand-blue flex items-center justify-center mb-4 group-hover:scale-105 transition">
-                  <Wallet className="h-6 w-6" />
-                </div>
-                <h3 className="text-base font-bold text-ink">ฝั่งประชาชน (Citizen)</h3>
-                <p className="text-xs text-ink-muted mt-2 leading-relaxed">
-                  • 2.2 กระเป๋าเงินดิจิทัล & โควตารัฐสมทบ 60%<br />
-                  • 2.2.1 สแกน QR ร่วมจ่าย Co-pay 60/40<br />
-                  • 2.2.2 ใบเสร็จ e-Slip พร้อมสิทธิ์รีวิว 24 ชม.<br />
-                  • 2.5.1 ประวัติการทำธุรกรรม
-                </p>
-              </div>
-              <div className="mt-5 pt-3 border-t border-hairline flex items-center justify-between text-xs font-semibold text-brand-blue">
-                <span>เปิดใช้งานกระเป๋าเงิน</span>
-                <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition" />
-              </div>
-            </div>
-
-            {/* Card 2: ฝั่งร้านค้า */}
-            <div
-              onClick={() => navigate(APP_ROUTES.MERCHANT_POS_QR)}
-              className="rounded-card border border-hairline bg-white p-6 shadow-sm hover:shadow-md transition cursor-pointer group flex flex-col justify-between"
-            >
-              <div>
-                <div className="h-12 w-12 rounded-2xl bg-emerald-50 text-status-success flex items-center justify-center mb-4 group-hover:scale-105 transition">
-                  <Store className="h-6 w-6" />
-                </div>
-                <h3 className="text-base font-bold text-ink">ฝั่งร้านค้า (Merchant)</h3>
-                <p className="text-xs text-ink-muted mt-2 leading-relaxed">
-                  • 3.2.1 สร้าง Dynamic QR ขนาดใหญ่ 300x300<br />
-                  • ระบุยอดเรียกเก็บและบันทึกพิกัดร้านค้า<br />
-                  • 3.3.1 ประวัติการรับเงินและสถิติการขาย<br />
-                  • สรุปยอดเงินอุดหนุนรัฐ 60% และลูกค้า 40%
-                </p>
-              </div>
-              <div className="mt-5 pt-3 border-t border-hairline flex items-center justify-between text-xs font-semibold text-status-success">
-                <span>เปิดระบบสร้าง QR หน้าร้าน</span>
-                <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition" />
-              </div>
-            </div>
-
-            {/* Card 3: ฝั่งผู้ดูแลระบบ */}
-            <div
-              onClick={() => navigate(APP_ROUTES.ADMIN_FRAUD_ALERTS)}
-              className="rounded-card border border-red-100 bg-white p-6 shadow-sm hover:shadow-md transition cursor-pointer group flex flex-col justify-between"
-            >
-              <div>
-                <div className="h-12 w-12 rounded-2xl bg-red-50 text-status-error flex items-center justify-center mb-4 group-hover:scale-105 transition">
-                  <ShieldAlert className="h-6 w-6" />
-                </div>
-                <h3 className="text-base font-bold text-ink">ฝั่งผู้ดูแลระบบ (Admin)</h3>
-                <p className="text-xs text-ink-muted mt-2 leading-relaxed">
-                  • 4.2 ระบบตรวจจับทุจริตพิกัด GPS Geofence<br />
-                  • Semi-AI Anomaly Scoring แบบหลายมิติ<br />
-                  • รายการธุรกรรมต้องสงสัย (Flagged Queue)<br />
-                  • ปุ่มตรวจสอบและอนุมัติ/ระงับรายการ
-                </p>
-              </div>
-              <div className="mt-5 pt-3 border-t border-hairline flex items-center justify-between text-xs font-semibold text-status-error">
-                <span>เปิดแดชบอร์ดตรวจทุจริต</span>
-                <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition" />
-              </div>
-            </div>
+          <p className="inline-flex min-h-11 items-center gap-2 rounded-pill border border-blue-200 bg-brand-blue-light px-4 text-base font-semibold text-brand-blue"><BadgeCheck aria-hidden="true" className="h-5 w-5" />{homeContent.hero.eyebrow}</p>
+          <h1 className="mt-5 text-4xl font-extrabold tracking-tight text-ink sm:text-5xl">{homeContent.hero.title}<span className="mt-2 block text-2xl font-bold text-brand-blue sm:text-3xl">({homeContent.hero.englishName})</span></h1>
+          <p className="mt-5 max-w-2xl text-lg leading-relaxed text-ink-body">{homeContent.hero.description}</p>
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+            <Link to="/register" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-pill bg-brand-blue px-6 text-base font-semibold text-white transition hover:bg-brand-blue-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-blue">{homeContent.hero.primaryCta}<ArrowRight aria-hidden="true" className="h-5 w-5" /></Link>
+            <Link to="/login" className="inline-flex min-h-12 items-center justify-center rounded-pill border border-brand-blue bg-white px-6 text-base font-semibold text-brand-blue transition hover:bg-brand-blue-light focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-blue">{homeContent.hero.secondaryCta}</Link>
           </div>
         </div>
-
-        {/* มาตรฐานวิศวกรรมซอฟต์แวร์ระดับสากล */}
-        <div className="rounded-card border border-hairline bg-white p-6 shadow-sm flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <ShieldCheck className="h-8 w-8 text-brand-blue" />
-            <div>
-              <h4 className="text-sm font-bold text-ink">พัฒนาตามมาตรฐาน Dev ระดับสากล</h4>
-              <p className="text-xs text-ink-muted">
-                Clean Architecture, TDD Unit Tests, Zero-Bug Regression, Responsive WCAG 2.1 AA
-              </p>
-            </div>
-          </div>
-          <span className="text-xs font-mono font-semibold text-brand-blue bg-brand-blue-light px-3 py-1 rounded-pill">
-            branch: developer-2-payment-fraud-engine
-          </span>
-        </div>
+        <div className="rounded-card border border-hairline bg-surface-soft p-6 sm:p-8"><div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-blue text-white"><QrCode aria-hidden="true" className="h-7 w-7" /></div><p className="mt-6 text-lg font-bold text-ink">{homeContent.hero.panelTitle}</p><p className="mt-2 text-base leading-relaxed text-ink-body">{homeContent.hero.panelDescription}</p><div className="mt-6 grid grid-cols-2 gap-3 border-t border-hairline pt-6">{homeContent.hero.paymentSplit.map((item) => <div key={item.label}><p className="text-2xl font-bold text-brand-blue">{item.value}</p><p className="text-sm text-ink-body">{item.label}</p></div>)}</div></div>
       </div>
-    </div>
-  );
-};
+    </section>
+
+    <section className="px-4 py-12 sm:py-16" aria-labelledby="challenge-title"><div className="mx-auto max-w-6xl"><p className="text-base font-semibold text-brand-blue">{homeContent.sections.challengeEyebrow}</p><h2 id="challenge-title" className="mt-2 text-3xl font-bold text-ink">{homeContent.sections.challengeTitle}</h2><div className="mt-7 grid gap-4 md:grid-cols-3">{homeContent.challenges.map((challenge) => <article key={challenge} className="rounded-card border border-hairline bg-white p-6"><CheckCircle2 aria-hidden="true" className="h-6 w-6 text-brand-blue" /><p className="mt-4 text-lg leading-relaxed text-ink-body">{challenge}</p></article>)}</div></div></section>
+
+    <section id="highlights" className="scroll-mt-24 border-y border-hairline bg-white px-4 py-12 sm:py-16" aria-labelledby="highlight-title"><div className="mx-auto max-w-6xl"><p className="text-base font-semibold text-brand-blue">{homeContent.sections.highlightEyebrow}</p><h2 id="highlight-title" className="mt-2 text-3xl font-bold text-ink">{homeContent.sections.highlightTitle}</h2><div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{homeContent.highlights.map((highlight, index) => { const Icon = highlightIcons[index]; return <article key={highlight.title} className="rounded-card border border-hairline bg-surface-soft p-6"><div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-blue-light text-brand-blue"><Icon aria-hidden="true" className="h-6 w-6" /></div><h3 className="mt-5 text-xl font-bold text-ink">{highlight.title}</h3><p className="mt-2 text-base leading-relaxed text-ink-body">{highlight.description}</p></article>; })}</div></div></section>
+
+    <section className="px-4 py-12 sm:py-16" aria-labelledby="steps-title"><div className="mx-auto max-w-6xl"><p className="text-base font-semibold text-brand-blue">{homeContent.sections.stepsEyebrow}</p><h2 id="steps-title" className="mt-2 text-3xl font-bold text-ink">{homeContent.sections.stepsTitle}</h2><ol className="mt-8 grid gap-5 md:grid-cols-3">{homeContent.steps.map((step, index) => <li key={step.title} className="rounded-card border border-hairline bg-white p-6"><span className="flex h-12 w-12 items-center justify-center rounded-full bg-brand-blue text-lg font-bold text-white">{index + 1}</span><h3 className="mt-5 text-xl font-bold text-ink">{step.title}</h3><p className="mt-2 text-base leading-relaxed text-ink-body">{step.description}</p></li>)}</ol></div></section>
+
+    <section className="bg-brand-blue px-4 py-12 text-white sm:py-16" aria-labelledby="impact-title"><div className="mx-auto max-w-6xl"><p className="text-base font-semibold text-blue-100">{homeContent.sections.impactEyebrow}</p><h2 id="impact-title" className="mt-2 text-3xl font-bold">{homeContent.sections.impactTitle}</h2><p className="mt-3 text-base text-blue-100">{homeContent.sections.impactNotice}</p><div className="mt-8 grid gap-4 sm:grid-cols-2">{homeContent.metrics.map((metric) => <div key={metric.label} className="rounded-card border border-white/30 bg-white/10 p-6"><p className="text-3xl font-bold">{metric.value}</p><p className="mt-2 text-base text-blue-100">{metric.label}</p></div>)}</div></div></section>
+
+    <section className="px-4 py-12 sm:py-16" aria-labelledby="audience-title"><div className="mx-auto max-w-6xl"><p className="text-base font-semibold text-brand-blue">{homeContent.sections.audienceEyebrow}</p><h2 id="audience-title" className="mt-2 text-3xl font-bold text-ink">{homeContent.sections.audienceTitle}</h2><div className="mt-8 grid gap-4 lg:grid-cols-3">{homeContent.audiences.map(({ title, description, to, label }, index) => { const Icon = audienceIcons[index]; return <article key={title} className="flex flex-col rounded-card border border-hairline bg-white p-6"><Icon aria-hidden="true" className="h-7 w-7 text-brand-blue" /><h3 className="mt-5 text-xl font-bold text-ink">{title}</h3><p className="mt-2 flex-1 text-base leading-relaxed text-ink-body">{description}</p><Link to={to} className="mt-6 inline-flex min-h-12 items-center justify-center gap-2 rounded-pill border border-brand-blue px-4 text-base font-semibold text-brand-blue transition hover:bg-brand-blue-light focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-blue">{label}<ArrowRight aria-hidden="true" className="h-5 w-5" /></Link></article>; })}</div></div></section>
+
+    <section id="faq" className="scroll-mt-24 border-t border-hairline bg-white px-4 py-12 sm:py-16" aria-labelledby="faq-title"><div className="mx-auto max-w-4xl"><p className="text-base font-semibold text-brand-blue">{homeContent.sections.faqEyebrow}</p><h2 id="faq-title" className="mt-2 text-3xl font-bold text-ink">{homeContent.sections.faqTitle}</h2><div className="mt-7 divide-y divide-hairline rounded-card border border-hairline">{homeContent.faqs.map((faq) => <details key={faq.question} className="bg-white px-5 first:rounded-t-card last:rounded-b-card"><summary className="flex min-h-14 cursor-pointer items-center py-3 text-left text-base font-semibold text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-blue">{faq.question}</summary><p className="pb-5 text-base leading-relaxed text-ink-body">{faq.answer}</p></details>)}</div></div></section>
+  </div>
+);

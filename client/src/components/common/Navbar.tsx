@@ -3,7 +3,7 @@ import { NavLink, Link, useNavigate, useLocation } from 'react-router-dom';
 import { LogOut, LogIn } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import { APP_ROUTES } from '../../constants/routes';
-import { NAV_BY_ROLE, ROLE_CONFIG, resolveNavRole } from './navConfig';
+import { ROLE_CONFIG, getNavItems, resolveNavRole } from './navConfig';
 
 export const Navbar: React.FC = () => {
   const navigate = useNavigate();
@@ -18,7 +18,7 @@ export const Navbar: React.FC = () => {
 
   // แสดงแถบนำทางของร้านค้าเฉพาะผู้ใช้ร้านค้าที่ผ่านการยืนยันตัวตนแล้วเท่านั้น (Authenticated Merchant)
   const isMerchantAuthenticated = isMerchant && isAuthenticated;
-  const navItems = isMerchant && !isMerchantAuthenticated ? [] : NAV_BY_ROLE[role];
+  const navItems = isMerchant && !isMerchantAuthenticated ? [] : getNavItems(role);
   const RoleIcon = roleConfig.icon;
 
   // สีของปุ่มเมนูที่ Active บน Desktop (แยกตามบทบาทและฟังก์ชันงาน)

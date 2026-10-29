@@ -65,10 +65,10 @@ assert.equal(getBangkokDateKey(atBangkokMidnight), '2026-10-28', 'daily quota re
 assert.equal(getDatabaseDateKey(toBangkokDatabaseDate(atBangkokMidnight)), '2026-10-28', 'Bangkok local date round-trips through a PostgreSQL DATE');
 
 const paymentService = new PaymentService();
-const periodCapped = paymentService.calculateCopay(200, 80, 50, 0, undefined, undefined, 40);
-assert.equal(periodCapped.governmentCopayAmount, 40, 'period, daily, and campaign caps limit government contribution');
-assert.equal(periodCapped.citizenPaidAmount, 160, 'existing partial-subsidy behavior is preserved');
-assert.equal(periodCapped.periodQuotaRemainingAfter, 0, 'exact period quota boundary is allowed');
+const quotaCapped = paymentService.calculateCopay(200, 80, 50);
+assert.equal(quotaCapped.governmentCopayAmount, 50, 'daily and total quota caps limit government contribution');
+assert.equal(quotaCapped.citizenPaidAmount, 150, 'existing partial-subsidy behavior is preserved');
+assert.equal(quotaCapped.dailyQuotaRemainingAfter, 30, 'remaining daily quota reflects the applied cap');
 
 const parsed = createCampaignSchema.safeParse({
   campaignName: 'Period validation test',

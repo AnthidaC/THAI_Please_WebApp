@@ -47,6 +47,11 @@ export const getQrDetails = async (req: Request, res: Response): Promise<void> =
 
 export const getQrPaymentStatus = async (req: Request, res: Response): Promise<void> => {
   try {
+    const merchantId = req.user?.userId;
+    if (!merchantId) {
+      sendError(res, 'กรุณาเข้าสู่ระบบร้านค้า', 401);
+      return;
+    }
     const reference = Array.isArray(req.params.reference)
       ? req.params.reference[0]
       : req.params.reference;
@@ -63,6 +68,11 @@ export const getQrPaymentStatus = async (req: Request, res: Response): Promise<v
  */
 export const streamQrPaymentStatus = async (req: Request, res: Response): Promise<void> => {
   try {
+    const merchantId = req.user?.userId;
+    if (!merchantId) {
+      sendError(res, 'กรุณาเข้าสู่ระบบร้านค้า', 401);
+      return;
+    }
     const reference = Array.isArray(req.params.reference)
       ? req.params.reference[0]
       : req.params.reference;

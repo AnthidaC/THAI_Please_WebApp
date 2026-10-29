@@ -8,8 +8,11 @@ export const errorHandler = (
 ): void => {
   console.error('Unhandled Error:', err);
 
-  const statusCode = err.statusCode || 500;
-  const message = err.message || 'Internal Server Error';
+  const candidateStatus = err.statusCode ?? err.status;
+  const statusCode = Number.isInteger(candidateStatus) && candidateStatus >= 400 && candidateStatus <= 599
+    ? candidateStatus
+    : 500;
+  const message = statusCode === 500 ? 'Internal Server Error' : err.message || 'Request failed';
 
   res.status(statusCode).json({
     status: 'error',
