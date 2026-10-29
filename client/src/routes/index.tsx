@@ -27,6 +27,7 @@ import { CitizenReviewPage } from '../pages/citizen/reviews/CitizenReviewPage';
 import { CitizenNearMePage } from '../pages/citizen/recommendations/CitizenNearMePage';
 import { CitizenMerchantDetailPage } from '../pages/citizen/merchants/CitizenMerchantDetailPage';
 import { CitizenPreferencesPage } from '../pages/citizen/preferences/CitizenPreferencesPage';
+import { CitizenReferralPage } from '../pages/citizen/referrals/CitizenReferralPage';
 import { CitizenProfilePage } from '../pages/citizen/profile/CitizenProfilePage';
 
 // Merchant Flow Pages
@@ -61,6 +62,7 @@ export const router = createBrowserRouter([
           { path: APP_ROUTES.CITIZEN_SLIP, element: <CitizenPaymentSlipPage /> },
           { path: APP_ROUTES.CITIZEN_TRANSACTIONS, element: <CitizenTransactionsPage /> },
           { path: APP_ROUTES.CITIZEN_ACHIEVEMENTS, element: <CitizenAchievementsPage /> },
+          { path: APP_ROUTES.CITIZEN_REFERRALS, element: <CitizenReferralPage /> },
           { path: APP_ROUTES.CITIZEN_REVIEW, element: <CitizenReviewPage /> },
           { path: APP_ROUTES.CITIZEN_NEAR_ME, element: <CitizenNearMePage /> },
           { path: APP_ROUTES.CITIZEN_MERCHANT_DETAIL, element: <CitizenMerchantDetailPage /> },

@@ -1,3 +1,5 @@
+import { UserPreferenceInput } from '../utils/recommendation-scoring';
+
 /**
  * โครงสร้างข้อมูลร้านค้าผู้สมัคร (Candidate Merchant) จาก Stage 1
  */
@@ -17,7 +19,7 @@ export interface CandidateMerchant {
  * โครงสร้างข้อมูลคำขอจัดอันดับใหม่ (Reranking Request)
  */
 export interface RerankingRequest {
-  userPreferredCategories?: string[];
+  userPreferredCategories?: UserPreferenceInput[];
   candidates: CandidateMerchant[];
   maxOutputLimit?: number; // จำนวนร้านค้าสูงสุดที่ต้องการคืนกลับ (Default 5)
 }

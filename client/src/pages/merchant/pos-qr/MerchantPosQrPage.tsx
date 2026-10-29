@@ -751,9 +751,9 @@ export const MerchantPosQrPage: React.FC = () => {
         </div>
       )}
 
-      {/* Page Title & Action Bar (พร้อมปุ่มเลือกเปิด/ปิดเสียงแจ้งเตือนเมื่อมีเงินเข้า) */}
-      <div className="bg-white border-b border-hairline px-3.5 sm:px-6 lg:px-8 py-2.5 sm:py-3.5 mb-3 sm:mb-4 shadow-2xs">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 sm:gap-3">
+      {/* Page Title & Action Bar (Integrated seamlessly into canvas — No duplicate white bar) */}
+      <div className="mx-auto max-w-6xl px-3.5 sm:px-6 lg:px-8 pt-4 sm:pt-6 pb-2">
+        <div className="flex items-center justify-between gap-2 sm:gap-3">
           <div className="flex items-center space-x-2 sm:space-x-2.5 min-w-0">
             <button
               onClick={() => {
