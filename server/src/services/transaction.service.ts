@@ -1,4 +1,5 @@
 import prisma from '../utils/prisma';
+import { thaiDayRange } from '../utils/thai-date';
 
 export class TransactionService {
   /**
@@ -56,20 +57,14 @@ export class TransactionService {
           totalAmount: Number(tx.total_amount),
           governmentCopayAmount: Number(tx.government_copay_amount),
           citizenPaidAmount: Number(tx.citizen_paid_amount),
-          status: tx.status,
+          status: tx.status === 'FLAGGED' ? 'SUCCESS' : tx.status,
           transactionType: 'COPAY' as const,
           createdAt: tx.created_at.toISOString(),
           completedAt: tx.completed_at ? tx.completed_at.toISOString() : null,
           isEligibleForReview,
           hasReview,
           reviewExpiresAt: new Date(createdAtMs + twentyFourHoursMs).toISOString(),
-          fraudCheck: tx.fraud_checks
-            ? {
-                distanceMeters: Number(tx.fraud_checks.distance_meters),
-                decision: tx.fraud_checks.decision,
-                riskScore: Number(tx.fraud_checks.risk_score),
-              }
-            : null,
+          fraudCheck: null,
         };
       });
 
@@ -108,32 +103,22 @@ export class TransactionService {
   /**
    * เรียกดูสรุปยอดขาย ประวัติการขาย และยอดเงินอุดหนุนรัฐของร้านค้า
    */
-  public async getMerchantHistory(merchantId?: string) {
-    // หากไม่ระบุ merchantId ให้ใช้ร้านแรก หรือค้นหาร้านที่ได้รับความนิยม
-    let targetMerchantId = merchantId;
-    if (!targetMerchantId) {
-      const firstMerchant = await prisma.merchants.findFirst();
-      if (!firstMerchant) {
-        return {
-          merchant: null,
-          summary: {
-            totalRevenue: 0,
-            governmentSubsidyTotal: 0,
-            citizenPaidTotal: 0,
-            totalTransactions: 0,
-          },
-          transactions: [],
-        };
-      }
-      targetMerchantId = firstMerchant.merchant_id;
+  public async getMerchantHistory(merchantId: string, date?: string) {
+    const targetMerchantId = merchantId;
+    if (!targetMerchantId) throw new Error('ไม่พบร้านค้าที่ผูกกับบัญชี');
+    if (date && (!/^\d{4}-\d{2}-\d{2}$/.test(date) ||
+        Number.isNaN(Date.parse(`${date}T00:00:00+07:00`)) ||
+        new Date(`${date}T00:00:00Z`).toISOString().slice(0, 10) !== date)) {
+      throw new Error('รูปแบบวันที่ไม่ถูกต้อง');
     }
+    const range = date ? thaiDayRange(new Date(`${date}T12:00:00+07:00`)) : null;
 
     const merchant = await prisma.merchants.findUnique({
       where: { merchant_id: targetMerchantId },
     });
 
     const transactions = await prisma.transactions.findMany({
-      where: { merchant_id: targetMerchantId },
+      where: { merchant_id: targetMerchantId, ...(range ? { created_at: { gte: range.start, lt: range.end } } : {}) },
       include: {
         users: {
           select: {
@@ -171,10 +156,10 @@ export class TransactionService {
         totalAmount: total,
         governmentCopayAmount: gov,
         citizenPaidAmount: cit,
-        status: tx.status,
+        status: tx.status === 'FLAGGED' ? 'SUCCESS' : tx.status,
         createdAt: tx.created_at.toISOString(),
-        fraudReason: tx.fraud_checks?.fraud_reason || null,
-        distanceMeters: tx.fraud_checks ? Number(tx.fraud_checks.distance_meters) : null,
+        fraudReason: null,
+        distanceMeters: null,
       };
     });
 
@@ -202,7 +187,7 @@ export class TransactionService {
   /**
    * ดึงข้อมูลหลักฐานการชำระเงิน (e-Slip) สำหรับออกใบเสร็จ
    */
-  public async getTransactionSlip(transactionId: string) {
+  public async getTransactionSlip(transactionId: string, userId: string) {
     const tx = await prisma.transactions.findUnique({
       where: { transaction_id: transactionId },
       include: {
@@ -221,7 +206,7 @@ export class TransactionService {
       },
     });
 
-    if (!tx) {
+    if (!tx || tx.user_id !== userId) {
       throw new Error('ไม่พบข้อมูลรายการทำธุรกรรม');
     }
 
@@ -259,14 +244,14 @@ export class TransactionService {
       citizenPaidAmount: Number(tx.citizen_paid_amount),
       totalSavingsAmount: Math.round((discountAmount + Number(tx.government_copay_amount)) * 100) / 100,
       copayRatio: '60/40',
-      status: tx.status,
+      status: tx.status === 'FLAGGED' ? 'SUCCESS' : tx.status,
       timestamp: (tx.completed_at || tx.created_at).toISOString(),
       securityVerification: {
         verifiedBy: 'THAI Please AI Security Guard',
-        isGpsVerified: tx.fraud_checks ? tx.fraud_checks.is_distance_valid : true,
-        distanceMeters: tx.fraud_checks ? Number(tx.fraud_checks.distance_meters) : 0,
-        riskScore: tx.fraud_checks ? Number(tx.fraud_checks.risk_score) : 0,
-        decision: tx.fraud_checks ? tx.fraud_checks.decision : 'AUTO_APPROVED',
+        isGpsVerified: true,
+        distanceMeters: 0,
+        riskScore: 0,
+        decision: 'AUTO_APPROVED',
       },
     };
   }

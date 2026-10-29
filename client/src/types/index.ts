@@ -1,19 +1,12 @@
 export interface User {
   id: string;
-  email: string;
+  email?: string;
   name?: string | null;
-  role: 'USER' | 'ADMIN' | 'STAFF' | 'MERCHANT' | 'GOVERNMENT_EXECUTIVE';
-  merchantApprovalStatus?: 'PENDING' | 'APPROVED' | 'REJECTED';
-  merchantRejectionReason?: string | null;
-  merchantApplicationSubmittedAt?: string | null;
-  merchantApplicationSummary?: {
-    businessName?: string;
-    contactName?: string;
-    phone?: string;
-    address?: string;
-  } | null;
+  role: 'USER' | 'ADMIN' | 'MERCHANT';
   createdAt: string;
 }
+
+export type DemoLoginRole = 'CITIZEN' | 'MERCHANT' | 'ADMIN';
 
 export interface AuthResponse {
   status: 'success' | 'error';

@@ -1,8 +1,22 @@
 import type { LucideIcon } from 'lucide-react';
-import { Activity, ClipboardCheck, Home, MapPin, Store, Wallet, ReceiptText, QrCode, ChartNoAxesCombined, ShieldAlert } from 'lucide-react';
+import { Home, Wallet, ScanLine, Store, User, QrCode, ShieldAlert, TrendingUp, Star, Megaphone } from 'lucide-react';
 import { APP_ROUTES } from '../../constants/routes';
 
-export type NavRole = 'PUBLIC' | 'CITIZEN' | 'MERCHANT' | 'ADMIN' | 'GOVERNMENT_EXECUTIVE';
+/**
+ * การตั้งค่าเมนูนำทางแยกตามบทบาทผู้ใช้ (Role-based Navigation)
+ *
+ * แถบเมนู (โดยเฉพาะแถบล่างบนมือถือ) จะเปลี่ยนไปตามบทบาทของผู้ใช้งาน
+ * ห้ามรวมเมนูของหลายบทบาทไว้ในแถบเดียวกัน
+ *
+ * สำหรับบทบาทประชาชน (CITIZEN) ลำดับเมนูประกอบด้วย 5 ลำดับ:
+ * 1. หน้าหลัก (Home)
+ * 2. กระเป๋าเงิน (Wallet)
+ * 3. สแกนจ่าย (Scan Pay) - ปุ่มหลักตรงกลาง
+ * 4. แนะนำร้าน (Recommended Stores)
+ * 5. โปรไฟล์ส่วนตัว (Profile) - มีทางไปหน้าเกมและหน้าตั้งค่าอยู่ภายใน
+ */
+export type NavRole = 'CITIZEN' | 'MERCHANT' | 'ADMIN';
+
 export interface NavItem {
   label: string;
   to?: string;
@@ -33,25 +47,20 @@ export const PUBLIC_ACTIONS = {
 
 export const NAV_BY_ROLE: Record<Exclude<NavRole, 'PUBLIC'>, NavItem[]> = {
   CITIZEN: [
-    { label: 'หน้าหลัก', to: APP_ROUTES.DASHBOARD, icon: Home },
-    { label: 'กระเป๋าเงิน', to: APP_ROUTES.CITIZEN_WALLET, icon: Wallet },
-    { label: 'ประวัติธุรกรรม', to: APP_ROUTES.CITIZEN_TRANSACTIONS, icon: ReceiptText },
+    { to: APP_ROUTES.HOME, label: 'หน้าแรก', fullLabel: 'หน้าหลัก', icon: Home },
+    { to: APP_ROUTES.CITIZEN_WALLET, label: 'กระเป๋าเงิน', fullLabel: 'กระเป๋าเงิน', icon: Wallet },
+    { to: APP_ROUTES.CITIZEN_SCAN_COPAY, label: 'สแกนจ่าย', fullLabel: 'สแกนจ่าย Co-pay', icon: ScanLine, primary: true },
+    { to: APP_ROUTES.CITIZEN_NEAR_ME, label: 'แนะนำร้าน', fullLabel: 'แนะนำร้านค้า', icon: Store },
+    { to: APP_ROUTES.PROFILE, label: 'โปรไฟล์', fullLabel: 'โปรไฟล์ส่วนตัว', icon: User },
   ],
   MERCHANT: [
-    { label: 'หน้าหลัก', to: APP_ROUTES.MERCHANT_HOME, icon: Home },
-    { label: 'รับชำระเงิน / QR', to: APP_ROUTES.MERCHANT_POS_QR, icon: QrCode },
-    { label: 'ยอดขาย', to: APP_ROUTES.MERCHANT_SALES, icon: ChartNoAxesCombined },
-    { label: 'ข้อมูลร้านค้า', to: APP_ROUTES.MERCHANT_PROFILE, icon: Store },
+    { to: APP_ROUTES.MERCHANT_SALES, label: 'ยอดขาย', fullLabel: 'สถิติยอดขาย', icon: TrendingUp },
+    { to: APP_ROUTES.MERCHANT_POS_QR, label: 'สร้าง QR', fullLabel: 'สร้าง QR รับเงิน', icon: QrCode, primary: true },
+    { to: APP_ROUTES.MERCHANT_REVIEWS, label: 'รีวิวร้านค้า', fullLabel: 'รีวิวร้านค้า', icon: Star },
   ],
   ADMIN: [
-    { label: 'ตรวจคำขอร้านค้า', to: APP_ROUTES.ADMIN_MERCHANT_APPLICATIONS, icon: ClipboardCheck },
-    { label: 'จัดการร้านค้า', to: APP_ROUTES.ADMIN_MERCHANTS, icon: Store },
-    { label: 'คำขอเปลี่ยนพิกัด', to: APP_ROUTES.ADMIN_MERCHANT_LOCATION_REQUESTS, icon: MapPin },
-    { label: 'ตรวจสอบทุจริต', to: APP_ROUTES.ADMIN_FRAUD_ALERTS, icon: ShieldAlert },
-    { label: 'Dashboard ผลกระทบทางสังคม', to: APP_ROUTES.ADMIN_SOCIAL_IMPACT, icon: Activity },
-  ],
-  GOVERNMENT_EXECUTIVE: [
-    { label: 'Dashboard ผลกระทบทางสังคม', to: APP_ROUTES.ADMIN_SOCIAL_IMPACT, icon: Activity },
+    { to: APP_ROUTES.ADMIN_FRAUD_ALERTS, label: 'ตรวจทุจริต', fullLabel: 'ตรวจจับทุจริต', icon: ShieldAlert },
+    { to: APP_ROUTES.ADMIN_CAMPAIGNS, label: 'แคมเปญ', fullLabel: 'แคมเปญและสิทธิประโยชน์', icon: Megaphone },
   ],
 };
 

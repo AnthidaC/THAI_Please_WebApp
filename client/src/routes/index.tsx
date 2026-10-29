@@ -1,33 +1,40 @@
-import React, { lazy, Suspense } from 'react';
+import React from 'react';
 import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom';
 import { APP_ROUTES } from '../constants/routes';
 import { RootLayout } from '../layouts/RootLayout';
 import { AuthLayout } from '../layouts/AuthLayout';
+import { AdminRoute } from './AdminRoute';
 import { ProtectedRoute } from './ProtectedRoute';
 import { PublicRoute } from './PublicRoute';
 
 import { HomePage } from '../pages/home/HomePage';
 import { LoginPage } from '../pages/auth/LoginPage';
 import { RegisterPage } from '../pages/auth/RegisterPage';
-import { MerchantRegisterPage } from '../pages/auth/MerchantRegisterPage';
-import { DashboardPage } from '../pages/dashboard/DashboardPage';
+import { DashboardPage } from '../pages/admin/dashboard/DashboardPage';
 import { NotFoundPage } from '../pages/notFound/NotFoundPage';
 import { MerchantHomePage } from '../pages/merchant/home/MerchantHomePage';
 import { CitizenBenefitsRegisterPage } from '../pages/citizen/CitizenBenefitsRegisterPage';
 
-// Developer 2: Payment & Fraud Engine Pages
+// Citizen Flow Pages
 import { CitizenWalletPage } from '../pages/citizen/wallet/CitizenWalletPage';
 import { CitizenScanCopayPage } from '../pages/citizen/scan-copay/CitizenScanCopayPage';
 import { CitizenPaymentSlipPage } from '../pages/citizen/scan-copay/CitizenPaymentSlipPage';
 import { CitizenTransactionsPage } from '../pages/citizen/transactions/CitizenTransactionsPage';
+import { CitizenAchievementsPage } from '../pages/citizen/achievements/CitizenAchievementsPage';
+import { CitizenReviewPage } from '../pages/citizen/reviews/CitizenReviewPage';
+import { CitizenNearMePage } from '../pages/citizen/recommendations/CitizenNearMePage';
+import { CitizenMerchantDetailPage } from '../pages/citizen/merchants/CitizenMerchantDetailPage';
+import { CitizenPreferencesPage } from '../pages/citizen/preferences/CitizenPreferencesPage';
+import { CitizenProfilePage } from '../pages/citizen/profile/CitizenProfilePage';
+
+// Merchant Flow Pages
 import { MerchantPosQrPage } from '../pages/merchant/pos-qr/MerchantPosQrPage';
 import { MerchantSalesHistoryPage } from '../pages/merchant/sales/MerchantSalesHistoryPage';
+import { MerchantReviewsPage } from '../pages/merchant/reviews/MerchantReviewsPage';
+
+// Admin Flow Pages
 import { AdminFraudAlertsPage } from '../pages/admin/fraud-alerts/AdminFraudAlertsPage';
-import { AdminMerchantApplicationsPage } from '../pages/admin/merchant-applications/AdminMerchantApplicationsPage';
-import { AdminMerchantsPage } from '../pages/admin/merchants/AdminMerchantsPage';
-import { AdminMerchantLocationRequestsPage } from '../pages/admin/merchant-location-requests/AdminMerchantLocationRequestsPage';
-import { MerchantProfilePage } from '../pages/merchant/profile/MerchantProfilePage';
-const AdminSocialImpactPage = lazy(() => import('../pages/admin/social-impact/AdminSocialImpactPage').then((module) => ({ default: module.AdminSocialImpactPage })));
+const AdminCampaignsPage = React.lazy(() => import('../pages/admin/campaigns/AdminCampaignsPage').then((module) => ({ default: module.AdminCampaignsPage })));
 
 export const router = createBrowserRouter([
   // Main Application Routes
@@ -39,83 +46,67 @@ export const router = createBrowserRouter([
         index: true,
         element: <HomePage />,
       },
-      // Citizen Flow (Dev 2)
+      // Citizen Flow
       {
-        element: <ProtectedRoute allowedRoles={['USER', 'CITIZEN']} />,
+        element: <ProtectedRoute allowedRoles={['USER']} />,
         children: [
-          { path: APP_ROUTES.CITIZEN_BENEFITS_REGISTER, element: <CitizenBenefitsRegisterPage /> },
           { path: APP_ROUTES.CITIZEN_WALLET, element: <CitizenWalletPage /> },
           { path: APP_ROUTES.CITIZEN_SCAN_COPAY, element: <CitizenScanCopayPage /> },
           { path: APP_ROUTES.CITIZEN_SLIP, element: <CitizenPaymentSlipPage /> },
           { path: APP_ROUTES.CITIZEN_TRANSACTIONS, element: <CitizenTransactionsPage /> },
+          { path: APP_ROUTES.CITIZEN_ACHIEVEMENTS, element: <CitizenAchievementsPage /> },
+          { path: APP_ROUTES.CITIZEN_REVIEW, element: <CitizenReviewPage /> },
+          { path: APP_ROUTES.CITIZEN_NEAR_ME, element: <CitizenNearMePage /> },
+          { path: APP_ROUTES.CITIZEN_MERCHANT_DETAIL, element: <CitizenMerchantDetailPage /> },
+          { path: APP_ROUTES.CITIZEN_PREFERENCES, element: <CitizenPreferencesPage /> },
+          { path: APP_ROUTES.PROFILE, element: <CitizenProfilePage /> },
         ],
       },
 
-      // Merchant Flow (Dev 2)
+      // Merchant Flow
       {
-        element: <ProtectedRoute allowedRoles={['MERCHANT']} loginPath={APP_ROUTES.MERCHANT_LOGIN} />,
+        element: <ProtectedRoute allowedRoles={['MERCHANT']} />,
         children: [
-          { path: APP_ROUTES.MERCHANT_HOME, element: <MerchantHomePage /> },
-          {
-            path: APP_ROUTES.MERCHANT_POS_QR,
-            element: <MerchantPosQrPage />,
-          },
-          {
-            path: APP_ROUTES.MERCHANT_SALES,
-            element: <MerchantSalesHistoryPage />,
-          },
-          {
-            path: APP_ROUTES.MERCHANT_PROFILE,
-            element: <MerchantProfilePage />,
-          },
+          { path: APP_ROUTES.MERCHANT_POS_QR, element: <MerchantPosQrPage /> },
+          { path: APP_ROUTES.MERCHANT_SALES, element: <MerchantSalesHistoryPage /> },
         ],
       },
-
-      // Staff-only administration and fraud operations.
       {
-        element: <ProtectedRoute allowedRoles={['ADMIN', 'STAFF']} loginPath={APP_ROUTES.STAFF_LOGIN} />,
+        path: APP_ROUTES.MERCHANT_REVIEWS,
+        element: <MerchantReviewsPage />,
+      },
+
+      // Admin routes
+      {
+        path: APP_ROUTES.ADMIN_ROOT,
+        element: <Navigate to={APP_ROUTES.ADMIN_DASHBOARD} replace />,
+      },
+      {
+        element: <AdminRoute />,
         children: [
+          {
+            path: APP_ROUTES.ADMIN_DASHBOARD,
+            element: <DashboardPage />,
+          },
           {
             path: APP_ROUTES.ADMIN_FRAUD_ALERTS,
             element: <AdminFraudAlertsPage />,
           },
           {
-            path: APP_ROUTES.ADMIN_MERCHANT_APPLICATIONS,
-            element: <AdminMerchantApplicationsPage />,
-          },
-          {
-            path: APP_ROUTES.ADMIN_MERCHANTS,
-            element: <AdminMerchantsPage />,
-          },
-          {
-            path: `${APP_ROUTES.ADMIN_MERCHANTS}/:merchantId/edit`,
-            element: <MerchantProfilePage />,
-          },
-          {
-            path: APP_ROUTES.ADMIN_MERCHANT_LOCATION_REQUESTS,
-            element: <AdminMerchantLocationRequestsPage />,
+            path: APP_ROUTES.ADMIN_CAMPAIGNS,
+            element: (
+              <React.Suspense fallback={<div className="mx-auto flex min-h-64 max-w-7xl items-center justify-center px-6 text-sm text-ink-muted">กำลังโหลดเครื่องมือจัดการ...</div>}>
+                <AdminCampaignsPage />
+              </React.Suspense>
+            ),
           },
         ],
       },
 
+      // Legacy dashboard URL
       {
-        element: <ProtectedRoute allowedRoles={['ADMIN', 'STAFF', 'GOVERNMENT_EXECUTIVE']} loginPath={APP_ROUTES.LOGIN} />,
-        children: [{ path: APP_ROUTES.ADMIN_SOCIAL_IMPACT, element: <Suspense fallback={<main className="p-8 text-center">กำลังโหลด Dashboard…</main>}><AdminSocialImpactPage /></Suspense> }],
-      },
-
-      // General authenticated routes.
-      {
-        element: <ProtectedRoute />,
-        children: [
-          {
-            path: APP_ROUTES.DASHBOARD,
-            element: <DashboardPage />,
-          },
-        ],
-      },
-      {
-        path: '*',
-        element: <NotFoundPage />,
+        path: APP_ROUTES.DASHBOARD,
+        element: <Navigate to={APP_ROUTES.ADMIN_DASHBOARD} replace />,
       },
     ],
   },

@@ -18,13 +18,18 @@ import {
   VolumeX,
   UserCheck,
   ShieldCheck,
+  X,
+  Receipt,
 } from 'lucide-react';
 import {
   generateDynamicQr,
   getMerchantHistory,
   getQrPaymentStatus,
+  streamQrPaymentStatus,
+  streamMerchantPayments,
   DynamicQrResponse,
   QrPaymentStatusResponse,
+  MerchantStreamEvent,
 } from '../../../services/paymentApi';
 import { APP_ROUTES } from '../../../constants/routes';
 
@@ -83,6 +88,23 @@ function playMerchantPaymentAlertSound(totalAmount: number) {
   }
 }
 
+export interface PosBillRecord {
+  qrReference: string;
+  totalAmount: number;
+  createdAt: string;
+  expiresAt: string;
+  status: 'WAITING_SCAN' | 'SCANNED' | 'PAID' | 'EXPIRED';
+  qrData: DynamicQrResponse;
+  paidTransaction?: {
+    transactionId: string;
+    customerName: string;
+    totalAmount: number;
+    governmentCopayAmount: number;
+    citizenPaidAmount: number;
+    completedAt: string;
+  };
+}
+
 export const MerchantPosQrPage: React.FC = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -94,10 +116,25 @@ export const MerchantPosQrPage: React.FC = () => {
   const [qrResult, setQrResult] = useState<DynamicQrResponse | null>(null);
   const [paidInfo, setPaidInfo] = useState<NonNullable<QrPaymentStatusResponse['paidTransaction']> | null>(null);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
+  const [isCustomerScanned, setIsCustomerScanned] = useState<boolean>(false);
   const [copied, setCopied] = useState<boolean>(false);
   const [secondsRemaining, setSecondsRemaining] = useState<number>(180);
+  const [sessionBills, setSessionBills] = useState<PosBillRecord[]>([]);
+  const [recentToast, setRecentToast] = useState<{
+    title: string;
+    subtitle: string;
+    amount: number;
+    time: string;
+  } | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const notifiedQrRef = useRef<string | null>(null);
+
+  // ปิด Toast แจ้งเตือนอัตโนมัติภายใน 8 วินาที
+  useEffect(() => {
+    if (!recentToast) return;
+    const timer = setTimeout(() => setRecentToast(null), 8000);
+    return () => clearTimeout(timer);
+  }, [recentToast]);
 
   // สถานะเปิด/ปิดเสียงแจ้งเตือนเมื่อมีเงินเข้า (ร้านค้าเลือกเปิด/ปิดได้ และจำค่าไว้ในเครื่อง)
   const [soundEnabled, setSoundEnabled] = useState<boolean>(() => {
@@ -158,12 +195,76 @@ export const MerchantPosQrPage: React.FC = () => {
     return () => clearInterval(interval);
   }, [qrResult, paidInfo]);
 
-  const isExpired = secondsRemaining <= 0 && !paidInfo;
+  const isExpired = !isCustomerScanned && secondsRemaining <= 0 && !paidInfo;
   const timerMinutes = Math.floor(secondsRemaining / 60);
   const timerSeconds = secondsRemaining % 60;
   const formattedTimer = `${String(timerMinutes).padStart(2, '0')}:${String(timerSeconds).padStart(2, '0')}`;
 
-  // Poll สถานะ QR พร้อมใช้ Bearer token เพื่อจำกัดข้อมูลลูกค้าให้เฉพาะร้านค้าที่เป็นเจ้าของ QR
+  // 1. สตรีมมิ่ง SSE ระดับร้านค้าทั้งระบบ (Merchant-Wide Stream):
+  // ดักรับสัญญาณเงินเข้าและลูกค้าสแกนแบบ Real-Time จากทุก QR ที่ร้านค้าสร้าง ไม่ว่าจะเปิดหน้ารอหรือสลับไปสร้างบิลถัดไป
+  useEffect(() => {
+    let active = true;
+    const streamController = new AbortController();
+
+    const handleMerchantEvent = (event: MerchantStreamEvent) => {
+      if (!active) return;
+
+      if (event.type === 'QR_SCANNED' && event.qrReference) {
+        setSessionBills((prev) =>
+          prev.map((b) => (b.qrReference === event.qrReference ? { ...b, status: 'SCANNED' } : b))
+        );
+        if (qrResult?.qrReference === event.qrReference) {
+          setIsCustomerScanned(true);
+          if (event.expiresAt) {
+            setQrResult((prev) => (prev ? { ...prev, expiresAt: event.expiresAt! } : null));
+          }
+        }
+      } else if (event.type === 'PAYMENT_RECEIVED' && event.paidTransaction) {
+        const paidTx = event.paidTransaction;
+        const ref = event.qrReference;
+
+        setSessionBills((prev) =>
+          prev.map((b) =>
+            b.qrReference === ref ? { ...b, status: 'PAID', paidTransaction: paidTx } : b
+          )
+        );
+
+        queryClient.invalidateQueries({ queryKey: ['merchant-sales'] });
+        queryClient.invalidateQueries({ queryKey: ['merchant-profile'] });
+
+        if (notifiedQrRef.current !== ref) {
+          notifiedQrRef.current = ref || 'paid';
+          if (soundEnabled) {
+            playMerchantPaymentAlertSound(paidTx.totalAmount);
+          }
+        }
+
+        // หากร้านค้ากำลังเปิดดู QR ของรายการนี้อยู่ -> ให้แสดง Modal ใบเสร็จ
+        if (qrResult?.qrReference === ref) {
+          setPaidInfo(paidTx);
+        } else {
+          // หากร้านค้ากำลังตั้งยอดหรือเปิดดู QR ลูกค้าคนอื่นอยู่ -> แสดง Toast แจ้งเตือนด้านบนโดยไม่ขัดจังหวะการขาย
+          setRecentToast({
+            title: `ได้รับเงิน ฿${paidTx.totalAmount.toFixed(2)} เรียบร้อยแล้ว`,
+            subtitle: `จากคุณ ${paidTx.customerName || 'ลูกค้าโครงการ'} (Ref: ${ref ? ref.slice(-6) : '-'})`,
+            amount: paidTx.totalAmount,
+            time: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
+          });
+        }
+      }
+    };
+
+    streamMerchantPayments(handleMerchantEvent, streamController.signal).catch(() => {
+      // Fallback polling will handle
+    });
+
+    return () => {
+      active = false;
+      streamController.abort();
+    };
+  }, [qrResult?.qrReference, soundEnabled, queryClient]);
+
+  // 2. ตรวจสอบสถานะการจ่ายเงินของ QR Code ที่เปิดอยู่ ณ ขณะนั้น (Active QR Polling / Direct SSE Fallback)
   useEffect(() => {
     if (!qrResult || paidInfo || isExpired) return;
 
@@ -183,7 +284,25 @@ export const MerchantPosQrPage: React.FC = () => {
       }
     };
 
-    // ตรวจสอบทันที แล้ว polling ทุก 3 วินาทีโดยใช้ API client ที่แนบ Bearer token
+    // 1. เชื่อมต่อ Server-Sent Events (SSE) เพื่อรับแจ้งเตือนแบบ Real-Time ทันที (0 ms Latency)
+    const streamController = new AbortController();
+    const eventSource = { close: () => streamController.abort() };
+    streamQrPaymentStatus(qrResult.qrReference, (res) => {
+          if (res.status === 'USED' && res.paidTransaction) {
+            handleSuccessfulPayment(res.paidTransaction);
+            eventSource.close();
+          } else if (res.status === 'SCANNED' || res.isScanned) {
+            setIsCustomerScanned(true);
+            if (res.expiresAt) {
+              setQrResult((prev) => (prev ? { ...prev, expiresAt: res.expiresAt! } : null));
+            }
+          } else if (res.status === 'EXPIRED') {
+            setSecondsRemaining(0);
+            eventSource.close();
+          }
+    }, streamController.signal).catch(() => { /* Polling remains available if streaming disconnects. */ });
+
+    // 2. สำรองด้วย Polling เผื่อเครือข่ายไม่อนุญาต SSE (ความถี่ต่ำทุก 3 วินาทีเพื่อประหยัดทรัพยากร)
     const checkPaymentStatusFallback = async () => {
       try {
         const res = await getQrPaymentStatus(qrResult.qrReference);
@@ -191,6 +310,12 @@ export const MerchantPosQrPage: React.FC = () => {
 
         if (res.status === 'USED' && res.paidTransaction) {
           handleSuccessfulPayment(res.paidTransaction);
+          eventSource?.close();
+        } else if (res.status === 'SCANNED' || res.isScanned) {
+          setIsCustomerScanned(true);
+          if (res.expiresAt) {
+            setQrResult((prev) => (prev ? { ...prev, expiresAt: res.expiresAt! } : null));
+          }
         } else if (res.status === 'EXPIRED') {
           setSecondsRemaining(0);
         }
@@ -267,8 +392,19 @@ export const MerchantPosQrPage: React.FC = () => {
         shopName: activeShopName,
         merchantId: activeMerchantId,
       });
+      // บันทึกบิลลงในถาดประวัติบิลรอบนี้ เพื่อให้สร้างบิลถัดไปได้ทันทีโดยไม่ทับซ้อน
+      const billRecord: PosBillRecord = {
+        qrReference: result.qrReference,
+        totalAmount: result.totalAmount,
+        createdAt: result.createdAt,
+        expiresAt: result.expiresAt,
+        status: 'WAITING_SCAN',
+        qrData: result,
+      };
+      setSessionBills((prev) => [billRecord, ...prev.filter((b) => b.qrReference !== result.qrReference)].slice(0, 15));
       // เด้งเข้าสู่หน้าแสดง QR Code ทันที ไม่ต้องเลื่อนจอ
       setPaidInfo(null);
+      setIsCustomerScanned(false);
       setQrResult(result);
     } catch (err: any) {
       console.error(err);
@@ -589,6 +725,32 @@ export const MerchantPosQrPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-surface-soft pb-24 md:pb-12 font-sans text-ink">
+      {/* Toast แจ้งเตือนเงินเข้าแบบ Real-Time เมื่อร้านค้าไม่ได้เปิดดูบิลนั้นอยู่ (Continuous Billing Floating Banner) */}
+      {recentToast && (
+        <div className="fixed top-4 right-4 left-4 sm:left-auto sm:w-96 z-50 animate-in slide-in-from-top duration-300">
+          <div className="bg-emerald-700 text-white p-4 rounded-2xl shadow-xl flex items-start justify-between gap-3 border border-emerald-500">
+            <div className="flex items-start space-x-3 min-w-0 flex-1">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/20 text-white">
+                <CheckCircle2 className="h-5 w-5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h4 className="text-sm font-bold truncate">{recentToast.title}</h4>
+                <p className="text-xs text-emerald-100 mt-0.5 truncate">{recentToast.subtitle}</p>
+                <span className="text-[10px] text-emerald-200 mt-1 inline-block">เวลา {recentToast.time} น.</span>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setRecentToast(null)}
+              className="text-white/80 hover:text-white shrink-0 p-1 rounded-full hover:bg-white/10"
+              title="ปิดการแจ้งเตือน"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Page Title & Action Bar (พร้อมปุ่มเลือกเปิด/ปิดเสียงแจ้งเตือนเมื่อมีเงินเข้า) */}
       <div className="bg-white border-b border-hairline px-3.5 sm:px-6 lg:px-8 py-2.5 sm:py-3.5 mb-3 sm:mb-4 shadow-2xs">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 sm:gap-3">
@@ -598,6 +760,7 @@ export const MerchantPosQrPage: React.FC = () => {
                 if (qrResult) {
                   setQrResult(null);
                   setPaidInfo(null);
+                  setIsCustomerScanned(false);
                 } else {
                   navigate(APP_ROUTES.HOME);
                 }
@@ -766,6 +929,7 @@ export const MerchantPosQrPage: React.FC = () => {
                   onClick={() => {
                     setPaidInfo(null);
                     setQrResult(null);
+                    setIsCustomerScanned(false);
                     setAmount(100);
                   }}
                   className="rounded-pill bg-brand-blue py-3 px-4 text-xs font-bold text-white shadow-md hover:bg-brand-blue-hover transition active:scale-95"
@@ -863,6 +1027,49 @@ export const MerchantPosQrPage: React.FC = () => {
                     </>
                   )}
                 </button>
+
+                {/* ถาดคิวบิลที่สร้างในรอบนี้ (Continuous Billing Queue: ร้านค้าสร้าง QR ต่อ ๆ กันได้ทันที) */}
+                {sessionBills.length > 0 && (
+                  <div className="rounded-2xl border border-hairline bg-surface-soft/80 p-3.5 space-y-2.5">
+                    <div className="flex items-center justify-between text-xs font-bold text-ink">
+                      <span className="flex items-center gap-1.5">
+                        <Receipt className="h-3.5 w-3.5 text-brand-blue shrink-0" />
+                        <span>บิลที่สร้างในรอบนี้ ({sessionBills.filter((b) => b.status !== 'PAID').length} รอชำระ / {sessionBills.filter((b) => b.status === 'PAID').length} จ่ายแล้ว)</span>
+                      </span>
+                      <span className="text-[10px] text-ink-muted font-normal">แตะเพื่อสลับดู QR</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {sessionBills.slice(0, 8).map((bill) => (
+                        <button
+                          key={bill.qrReference}
+                          type="button"
+                          onClick={() => {
+                            setQrResult(bill.qrData);
+                            setIsCustomerScanned(bill.status === 'SCANNED');
+                            setPaidInfo(bill.paidTransaction || null);
+                          }}
+                          className={`inline-flex items-center gap-2 rounded-pill px-3 py-1.5 text-xs font-mono border transition hover:shadow-2xs active:scale-98 ${
+                            bill.status === 'PAID'
+                              ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                              : bill.status === 'SCANNED'
+                              ? 'bg-blue-50 text-brand-blue border-blue-200 ring-1 ring-blue-300 animate-pulse'
+                              : 'bg-white text-ink border-hairline shadow-2xs'
+                          }`}
+                        >
+                          <span className="font-extrabold">฿{bill.totalAmount.toFixed(0)}</span>
+                          <span className="text-[10px] text-ink-muted">({bill.qrReference.slice(-4)})</span>
+                          {bill.status === 'PAID' ? (
+                            <span className="text-[10px] font-sans font-bold text-emerald-700">✓ จ่ายแล้ว</span>
+                          ) : bill.status === 'SCANNED' ? (
+                            <span className="text-[10px] font-sans font-bold text-brand-blue">ลูกค้าสแกนแล้ว</span>
+                          ) : (
+                            <span className="text-[10px] font-sans text-amber-700">รอสแกน</span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* ข้อมูลสรุปสัดส่วนการรับเงิน (จอใหญ่แสดงด้านขวา / มือถือแสดงการ์ดสรุปด้านล่าง) */}
@@ -929,7 +1136,12 @@ export const MerchantPosQrPage: React.FC = () => {
             <div className="rounded-card border border-hairline bg-white p-4 sm:p-6 md:p-8 shadow-lg text-center">
               {/* Badge สถานะพร้อมสแกน & Countdown Timer 3 นาที */}
               <div className="flex flex-wrap items-center justify-center gap-1.5 sm:gap-2 mb-2">
-                {!isExpired ? (
+                {isCustomerScanned ? (
+                  <span className="inline-flex items-center space-x-1.5 rounded-pill bg-blue-50 px-2.5 sm:px-3 py-1 text-[11px] sm:text-xs font-semibold text-brand-blue border border-blue-200 animate-pulse">
+                    <span className="h-2 w-2 rounded-full bg-brand-blue animate-ping" />
+                    <span>ลูกค้าสแกนแล้ว • กำลังชำระเงิน</span>
+                  </span>
+                ) : !isExpired ? (
                   <span className="inline-flex items-center space-x-1.5 rounded-pill bg-emerald-50 px-2.5 sm:px-3 py-1 text-[11px] sm:text-xs font-semibold text-status-success border border-emerald-200">
                     <span className="h-2 w-2 rounded-full bg-status-success animate-ping" />
                     <span>รอรับชำระเงิน</span>
@@ -945,13 +1157,21 @@ export const MerchantPosQrPage: React.FC = () => {
                   className={`inline-flex items-center space-x-1 rounded-pill px-2.5 py-1 text-[11px] sm:text-xs font-mono font-bold border ${
                     isExpired
                       ? 'bg-red-100 text-red-700 border-red-300'
+                      : isCustomerScanned
+                      ? 'bg-blue-50 text-brand-blue border-blue-200'
                       : secondsRemaining < 60
                       ? 'bg-amber-100 text-amber-800 border-amber-300 animate-pulse'
                       : 'bg-blue-50 text-brand-blue border-blue-200'
                   }`}
                 >
                   <Clock className="h-3.5 w-3.5 shrink-0" />
-                  <span>{isExpired ? 'หมดอายุแล้ว' : `เวลาคงเหลือ ${formattedTimer}`}</span>
+                  <span>
+                    {isExpired
+                      ? 'หมดอายุแล้ว'
+                      : isCustomerScanned
+                      ? `เซสชันชำระเงิน ${formattedTimer}`
+                      : `เวลาคงเหลือ ${formattedTimer}`}
+                  </span>
                 </span>
               </div>
 
@@ -1051,14 +1271,60 @@ export const MerchantPosQrPage: React.FC = () => {
                   onClick={() => {
                     setPaidInfo(null);
                     setQrResult(null);
+                    setIsCustomerScanned(false);
                     setAmount(100);
                   }}
                   className="flex items-center justify-center space-x-1.5 rounded-pill bg-brand-blue py-3 px-4 text-xs font-semibold text-white shadow-md hover:bg-brand-blue-hover transition active:scale-95"
                 >
                   <RefreshCw className="h-4 w-4 shrink-0" />
-                  <span>สร้างบิลใหม่</span>
+                  <span>+ สร้างบิลถัดไปทันที</span>
                 </button>
               </div>
+
+              {/* คำแนะนำสำหรับร้านค้าในการสร้างบิลต่อเนื่อง */}
+              <p className="mt-3 text-[11px] text-ink-muted">
+                💡 ไม่จำเป็นต้องเปิดหน้ารอ สามารถกด <b>"+ สร้างบิลถัดไปทันที"</b> เพื่อคิดเงินลูกค้ารายต่อไปได้เลย โดยระบบจะส่งเสียงและแจ้งเตือนเมื่อเงินเข้าอัตโนมัติ
+              </p>
+
+              {/* รายการบิลอื่น ๆ ที่สร้างในรอบนี้ (สลับไปมาได้) */}
+              {sessionBills.length > 1 && (
+                <div className="mt-4 pt-3.5 border-t border-hairline text-left">
+                  <span className="block text-[11px] font-bold text-ink-muted mb-2">
+                    บิลอื่น ๆ ในรอบนี้ ({sessionBills.filter((b) => b.qrReference !== qrResult.qrReference).length} บิล):
+                  </span>
+                  <div className="flex flex-wrap gap-2">
+                    {sessionBills
+                      .filter((b) => b.qrReference !== qrResult.qrReference)
+                      .slice(0, 5)
+                      .map((b) => (
+                        <button
+                          key={b.qrReference}
+                          type="button"
+                          onClick={() => {
+                            setQrResult(b.qrData);
+                            setIsCustomerScanned(b.status === 'SCANNED');
+                            setPaidInfo(b.paidTransaction || null);
+                          }}
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-pill text-[11px] font-mono border transition ${
+                            b.status === 'PAID'
+                              ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                              : b.status === 'SCANNED'
+                              ? 'bg-blue-50 text-brand-blue border-blue-200 ring-1 ring-blue-300 animate-pulse'
+                              : 'bg-surface-soft text-ink border-hairline hover:bg-white'
+                          }`}
+                        >
+                          <span className="font-bold">฿{b.totalAmount.toFixed(0)}</span>
+                          <span className="text-[10px] text-ink-muted">({b.qrReference.slice(-4)})</span>
+                          {b.status === 'PAID' ? (
+                            <CheckCircle2 className="h-3 w-3 text-emerald-600" />
+                          ) : b.status === 'SCANNED' ? (
+                            <span className="h-1.5 w-1.5 rounded-full bg-brand-blue animate-ping" />
+                          ) : null}
+                        </button>
+                      ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}

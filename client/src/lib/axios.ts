@@ -19,8 +19,7 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    const token = useAuthStore.getState().token;
-    if (error.response?.status === 401 && !token?.startsWith('mock-')) {
+    if (error.response?.status === 401) {
       useAuthStore.getState().clearAuth();
     }
     return Promise.reject(error);

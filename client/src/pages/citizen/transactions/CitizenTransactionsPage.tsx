@@ -4,7 +4,6 @@ import { useQuery } from '@tanstack/react-query';
 import {
   ArrowLeft,
   History,
-  Star,
   ChevronRight,
   RefreshCw,
   Search,
@@ -13,13 +12,14 @@ import {
   Receipt,
   Sparkles,
   Wallet,
+  Star,
 } from 'lucide-react';
 import { getBuyerHistory } from '../../../services/paymentApi';
 import { APP_ROUTES } from '../../../constants/routes';
 
 export const CitizenTransactionsPage: React.FC = () => {
   const navigate = useNavigate();
-  const [filterType, setFilterType] = useState<'ALL' | 'SUCCESS' | 'FLAGGED'>('ALL');
+  const [filterType, setFilterType] = useState<'ALL' | 'SUCCESS'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
 
   const { data: transactions, isLoading, refetch, isFetching } = useQuery({
@@ -29,8 +29,7 @@ export const CitizenTransactionsPage: React.FC = () => {
 
   const filtered = useMemo(() => {
     return (transactions || []).filter((tx) => {
-      if (filterType === 'SUCCESS' && tx.status !== 'SUCCESS') return false;
-      if (filterType === 'FLAGGED' && tx.status !== 'FLAGGED') return false;
+      if (filterType === 'SUCCESS' && tx.status !== 'SUCCESS' && tx.status !== 'FLAGGED') return false;
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         return (
@@ -54,11 +53,10 @@ export const CitizenTransactionsPage: React.FC = () => {
           acc.citizenPaid += tx.citizenPaidAmount || 0;
           acc.govCopay += tx.governmentCopayAmount || 0;
         }
-        if (tx.status === 'SUCCESS') acc.successCount += 1;
-        if (tx.status === 'FLAGGED') acc.flaggedCount += 1;
+        if (tx.status === 'SUCCESS' || tx.status === 'FLAGGED') acc.successCount += 1;
         return acc;
       },
-      { count: 0, citizenPaid: 0, govCopay: 0, successCount: 0, flaggedCount: 0 }
+      { count: 0, citizenPaid: 0, govCopay: 0, successCount: 0 }
     );
   }, [transactions]);
 
@@ -156,7 +154,6 @@ export const CitizenTransactionsPage: React.FC = () => {
               [
                 { key: 'ALL', label: 'ทั้งหมด', count: summary.count },
                 { key: 'SUCCESS', label: 'สำเร็จ', count: summary.successCount },
-                { key: 'FLAGGED', label: 'รอตรวจสอบ', count: summary.flaggedCount },
               ] as const
             ).map((tab) => (
               <button
@@ -195,11 +192,22 @@ export const CitizenTransactionsPage: React.FC = () => {
           ) : (
             <div className="divide-y divide-hairline">
               {filtered.map((tx) => {
-                const isFlagged = tx.status === 'FLAGGED';
                 const isRejected = tx.status === 'REJECTED';
                 const isTopUp = tx.transactionType === 'TOPUP';
                 const isRefund = tx.transactionType === 'REFUND';
                 const isPositive = isTopUp || isRefund;
+                const isSuccessPayment = tx.status === 'SUCCESS' || tx.status === 'FLAGGED';
+                const completionTime = tx.completedAt ? new Date(tx.completedAt).getTime() : 0;
+                const isWithin24Hours = completionTime > 0 && Date.now() - completionTime <= 24 * 60 * 60 * 1000;
+
+                const isEligibleForReview = Boolean(
+                  !isTopUp &&
+                  !isRefund &&
+                  !tx.hasReview &&
+                  isSuccessPayment &&
+                  tx.isEligibleForReview &&
+                  isWithin24Hours
+                );
 
                 const formattedDate = new Date(tx.createdAt).toLocaleDateString('th-TH', {
                   day: 'numeric',
@@ -229,8 +237,6 @@ export const CitizenTransactionsPage: React.FC = () => {
                             ? 'bg-emerald-50 text-status-success border-emerald-200'
                             : isRejected
                             ? 'bg-red-50 text-status-error border-red-200'
-                            : isFlagged
-                            ? 'bg-amber-50 text-amber-700 border-amber-200'
                             : 'bg-brand-blue-light text-brand-blue border-blue-200'
                         }`}
                       >
@@ -249,22 +255,10 @@ export const CitizenTransactionsPage: React.FC = () => {
                               <AlertTriangle className="h-2.5 w-2.5 text-status-error" />
                               <span>ยกเลิกและคืนเงินแล้ว</span>
                             </span>
-                          ) : isFlagged ? (
-                            <span className="inline-flex shrink-0 items-center space-x-1 rounded-pill bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-800 border border-amber-200">
-                              <AlertTriangle className="h-2.5 w-2.5 text-amber-600" />
-                              <span>รอตรวจสอบ</span>
-                            </span>
                           ) : (
                             <span className="inline-flex shrink-0 items-center space-x-1 rounded-pill bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 border border-emerald-200">
                               <CheckCircle2 className="h-2.5 w-2.5 text-emerald-600" />
                               <span>สำเร็จ</span>
-                            </span>
-                          )}
-
-                          {tx.isEligibleForReview && !isPositive && !isRejected && (
-                            <span className="inline-flex shrink-0 items-center space-x-0.5 rounded-pill bg-amber-50 px-2 py-0.5 text-[10px] text-amber-700 font-medium border border-amber-200">
-                              <Star className="h-2.5 w-2.5 fill-amber-500 text-amber-500" />
-                              <span>รีวิวได้</span>
                             </span>
                           )}
                         </div>
@@ -313,15 +307,45 @@ export const CitizenTransactionsPage: React.FC = () => {
                         </div>
                       </div>
 
-                      {!isTopUp && (
-                        <div className="flex items-center space-x-1 rounded-pill bg-surface-soft group-hover:bg-blue-50 px-2.5 py-1.5 border border-hairline group-hover:border-blue-200 transition">
-                          <Receipt className="h-3.5 w-3.5 text-brand-blue shrink-0" />
-                          <span className="text-[11px] font-semibold text-brand-blue hidden sm:inline">
-                            ดูสลิป
-                          </span>
-                          <ChevronRight className="h-3.5 w-3.5 text-ink-muted group-hover:text-brand-blue group-hover:translate-x-0.5 transition shrink-0" />
-                        </div>
-                      )}
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {isEligibleForReview && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate(APP_ROUTES.CITIZEN_REVIEW, {
+                                state: {
+                                  transactionId: tx.transactionId,
+                                  shopName: tx.shopName,
+                                  totalAmount: tx.totalAmount,
+                                  citizenPaidAmount: tx.citizenPaidAmount,
+                                  timestamp: tx.completedAt || tx.createdAt,
+                                  from: 'transactions',
+                                  slipUrl: APP_ROUTES.CITIZEN_TRANSACTIONS,
+                                },
+                              });
+                            }}
+                            className="flex items-center space-x-1 rounded-pill bg-surface-soft hover:bg-amber-50/80 px-2.5 py-1.5 border border-hairline hover:border-amber-200 transition group/review active:scale-95"
+                            title="รีวิวร้านค้า"
+                          >
+                            <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-500 shrink-0" />
+                            <span className="text-[11px] font-semibold text-amber-700 hidden sm:inline">
+                              รีวิวร้านค้า
+                            </span>
+                            <ChevronRight className="h-3.5 w-3.5 text-ink-muted group-hover/review:text-amber-600 group-hover/review:translate-x-0.5 transition shrink-0" />
+                          </button>
+                        )}
+
+                        {!isTopUp && (
+                          <div className="flex items-center space-x-1 rounded-pill bg-surface-soft group-hover:bg-blue-50 px-2.5 py-1.5 border border-hairline group-hover:border-blue-200 transition">
+                            <Receipt className="h-3.5 w-3.5 text-brand-blue shrink-0" />
+                            <span className="text-[11px] font-semibold text-brand-blue hidden sm:inline">
+                              ดูสลิป
+                            </span>
+                            <ChevronRight className="h-3.5 w-3.5 text-ink-muted group-hover:text-brand-blue group-hover:translate-x-0.5 transition shrink-0" />
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 );

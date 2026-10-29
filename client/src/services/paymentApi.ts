@@ -19,6 +19,25 @@ export interface AvailableCampaignInfo {
   endDate: string;
   status: string;
   isRegistrationOpen: boolean;
+  periodCount: number;
+  configuredPeriodQuota: number;
+}
+
+export interface WalletCampaignPeriod {
+  id: string;
+  name: string;
+  startDate: string;
+  endDate: string;
+  quotaLimit: number;
+  quotaUsed: number;
+  quotaRemaining: number;
+}
+
+export interface WalletPeriodQuotaInfo {
+  enabled: boolean;
+  status: 'ACTIVE' | 'BEFORE_FIRST' | 'BETWEEN_PERIODS' | 'AFTER_LAST' | 'ALLOCATION_MISSING' | 'INVALID_OVERLAP' | 'NOT_CONFIGURED';
+  currentPeriod: WalletCampaignPeriod | null;
+  nextPeriod: WalletCampaignPeriod | null;
 }
 
 export interface WalletData {
@@ -33,6 +52,7 @@ export interface WalletData {
   status: string;
   lastQuotaResetDate: string;
   monthlyCycle?: MonthlyCycleInfo;
+  periodQuota: WalletPeriodQuotaInfo;
   campaignInfo?: {
     campaignId: string;
     campaignName: string;
@@ -137,10 +157,12 @@ export interface TransactionItem {
 
 export interface QrPaymentStatusResponse {
   qrReference: string;
-  status: 'ACTIVE' | 'USED' | 'SUSPENDED' | 'EXPIRED' | 'REJECTED';
+  status: 'ACTIVE' | 'USED' | 'SUSPENDED' | 'EXPIRED' | 'REJECTED' | 'SCANNED';
   shopName?: string;
   totalAmount?: number;
   expiresAt?: string;
+  scannedAt?: string | null;
+  isScanned?: boolean;
   paidTransaction?: {
     transactionId: string;
     customerName: string;
@@ -301,6 +323,22 @@ export const getWalletBalance = async (): Promise<WalletData> => {
   return res.data.data;
 };
 
+export const getPaymentPinStatus = async (): Promise<{ isSet: boolean; lockedUntil: string | null }> => {
+  const res = await axios.get('/wallet/pin/status');
+  return res.data.data;
+};
+
+export const setPaymentPin = async (payload: { pin: string; confirmPin: string; currentPin?: string }) => {
+  const res = await axios.put('/wallet/pin', payload);
+  return res.data.data;
+};
+
+/** Forgot PIN: server accepts only a freshly signed-in session (code REAUTH_REQUIRED otherwise). */
+export const resetPaymentPin = async (payload: { pin: string; confirmPin: string }) => {
+  const res = await axios.post('/wallet/pin/reset', payload);
+  return res.data.data;
+};
+
 export const topUpWallet = async (amount: number, paymentChannel = 'PROMPTPAY') => {
   const res = await axios.post('/wallet/top-up', { amount, paymentChannel });
   return res.data.data;
@@ -328,6 +366,94 @@ export const getQrPaymentStatus = async (
 ): Promise<QrPaymentStatusResponse> => {
   const res = await axios.get(`/payment/qr/${reference}/status`);
   return res.data.data;
+};
+
+export interface MerchantStreamEvent {
+  type: 'CONNECTED' | 'PAYMENT_RECEIVED' | 'QR_SCANNED';
+  merchantId?: string;
+  qrReference?: string;
+  status?: string;
+  expiresAt?: string;
+  scannedAt?: string;
+  totalAmount?: number;
+  paidTransaction?: {
+    transactionId: string;
+    customerName: string;
+    totalAmount: number;
+    governmentCopayAmount: number;
+    citizenPaidAmount: number;
+    completedAt: string;
+  };
+}
+
+/** Fetch streaming supports Bearer auth, unlike the browser's native EventSource. */
+export const streamQrPaymentStatus = async (
+  reference: string,
+  onStatus: (status: QrPaymentStatusResponse) => void,
+  signal: AbortSignal
+) => {
+  const token = localStorage.getItem('auth_token');
+  const response = await fetch(axios.getUri({ url: `/payment/qr/${encodeURIComponent(reference)}/stream` }), {
+    headers: token ? { Authorization: `Bearer ${token}` } : {}, signal,
+  });
+  if (!response.ok || !response.body) throw new Error('Unable to stream payment status');
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      let end: number;
+      while ((end = buffer.indexOf('\n\n')) !== -1) {
+        const event = buffer.slice(0, end); buffer = buffer.slice(end + 2);
+        const data = event.split('\n').find(line => line.startsWith('data: '));
+        if (data) onStatus(JSON.parse(data.slice(6)));
+      }
+    }
+  } finally { reader.releaseLock(); }
+};
+
+/**
+ * Server-Sent Events (SSE) ระดับร้านค้าทั้งระบบ
+ * ติดตามเงินเข้าและสถานะสแกน QR แบบต่อเนื่อง ไม่ว่าจะเปิดอยู่หน้าจอใด หรือกำลังสร้างบิลถัดไป
+ */
+export const streamMerchantPayments = async (
+  onEvent: (event: MerchantStreamEvent) => void,
+  signal: AbortSignal
+) => {
+  const token = localStorage.getItem('auth_token');
+  const response = await fetch(axios.getUri({ url: '/payment/merchant/stream' }), {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    signal,
+  });
+  if (!response.ok || !response.body) throw new Error('Unable to stream merchant payments');
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      let end: number;
+      while ((end = buffer.indexOf('\n\n')) !== -1) {
+        const event = buffer.slice(0, end);
+        buffer = buffer.slice(end + 2);
+        const data = event.split('\n').find((line) => line.startsWith('data: '));
+        if (data) {
+          try {
+            onEvent(JSON.parse(data.slice(6)));
+          } catch {
+            // ignore malformed frame
+          }
+        }
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
 };
 
 export const getQrDetails = async (
@@ -360,7 +486,7 @@ export const checkoutCopay = async (payload: {
   userLatitude: number;
   userLongitude: number;
   merchantId?: string;
-  pin?: string;
+  pin: string;
   discountCode?: string;
 }): Promise<CheckoutResult> => {
   const res = await axios.post('/payment/qr/checkout', payload);
@@ -373,9 +499,9 @@ export const getBuyerHistory = async (): Promise<TransactionItem[]> => {
   return res.data.data;
 };
 
-export const getMerchantHistory = async (merchantId?: string): Promise<MerchantSalesSummary> => {
+export const getMerchantHistory = async (merchantId?: string, date?: string): Promise<MerchantSalesSummary> => {
   const res = await axios.get('/transactions/merchant/history', {
-    params: merchantId ? { merchantId } : {},
+    params: { ...(merchantId ? { merchantId } : {}), ...(date ? { date } : {}) },
   });
   return res.data.data;
 };
@@ -383,6 +509,15 @@ export const getMerchantHistory = async (merchantId?: string): Promise<MerchantS
 export const getTransactionSlip = async (id: string): Promise<SlipData> => {
   const res = await axios.get(`/transactions/${id}/slip`);
   return res.data.data;
+};
+
+// 3.1 รีวิวร้านค้าหลังชำระเงิน (บันทึกแล้วประเมินตราความสำเร็จฝั่งเซิร์ฟเวอร์)
+export const createReview = async (payload: {
+  transactionId: string;
+  ratingStars: number;
+  reviewText?: string;
+}): Promise<void> => {
+  await axios.post('/reviews', payload);
 };
 
 // 4. ระบบตรวจจับทุจริตสำหรับ Admin (Fraud Alerts & User Dossiers)
