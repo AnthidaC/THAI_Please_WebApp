@@ -60,6 +60,7 @@ export interface DynamicQrData {
   estimatedGovCopay: number;
   estimatedCitizenPay: number;
   status?: 'ACTIVE' | 'USED' | 'SUSPENDED' | 'EXPIRED' | 'REJECTED';
+  scannedAt?: string;
   paidTransaction?: {
     transactionId: string;
     customerName: string;
@@ -407,6 +408,8 @@ export class PaymentService {
       shopName: qrData.shopName,
       totalAmount: qrData.totalAmount,
       expiresAt: qrData.expiresAt,
+      scannedAt: qrData.scannedAt || null,
+      isScanned: Boolean(qrData.scannedAt),
       paidTransaction: qrData.paidTransaction || null,
     };
   }
@@ -560,6 +563,36 @@ export class PaymentService {
         walletInfo.periodQuota.enabled ? walletInfo.periodQuota.currentPeriod?.quotaRemaining ?? 0 : undefined
       );
     }
+
+    // เมื่อสแกน QR สำเร็จและเข้าสู่หน้าจอชำระเงิน:
+    // ขยายเวลาทำรายการ (Checkout Window 15 นาที) เพื่อให้ลูกค้ามีเวลาตรวจสอบยอดและกรอก PIN โดยไม่ถูกตัดเวลา 3 นาทีของ QR
+    const CHECKOUT_SESSION_MS = 15 * 60 * 1000;
+    const checkoutExpiresAt = new Date(Date.now() + CHECKOUT_SESSION_MS);
+    qrData.scannedAt = qrData.scannedAt || new Date().toISOString();
+    if (new Date(qrData.expiresAt).getTime() < checkoutExpiresAt.getTime()) {
+      qrData.expiresAt = checkoutExpiresAt.toISOString();
+    }
+    await prisma.payment_qr_codes.updateMany({
+      where: { qr_reference: qrReference, status: 'ACTIVE' },
+      data: {
+        payload: JSON.parse(JSON.stringify(qrData)),
+        expires_at: new Date(qrData.expiresAt),
+      },
+    });
+
+    this.qrPaymentEvents.emit(`scanned:${qrReference}`, {
+      qrReference,
+      status: qrData.status,
+      expiresAt: qrData.expiresAt,
+      scannedAt: qrData.scannedAt,
+    });
+    this.qrPaymentEvents.emit(`merchant:${qrData.merchantId}:scanned`, {
+      qrReference,
+      status: qrData.status,
+      expiresAt: qrData.expiresAt,
+      scannedAt: qrData.scannedAt,
+      totalAmount: qrData.totalAmount,
+    });
 
     return {
       qrData,
@@ -767,7 +800,6 @@ export class PaymentService {
           }
         }
       }
-
       await tx.$queryRaw`SELECT wallet_id FROM wallets WHERE wallet_id = ${wallet.walletId}::uuid FOR UPDATE`;
       const currentWallet = await tx.wallets.findUnique({
         where: { wallet_id: wallet.walletId },
@@ -785,6 +817,13 @@ export class PaymentService {
       const today = getBangkokDateKey(completedAtDate);
       const lastReset = getDatabaseDateKey(currentWallet.last_quota_reset_date);
       const dailyQuotaUsed = lastReset === today ? Number(currentWallet.daily_quota_used) : 0;
+      if (
+        Number(currentWallet.balance) !== wallet.balance ||
+        dailyQuotaUsed !== wallet.dailyQuotaUsed ||
+        Number(currentWallet.total_quota_remaining) !== wallet.totalQuotaRemaining
+      ) {
+        throw new Error('ข้อมูลกระเป๋าเงินเปลี่ยนแปลง กรุณาตรวจสอบยอดและลองชำระใหม่');
+      }
       const dailyQuotaRemaining = Math.max(0, Number(currentWallet.campaigns.daily_quota_limit) - dailyQuotaUsed);
       const configuredPeriods = await tx.campaign_periods.findMany({
         where: { campaign_id: currentWallet.campaign_id! },
@@ -945,6 +984,10 @@ export class PaymentService {
     };
     // ส่งสัญญาณ Real-time ผ่าน SSE ไปยังหน้าจอ POS ของร้านค้าทันที (0 ms Latency)
     this.qrPaymentEvents.emit(`payment:${params.qrReference}`, qrData.paidTransaction);
+    this.qrPaymentEvents.emit(`merchant:${qrData.merchantId}:payment`, {
+      qrReference: params.qrReference,
+      paidTransaction: qrData.paidTransaction,
+    });
 
     // หลัง commit เท่านั้น: ประเมิน Badge จากยอดที่บันทึกสำเร็จแล้ว
     // ถ้า Badge ผิดพลาด ระบบจะ log และไม่กระทบผลการชำระเงิน
@@ -1001,8 +1044,14 @@ export class PaymentService {
    * สำหรับใช้ในการทดสอบ Unit Test หรือจำลองสถานะ QR Code หมดอายุ (ตั้งเวลาถอยหลังเป็นอดีต)
    */
   public async _simulateExpireQr(qrReference: string): Promise<void> {
+    const qrData = await qrStore.get(qrReference);
+    if (qrData) {
+      qrData.status = 'EXPIRED';
+      qrData.expiresAt = new Date(Date.now() - 5000).toISOString();
+      await qrStore.set(qrReference, qrData);
+    }
     await prisma.payment_qr_codes.updateMany({
-      where: { qr_reference: qrReference, status: 'ACTIVE' },
+      where: { qr_reference: qrReference },
       data: { expires_at: new Date(Date.now() - 5000), status: 'EXPIRED' },
     });
   }
