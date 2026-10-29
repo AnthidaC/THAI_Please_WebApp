@@ -21,7 +21,7 @@ import {
   updateAdminBadgeImplementationStatus,
 } from '../controllers/adminBadge.controller';
 import { authenticateAdmin } from '../middlewares/admin.middleware';
-import { authenticate } from '../middlewares/auth.middleware';
+import { authenticate, requireCitizen } from '../middlewares/auth.middleware';
 import { getMyBadge, listMyBadges } from '../controllers/badge.controller';
 import {
   createAdminConditionType,
@@ -76,7 +76,7 @@ router.post('/badges/:id/activate', authenticateAdmin, activateAdminBadge);
 router.post('/badges/:id/deactivate', authenticateAdmin, deactivateAdminBadge);
 
 // Citizen Badge progress. The user comes from the authenticated request context.
-router.get('/me/badges', authenticate, listMyBadges);
-router.get('/me/badges/:badgeId', authenticate, getMyBadge);
+router.get('/me/badges', authenticate, requireCitizen, listMyBadges);
+router.get('/me/badges/:badgeId', authenticate, requireCitizen, getMyBadge);
 
 export default router;

@@ -24,6 +24,7 @@ export interface DiscountValidationResult {
   referrerUserId?: string;
   referralId?: string;
   userRewardId?: string;
+  rewardId?: string;
 }
 
 export interface CopayCalculationResult {
@@ -210,6 +211,15 @@ export class PaymentService {
           throw new Error('คูปองนี้หมดอายุแล้ว');
         }
 
+        if (userReward.rewards.quota_limit !== null) {
+          const redeemedCount = await prisma.user_rewards.count({
+            where: { reward_id: userReward.reward_id, status: 'used' },
+          });
+          if (redeemedCount >= userReward.rewards.quota_limit) {
+            throw new Error('รางวัลนี้ถูกใช้ครบโควตาแล้ว');
+          }
+        }
+
         let discountVal = 0;
         if (userReward.rewards.discount_type === 'percent') {
           const pct = Number(userReward.rewards.discount_value || 10);
@@ -227,6 +237,7 @@ export class PaymentService {
           discountSource: 'COUPON',
           sourceDescription: `คูปองส่วนลด: ${userReward.rewards.reward_name} (ลด ฿${finalDiscount.toFixed(0)})`,
           userRewardId: userReward.user_reward_id,
+          rewardId: userReward.reward_id,
         };
       }
     } catch (e: any) {
@@ -753,6 +764,25 @@ export class PaymentService {
       });
       if (claim.count !== 1) throw new Error('QR นี้ถูกชำระแล้ว ถูกยกเลิก หรือหมดอายุ กรุณาตรวจสอบประวัติ');
 
+      if (discountInfo?.userRewardId) {
+        if (!discountInfo.rewardId) throw new Error('ไม่พบข้อมูลรางวัลของคูปองนี้');
+        const lockedRewards = await tx.$queryRaw<Array<{ quota_limit: number | null }>>`
+          SELECT quota_limit
+          FROM rewards
+          WHERE reward_id = ${discountInfo.rewardId}::uuid
+          FOR UPDATE
+        `;
+        const reward = lockedRewards[0];
+        if (!reward) throw new Error('ไม่พบรางวัลของคูปองนี้');
+        if (reward.quota_limit !== null) {
+          const redeemedCount = await tx.user_rewards.count({
+            where: { reward_id: discountInfo.rewardId, status: 'used' },
+          });
+          if (redeemedCount >= reward.quota_limit) {
+            throw new Error('รางวัลนี้ถูกใช้ครบโควตาแล้ว');
+          }
+        }
+      }
       await tx.$queryRaw`SELECT wallet_id FROM wallets WHERE wallet_id = ${wallet.walletId}::uuid FOR UPDATE`;
       const currentWallet = await tx.wallets.findUnique({
         where: { wallet_id: wallet.walletId },

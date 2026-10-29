@@ -4,6 +4,7 @@ import { APP_ROUTES } from '../constants/routes';
 import { RootLayout } from '../layouts/RootLayout';
 import { AuthLayout } from '../layouts/AuthLayout';
 import { AdminRoute } from './AdminRoute';
+import { ProtectedRoute } from './ProtectedRoute';
 import { PublicRoute } from './PublicRoute';
 
 import { HomePage } from '../pages/home/HomePage';
@@ -18,13 +19,16 @@ import { CitizenScanCopayPage } from '../pages/citizen/scan-copay/CitizenScanCop
 import { CitizenPaymentSlipPage } from '../pages/citizen/scan-copay/CitizenPaymentSlipPage';
 import { CitizenTransactionsPage } from '../pages/citizen/transactions/CitizenTransactionsPage';
 import { CitizenAchievementsPage } from '../pages/citizen/achievements/CitizenAchievementsPage';
+import { CitizenReviewPage } from '../pages/citizen/reviews/CitizenReviewPage';
 import { CitizenNearMePage } from '../pages/citizen/recommendations/CitizenNearMePage';
 import { CitizenMerchantDetailPage } from '../pages/citizen/merchants/CitizenMerchantDetailPage';
+import { CitizenPreferencesPage } from '../pages/citizen/preferences/CitizenPreferencesPage';
 import { CitizenProfilePage } from '../pages/citizen/profile/CitizenProfilePage';
 
 // Merchant Flow Pages
 import { MerchantPosQrPage } from '../pages/merchant/pos-qr/MerchantPosQrPage';
 import { MerchantSalesHistoryPage } from '../pages/merchant/sales/MerchantSalesHistoryPage';
+import { MerchantReviewsPage } from '../pages/merchant/reviews/MerchantReviewsPage';
 
 // Admin Flow Pages
 import { AdminFraudAlertsPage } from '../pages/admin/fraud-alerts/AdminFraudAlertsPage';
@@ -42,46 +46,32 @@ export const router = createBrowserRouter([
       },
       // Citizen Flow
       {
-        path: APP_ROUTES.CITIZEN_WALLET,
-        element: <CitizenWalletPage />,
-      },
-      {
-        path: APP_ROUTES.CITIZEN_SCAN_COPAY,
-        element: <CitizenScanCopayPage />,
-      },
-      {
-        path: APP_ROUTES.CITIZEN_SLIP,
-        element: <CitizenPaymentSlipPage />,
-      },
-      {
-        path: APP_ROUTES.CITIZEN_TRANSACTIONS,
-        element: <CitizenTransactionsPage />,
-      },
-      {
-        path: APP_ROUTES.CITIZEN_ACHIEVEMENTS,
-        element: <CitizenAchievementsPage />,
-      },
-      {
-        path: APP_ROUTES.CITIZEN_NEAR_ME,
-        element: <CitizenNearMePage />,
-      },
-      {
-        path: APP_ROUTES.CITIZEN_MERCHANT_DETAIL,
-        element: <CitizenMerchantDetailPage />,
-      },
-      {
-        path: APP_ROUTES.PROFILE,
-        element: <CitizenProfilePage />,
+        element: <ProtectedRoute allowedRoles={['USER']} />,
+        children: [
+          { path: APP_ROUTES.CITIZEN_WALLET, element: <CitizenWalletPage /> },
+          { path: APP_ROUTES.CITIZEN_SCAN_COPAY, element: <CitizenScanCopayPage /> },
+          { path: APP_ROUTES.CITIZEN_SLIP, element: <CitizenPaymentSlipPage /> },
+          { path: APP_ROUTES.CITIZEN_TRANSACTIONS, element: <CitizenTransactionsPage /> },
+          { path: APP_ROUTES.CITIZEN_ACHIEVEMENTS, element: <CitizenAchievementsPage /> },
+          { path: APP_ROUTES.CITIZEN_REVIEW, element: <CitizenReviewPage /> },
+          { path: APP_ROUTES.CITIZEN_NEAR_ME, element: <CitizenNearMePage /> },
+          { path: APP_ROUTES.CITIZEN_MERCHANT_DETAIL, element: <CitizenMerchantDetailPage /> },
+          { path: APP_ROUTES.CITIZEN_PREFERENCES, element: <CitizenPreferencesPage /> },
+          { path: APP_ROUTES.PROFILE, element: <CitizenProfilePage /> },
+        ],
       },
 
       // Merchant Flow
       {
-        path: APP_ROUTES.MERCHANT_POS_QR,
-        element: <MerchantPosQrPage />,
+        element: <ProtectedRoute allowedRoles={['MERCHANT']} />,
+        children: [
+          { path: APP_ROUTES.MERCHANT_POS_QR, element: <MerchantPosQrPage /> },
+          { path: APP_ROUTES.MERCHANT_SALES, element: <MerchantSalesHistoryPage /> },
+        ],
       },
       {
-        path: APP_ROUTES.MERCHANT_SALES,
-        element: <MerchantSalesHistoryPage />,
+        path: APP_ROUTES.MERCHANT_REVIEWS,
+        element: <MerchantReviewsPage />,
       },
 
       // Admin routes

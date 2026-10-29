@@ -40,7 +40,7 @@ export interface MissionRecord {
   rewardName: string | null;
   name: string;
   description: string | null;
-  type: string;
+  conditionType: string;
   targetValue: string;
   startsAt: string;
   endsAt: string;
@@ -56,10 +56,12 @@ export interface RewardRecord {
   type: string;
   discountType: string | null;
   discountValue: string | null;
+  quotaLimit: number | null;
   validDays: number;
   status: RecordStatus;
   createdAt: string;
   issuedCount: number;
+  redeemedCount: number;
 }
 
 export interface BadgeRecord {
@@ -74,6 +76,7 @@ export interface BadgeRecord {
   handlerRegistered: boolean;
   activationEligible: boolean;
   tierCount: number;
+  tierStructureCompatible: boolean;
   createdAt: string;
   updatedAt: string;
   awardedCount: number;

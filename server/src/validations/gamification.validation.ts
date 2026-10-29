@@ -5,6 +5,10 @@ const description = z.string().trim().max(1000).nullable().optional();
 const positiveAmount = z.coerce.number().positive().max(9_999_999_999.99);
 const percent = z.coerce.number().min(0).max(100);
 const date = z.coerce.date();
+const rewardQuota = z.preprocess(
+  (value) => value === '' ? null : value,
+  z.coerce.number().int().min(0).max(2_147_483_647).nullable()
+);
 
 const dateRange = <T extends z.ZodRawShape>(shape: T) =>
   z.object(shape).strict().superRefine((value, context) => {
@@ -87,7 +91,7 @@ const questFields = {
   rewardId: z.string().uuid().nullable().optional(),
   questName: z.string().trim().min(2).max(150),
   description,
-  questType: z.string().trim().min(2).max(50),
+  conditionType: z.string().trim().min(2).max(50),
   targetValue: positiveAmount,
   startsAt: date,
   endsAt: date,
@@ -100,7 +104,7 @@ export const updateQuestSchema = z.object({
   rewardId: questFields.rewardId,
   questName: questFields.questName.optional(),
   description: questFields.description,
-  questType: questFields.questType.optional(),
+  conditionType: questFields.conditionType.optional(),
   targetValue: questFields.targetValue.optional(),
   startsAt: questFields.startsAt.optional(),
   endsAt: questFields.endsAt.optional(),
@@ -113,6 +117,7 @@ const rewardFields = {
   rewardType: z.enum(['discount', 'coupon']),
   discountType: z.enum(['percent', 'fixed']).nullable().optional(),
   discountValue: z.coerce.number().positive().max(99_999_999.99).nullable().optional(),
+  quotaLimit: rewardQuota.default(null),
   validDays: z.coerce.number().int().min(1).max(3650),
   status: z.enum(['active', 'paused', 'archived']).default('active'),
 };
@@ -132,6 +137,7 @@ export const updateRewardSchema = z.object({
   rewardType: rewardFields.rewardType.optional(),
   discountType: rewardFields.discountType,
   discountValue: rewardFields.discountValue,
+  quotaLimit: rewardQuota.optional(),
   validDays: rewardFields.validDays.optional(),
   status: z.enum(['active', 'paused', 'archived']).optional(),
 }).strict().refine((value) => Object.keys(value).length > 0, 'Provide at least one field to update');

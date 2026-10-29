@@ -18,6 +18,9 @@ import {
   CheckCircle2,
   ArrowRight,
   Info,
+  Star,
+  Store,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { useAuthStore } from '../../../stores/authStore';
 import { APP_ROUTES } from '../../../constants/routes';
@@ -193,6 +196,29 @@ export const CitizenProfilePage: React.FC = () => {
           </div>
         </section>
 
+        {/* ================= ประวัติการรีวิวของฉัน ================= */}
+        <section aria-label="ประวัติการรีวิวร้านค้า" className="bg-white rounded-2xl border border-hairline p-4 sm:p-5 flex items-center justify-between shadow-xs">
+          <div className="space-y-1">
+            <p className="text-xs text-ink-muted flex items-center gap-1.5">
+              <Star className="h-3.5 w-3.5 text-amber-500 fill-amber-500" />
+              <span>ประวัติการรีวิวของฉัน</span>
+            </p>
+            <p className="text-sm font-semibold text-ink">
+              ร้านค้าที่คุณเคยให้คะแนน
+            </p>
+            <p className="text-[11px] text-ink-muted">
+              ตรวจสอบดาวและความคิดเห็นที่คุณเคยให้แก่ร้านค้าชุมชน
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate(APP_ROUTES.CITIZEN_REVIEW, { state: { from: 'profile' } })}
+            className="px-3.5 py-2 text-xs font-semibold text-ink-body bg-surface-soft hover:bg-gray-200 rounded-pill transition border border-hairline shrink-0"
+          >
+            ดูรีวิว
+          </button>
+        </section>
+
         {/* ================= 4. ทางไปหน้าเกม (GAME & ACHIEVEMENTS PORTAL) ================= */}
         <section aria-labelledby="game-portal-heading" className="bg-gradient-to-br from-indigo-900 via-brand-blue to-blue-700 text-white rounded-3xl p-5 sm:p-6 shadow-md shadow-blue-900/10 relative overflow-hidden">
           {/* Decorative Background Accents */}
@@ -275,7 +301,7 @@ export const CitizenProfilePage: React.FC = () => {
             </span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 pt-1">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5 pt-1">
             {/* 5.1 PIN Security Settings */}
             <div className="rounded-2xl border border-hairline bg-surface-soft/60 p-4 space-y-3 flex flex-col justify-between">
               <div className="space-y-1.5">
@@ -331,6 +357,39 @@ export const CitizenProfilePage: React.FC = () => {
                   <div className="flex items-center gap-2">
                     <Compass className="h-4 w-4 text-brand-blue" />
                     <span>เปิดหน้าแนะนำร้านค้า</span>
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-ink-muted" />
+                </button>
+              </div>
+            </div>
+
+            {/* 5.3 Citizen Category Preferences (UC 2.5.3) */}
+            <div className="rounded-2xl border border-hairline bg-surface-soft/60 p-4 space-y-3 flex flex-col justify-between">
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2 text-sm font-bold text-ink">
+                  <SlidersHorizontal className="h-4 w-4 text-brand-blue" />
+                  <span>ประเภทร้านค้าที่สนใจ</span>
+                </div>
+                <p className="text-xs text-ink-muted leading-relaxed">
+                  เลือกประเภทสินค้าและบริการที่คุณชื่นชอบเพื่อช่วยให้ AI แนะนำร้านค้าได้ตรงใจคุณ
+                </p>
+                <div className="pt-1">
+                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold bg-blue-50 text-brand-blue px-2.5 py-0.5 rounded-pill border border-blue-200">
+                    <Sparkles className="h-3 w-3" />
+                    <span>5 หมวดหมู่ทางการ (UC 2.5.3)</span>
+                  </span>
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => navigate(APP_ROUTES.CITIZEN_PREFERENCES)}
+                  className="flex w-full items-center justify-between rounded-2xl border border-hairline bg-white px-4 py-3 text-left text-xs sm:text-sm font-medium text-ink transition hover:bg-surface-soft"
+                >
+                  <div className="flex items-center gap-2">
+                    <Store className="h-4 w-4 text-brand-blue" />
+                    <span>ตั้งค่าหมวดหมู่ที่สนใจ</span>
                   </div>
                   <ChevronRight className="h-4 w-4 text-ink-muted" />
                 </button>

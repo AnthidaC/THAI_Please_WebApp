@@ -34,9 +34,111 @@ export interface MerchantReviewsData {
 }
 
 /**
+ * DTO สำหรับส่งรีวิวร้านค้า (Create Review Payload)
+ */
+export interface CreateReviewPayload {
+  transactionId: string;
+  ratingStars: number;
+  reviewText?: string | null;
+  isAnonymous?: boolean;
+}
+
+/**
+ * ผลลัพธ์ตอบกลับเมื่อบันทึกรีวิวสำเร็จจาก Backend
+ */
+export interface ReviewSubmissionResult {
+  reviewId: string;
+  transactionId: string;
+  merchantId: string;
+  merchantName: string;
+  ratingStars: number;
+  reviewText: string | null;
+  isVerifiedPurchase: boolean;
+  isAnonymous?: boolean;
+  newMerchantAverageRating: number;
+  totalMerchantReviews: number;
+  createdAt: string;
+}
+
+/**
+ * DTO สำหรับผลการตรวจสอบการประเมินรีวิวของธุรกรรม
+ */
+export interface ExistingReviewItem {
+  reviewId: string;
+  transactionId: string;
+  merchantId: string;
+  merchantName: string;
+  ratingStars: number;
+  reviewText: string | null;
+  isVerifiedPurchase: boolean;
+  isAnonymous?: boolean;
+  createdAt: string;
+}
+
+export interface TransactionReviewCheckResult {
+  reviewed: boolean;
+  isEligible?: boolean;
+  eligibilityStatus?: 'ELIGIBLE' | 'ALREADY_REVIEWED' | 'EXPIRED' | 'NOT_ELIGIBLE';
+  message?: string | null;
+  verificationTimestamp?: string;
+  expiresAt?: string;
+  review: ExistingReviewItem | null;
+}
+
+/**
+ * DTO สำหรับประวัติการประเมินรีวิวของผู้ใช้งาน
+ */
+export interface UserReviewHistoryItem {
+  reviewId: string;
+  transactionId: string;
+  merchantId: string;
+  merchantName: string;
+  merchantAverageRating?: number;
+  ratingStars: number;
+  reviewText: string | null;
+  isVerifiedPurchase: boolean;
+  isAnonymous?: boolean;
+  totalAmount?: number;
+  citizenPaidAmount?: number;
+  transactionDate?: string;
+  createdAt: string;
+}
+
+/**
  * API Service สำหรับระบบรีวิวและข้อมูลสถิติร้านค้า
  */
 export const reviewApi = {
+  /**
+   * ตรวจสอบและดึงข้อมูลการประเมินรีวิวของธุรกรรม (Authenticated)
+   * GET /api/reviews/transaction/:transactionId
+   */
+  getReviewByTransaction: async (
+    transactionId: string
+  ): Promise<TransactionReviewCheckResult> => {
+    const response = await api.get<ApiResponse<TransactionReviewCheckResult>>(
+      `/reviews/transaction/${transactionId}`
+    );
+    return response.data.data;
+  },
+
+  /**
+   * ส่งรีวิวร้านค้าหลังการซื้อสินค้าจริง (Authenticated)
+   * POST /api/reviews
+   */
+  submitReview: async (payload: CreateReviewPayload): Promise<ReviewSubmissionResult> => {
+    const response = await api.post<ApiResponse<ReviewSubmissionResult>>('/reviews', payload);
+    return response.data.data;
+  },
+
+  /**
+   * ดึงรายการประวัติการรีวิวทั้งหมดของผู้ใช้งานปัจจุบัน (Authenticated)
+   * GET /api/reviews/my-reviews
+   */
+  getMyReviews: async (): Promise<UserReviewHistoryItem[]> => {
+    const response = await api.get<ApiResponse<UserReviewHistoryItem[]>>('/reviews/my-reviews');
+    return response.data.data;
+  },
+
   /**
    * ดึงรายการรีวิวและสถิติคะแนนของร้านค้า (Public / Authenticated)
    * GET /api/reviews/merchant/:merchantId

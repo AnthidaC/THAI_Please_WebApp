@@ -1,13 +1,12 @@
 import { Router } from 'express';
-import { register, login, getMe } from '../controllers/auth.controller';
+import { demoLogin, getMe } from '../controllers/auth.controller';
 import { validate } from '../middlewares/validate.middleware';
-import { citizenAuthSchema, citizenLoginSchema } from '../validations/auth.validation';
-import { authenticate } from '../middlewares/auth.middleware';
+import { demoLoginSchema } from '../validations/auth.validation';
+import { authenticate, requireCitizen } from '../middlewares/auth.middleware';
 
 const router = Router();
 
-router.post('/register', validate(citizenAuthSchema), register);
-router.post('/login', validate(citizenLoginSchema), login);
-router.get('/me', authenticate, getMe);
+router.post('/demo-login', validate(demoLoginSchema), demoLogin);
+router.get('/me', authenticate, requireCitizen, getMe);
 
 export default router;

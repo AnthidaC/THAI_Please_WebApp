@@ -13,6 +13,7 @@ export interface RecommendedMerchantItem {
   formattedDistance: string;
   averageRating: number;
   transactionCount24h: number;
+  categoryId?: string | null;
   baseScore: number;
   finalScore: number;
   recommendationReason: string;
