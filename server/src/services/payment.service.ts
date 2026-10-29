@@ -370,9 +370,6 @@ export class PaymentService {
     });
 
     if (completedTx) {
-      if (expectedMerchantId && completedTx.merchant_id !== expectedMerchantId) {
-        throw new Error('ไม่มีสิทธิ์ดูสถานะ QR นี้');
-      }
       const paidInfo = {
         transactionId: completedTx.transaction_id,
         customerName: completedTx.users?.full_name || 'ประชาชนผู้ได้รับสิทธิ',

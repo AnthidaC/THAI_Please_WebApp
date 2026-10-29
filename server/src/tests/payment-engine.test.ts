@@ -1,7 +1,6 @@
 import assert from 'node:assert';
 import { paymentService } from '../services/payment.service';
 import { calculateHaversineDistance, AiFraudEngine } from '../services/fraud.service';
-import { prisma } from '../utils/prisma';
 
 console.log('🧪 เริ่มการทดสอบระบบคำนวณและประมวลผล (Unit Tests: Payment & Fraud Engine)');
 
@@ -206,7 +205,7 @@ async function testAiEngine() {
 }
 
 // 9. ทดสอบอนุญาตธุรกรรมไม่เกิน 2 กม. (<= 2,000 ม.) และปฏิเสธเมื่อเกิน 2 กม. พร้อมระงับ QR ทันทีและแจ้งข้อความสุภาพ
-async function testDistanceCheckAndQrSuspension(merchantId: string) {
+async function testDistanceCheckAndQrSuspension() {
   // 9.1 ทดสอบระยะทางประมาณ 1.5 กม. (ไม่เกิน 2 กม.) ต้องอนุญาตให้ทำรายการได้
   const qrWithin2Km = await paymentService.generateDynamicQr({
     merchantId: process.env.PAYMENT_TEST_MERCHANT_ID,
@@ -264,7 +263,7 @@ async function testDistanceCheckAndQrSuspension(merchantId: string) {
 }
 
 // 10. ทดสอบอายุ QR Code 3 นาที (180,000 มิลลิวินาที) และการแจ้งเตือน "QR หมดอายุ กรุณาทำรายการใหม่"
-async function testQrExpirationIn3Minutes(merchantId: string) {
+async function testQrExpirationIn3Minutes() {
   const qr = await paymentService.generateDynamicQr({
     merchantId: process.env.PAYMENT_TEST_MERCHANT_ID,
     amount: 100,
