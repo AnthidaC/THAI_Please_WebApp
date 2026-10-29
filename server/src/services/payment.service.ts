@@ -6,6 +6,7 @@ import { paymentPinService } from './payment-pin.service';
 import { getBangkokDateKey, getDatabaseDateKey, toBangkokDatabaseDate } from '../utils/bangkok-date';
 import { walletService } from './wallet.service';
 import { awardAfterActivity } from './achievements/badgeAwardEngine';
+import { referralService } from './referral.service';
 import {
   fraudService,
   calculateHaversineDistance,
@@ -170,8 +171,12 @@ export class PaymentService {
         if (referral.merchant_id && params.merchantId && referral.merchant_id !== params.merchantId) {
           throw new Error('โค้ดนี้สามารถใช้ได้เฉพาะกับร้านค้าที่กำหนดเท่านั้น');
         }
+        if (referral.merchant_id && params.userId) {
+          await referralService.assertRefereeEligibleAtMerchant(params.userId, referral.merchant_id);
+        }
 
-        const discountAmount = Math.min(params.totalAmount, Number(referral.discount_amount || 30));
+        // UC 2.4.3: ผู้ถูกชวนไม่ได้รับส่วนลด (ได้รับส่วนลด ฿0 เสมอ แม้เป็นโค้ดเก่าที่มี discount_amount)
+        const discountAmount = 0;
         const referrerName = referral.users_referrals_referrer_user_idTousers.full_name;
 
         return {
@@ -180,7 +185,7 @@ export class PaymentService {
           discountAmount,
           discountType: 'FIXED',
           discountSource: 'FRIEND_REFERRAL',
-          sourceDescription: `ส่วนลด ฿${discountAmount.toFixed(0)} จากโค้ดคำชวนของเพื่อน (${referrerName})`,
+          sourceDescription: `โค้ดคำชวนเพื่อนจาก (${referrerName})`,
           referrerName,
           referrerUserId: referral.referrer_user_id,
           referralId: referral.referral_id,
@@ -206,7 +211,7 @@ export class PaymentService {
         if (userReward.status !== 'available') {
           throw new Error('คูปองนี้ถูกใช้งานไปแล้วหรือหมดสิทธิ์');
         }
-        if (userReward.expires_at && new Date(userReward.expires_at).getTime() < Date.now()) {
+        if (userReward.expires_at && new Date(userReward.expires_at).getTime() <= Date.now()) {
           throw new Error('คูปองนี้หมดอายุแล้ว');
         }
 
@@ -733,6 +738,18 @@ export class PaymentService {
 
       if (discountInfo?.userRewardId) {
         if (!discountInfo.rewardId) throw new Error('ไม่พบข้อมูลรางวัลของคูปองนี้');
+
+        // Revalidate user_rewards.expires_at atomically inside the checkout transaction
+        const userReward = await tx.user_rewards.findUnique({
+          where: { user_reward_id: discountInfo.userRewardId },
+        });
+        if (!userReward || userReward.user_id !== params.userId || userReward.status !== 'available') {
+          throw new Error('คูปองนี้ถูกใช้งานไปแล้วหรือหมดสิทธิ์');
+        }
+        if (userReward.expires_at && new Date(userReward.expires_at).getTime() <= completedAtDate.getTime()) {
+          throw new Error('คูปองนี้หมดอายุแล้ว');
+        }
+
         const lockedRewards = await tx.$queryRaw<Array<{ quota_limit: number | null }>>`
           SELECT quota_limit
           FROM rewards
@@ -854,14 +871,22 @@ export class PaymentService {
         if (redeemed.count !== 1) throw new Error('โค้ดคำชวนถูกใช้งานแล้ว กรุณาตรวจสอบใหม่');
       } else if (discountInfo?.userRewardId) {
         const redeemed = await tx.user_rewards.updateMany({
-          where: { user_reward_id: discountInfo.userRewardId, user_id: params.userId, status: 'available' },
+          where: {
+            user_reward_id: discountInfo.userRewardId,
+            user_id: params.userId,
+            status: 'available',
+            OR: [
+              { expires_at: null },
+              { expires_at: { gt: completedAtDate } },
+            ],
+          },
           data: {
             status: 'used',
             transaction_id: newTx.transaction_id,
             used_at: completedAtDate,
           },
         });
-        if (redeemed.count !== 1) throw new Error('คูปองถูกใช้งานแล้ว กรุณาตรวจสอบใหม่');
+        if (redeemed.count !== 1) throw new Error('คูปองถูกใช้งานแล้วหรือหมดอายุ กรุณาตรวจสอบใหม่');
       }
 
       // 4.4 บันทึกประวัติการเคลื่อนไหวของกระเป๋าเงิน
@@ -934,6 +959,18 @@ export class PaymentService {
         ['referral_count'],
         'referral conversion'
       );
+      if (discountInfo?.code && params.userId && qrData?.merchantId) {
+        try {
+          await referralService.processReferralConversion({
+            referralCode: discountInfo.code,
+            refereeUserId: params.userId,
+            merchantId: qrData.merchantId,
+            transactionId: transactionRecord.transaction_id,
+          });
+        } catch (refErr) {
+          console.error('[Payment] Referral conversion reward processing error:', refErr);
+        }
+      }
     }
 
     return {

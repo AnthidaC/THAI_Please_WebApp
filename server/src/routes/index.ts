@@ -8,6 +8,7 @@ import gamificationRoutes from './gamification.routes';
 import reviewRoutes from './review.routes';
 import recommendationRoutes from './recommendation.routes';
 import preferenceRoutes from './preference.routes';
+import referralRoutes from './referral.routes';
 
 const router = Router();
 
@@ -25,6 +26,7 @@ router.use('/fraud', fraudRoutes);
 router.use('/reviews', reviewRoutes);
 router.use('/recommendations', recommendationRoutes);
 router.use('/preferences', preferenceRoutes);
+router.use('/referrals', referralRoutes);
 router.use('/', gamificationRoutes);
 
 export default router;
