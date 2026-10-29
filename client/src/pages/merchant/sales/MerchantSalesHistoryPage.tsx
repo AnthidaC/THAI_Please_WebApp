@@ -24,7 +24,7 @@ export const MerchantSalesHistoryPage: React.FC = () => {
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['merchant-sales', salesDate],
-    queryFn: () => getMerchantHistory(undefined, salesDate || undefined),
+    queryFn: () => getMerchantHistory(salesDate || undefined),
   });
 
   const allTransactions = data?.transactions || [];

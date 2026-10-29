@@ -2,8 +2,11 @@ export interface User {
   id: string;
   email?: string;
   name?: string | null;
-  role: 'USER' | 'ADMIN' | 'MERCHANT';
+  role: 'USER' | 'ADMIN' | 'MERCHANT' | 'STAFF' | 'GOVERNMENT_EXECUTIVE';
   createdAt: string;
+  merchantApprovalStatus?: 'SUBMITTING' | 'PENDING' | 'APPROVED' | 'REJECTED';
+  merchantApplicationSubmittedAt?: string | null;
+  merchantRejectionReason?: string | null;
 }
 
 export type DemoLoginRole = 'CITIZEN' | 'MERCHANT' | 'ADMIN';

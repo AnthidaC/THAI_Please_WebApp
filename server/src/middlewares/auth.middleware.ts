@@ -56,6 +56,18 @@ export const requireStaff = (req: Request, res: Response, next: NextFunction): v
   next();
 };
 
+export const requireAdmin = (req: Request, res: Response, next: NextFunction): void => {
+  if (!req.user) {
+    res.status(401).json({ status: 'error', message: 'Unauthorized' });
+    return;
+  }
+  if (req.user.role.toUpperCase() !== 'ADMIN') {
+    res.status(403).json({ status: 'error', message: 'Administrator access required' });
+    return;
+  }
+  next();
+};
+
 export const requireApprovedMerchant = (req: Request, res: Response, next: NextFunction): void => {
   if (!req.user) {
     res.status(401).json({ status: 'error', message: 'Unauthorized' });

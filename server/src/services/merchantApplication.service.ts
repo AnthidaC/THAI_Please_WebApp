@@ -144,6 +144,7 @@ export const merchantApplicationService = {
           business_type: input.businessType,
           tax_id: input.taxId,
           shop_name: input.businessName,
+          category_id: input.categoryId ?? null,
           contact_name: input.contactName,
           email: input.email,
           phone: input.phone,
@@ -214,6 +215,9 @@ export const merchantApplicationService = {
         name: merchant.shop_name,
         role: 'MERCHANT',
         createdAt: merchant.created_at.toISOString(),
+        merchantApprovalStatus: 'APPROVED',
+        merchantApplicationSubmittedAt: application.created_at.toISOString(),
+        merchantRejectionReason: application.rejection_reason,
       },
       token: signToken({ userId: merchant.merchant_id, role: 'MERCHANT' }),
     };
@@ -330,6 +334,7 @@ export const merchantApplicationService = {
             data: {
               tax_id: application.tax_id,
               shop_name: application.shop_name,
+              category_id: application.category_id,
               latitude: application.latitude,
               longitude: application.longitude,
               is_approved: true,

@@ -7,6 +7,7 @@ export const APP_ROUTES = {
   REGISTER: '/register',
   DASHBOARD: '/dashboard',
   MERCHANT_HOME: '/merchant/home',
+  MERCHANT_PROFILE: '/merchant/profile',
   CITIZEN_BENEFITS_REGISTER: '/citizen/register-benefits',
   PROFILE: '/profile',
 
@@ -30,6 +31,9 @@ export const APP_ROUTES = {
   // เส้นทางผู้ดูแลระบบ (Admin Flow)
   ADMIN_ROOT: '/admin',
   ADMIN_DASHBOARD: '/admin/dashboard',
+  ADMIN_MERCHANT_APPLICATIONS: '/admin/merchant-applications',
+  ADMIN_MERCHANT_LOCATION_REQUESTS: '/admin/merchant-location-requests',
+  ADMIN_MERCHANTS: '/admin/merchants',
   ADMIN_FRAUD_ALERTS: '/admin/fraud-alerts',
   ADMIN_CAMPAIGNS: '/admin/campaigns',
 } as const;

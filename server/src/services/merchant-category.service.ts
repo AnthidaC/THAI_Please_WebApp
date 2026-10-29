@@ -135,7 +135,7 @@ export class MerchantCategoryService {
       data: {
         business_type: input.businessType,
         tax_id: input.taxId,
-        shop_name: input.shopName,
+        shop_name: input.businessName,
         contact_name: input.contactName,
         category_id: validatedCategory,
         email: input.email,

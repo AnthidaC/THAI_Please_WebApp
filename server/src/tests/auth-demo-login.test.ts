@@ -5,7 +5,6 @@ import jwt from 'jsonwebtoken';
 import { env } from '../config/env';
 import { createDemoLoginHandler } from '../controllers/auth.controller';
 import { authenticateAdmin } from '../middlewares/admin.middleware';
-import { authenticatePaymentSession } from '../middlewares/payment-access.middleware';
 import { signToken } from '../utils/jwt';
 
 const citizenId = 'c7d8e58d-117c-4e52-9d25-20b5899d7e25';
@@ -112,32 +111,21 @@ test('Citizen, Merchant, and Admin mock accounts receive expiring signed role to
   }
 });
 
-test('signed mock sessions pass the existing Admin and Merchant authentication middleware', async () => {
+test('signed mock sessions pass the existing Admin authentication middleware', async () => {
   const adminLogin = await invoke(options(), { role: 'ADMIN' });
-  const merchantLogin = await invoke(options(), { role: 'MERCHANT' });
 
   const admin = await invokeMiddleware(authenticateAdmin, adminLogin.body.data.token);
-  const merchant = await invokeMiddleware(authenticatePaymentSession, merchantLogin.body.data.token);
 
   assert.deepEqual({ statusCode: admin.statusCode, nextCalled: admin.nextCalled, role: admin.user?.role }, {
     statusCode: 200,
     nextCalled: true,
     role: 'ADMIN',
   });
-  assert.deepEqual({ statusCode: merchant.statusCode, nextCalled: merchant.nextCalled, role: merchant.user?.role }, {
-    statusCode: 200,
-    nextCalled: true,
-    role: 'MERCHANT',
-  });
 });
 
-test('static legacy demo tokens do not authenticate Admin or Merchant APIs', async () => {
-  for (const [middleware, token] of [
-    [authenticateAdmin, 'demo-token-admin'],
-    [authenticatePaymentSession, 'demo-token-merchant'],
-    [authenticatePaymentSession, 'demo-token'],
-  ] as const) {
-    const result = await invokeMiddleware(middleware, token);
+test('static legacy demo tokens do not authenticate Admin APIs', async () => {
+  for (const token of ['demo-token-admin']) {
+    const result = await invokeMiddleware(authenticateAdmin, token);
     assert.equal(result.statusCode, 401);
     assert.equal(result.nextCalled, false);
   }

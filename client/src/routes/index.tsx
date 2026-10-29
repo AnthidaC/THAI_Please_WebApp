@@ -15,6 +15,7 @@ import { DashboardPage } from '../pages/admin/dashboard/DashboardPage';
 import { NotFoundPage } from '../pages/notFound/NotFoundPage';
 import { MerchantHomePage } from '../pages/merchant/home/MerchantHomePage';
 import { CitizenBenefitsRegisterPage } from '../pages/citizen/CitizenBenefitsRegisterPage';
+import { MerchantProfilePage } from '../pages/merchant/profile/MerchantProfilePage';
 
 // Citizen Flow Pages
 import { CitizenWalletPage } from '../pages/citizen/wallet/CitizenWalletPage';
@@ -35,6 +36,9 @@ import { MerchantReviewsPage } from '../pages/merchant/reviews/MerchantReviewsPa
 
 // Admin Flow Pages
 import { AdminFraudAlertsPage } from '../pages/admin/fraud-alerts/AdminFraudAlertsPage';
+import { AdminMerchantApplicationsPage } from '../pages/admin/merchant-applications/AdminMerchantApplicationsPage';
+import { AdminMerchantLocationRequestsPage } from '../pages/admin/merchant-location-requests/AdminMerchantLocationRequestsPage';
+import { AdminMerchantsPage } from '../pages/admin/merchants/AdminMerchantsPage';
 const AdminCampaignsPage = React.lazy(() => import('../pages/admin/campaigns/AdminCampaignsPage').then((module) => ({ default: module.AdminCampaignsPage })));
 
 export const router = createBrowserRouter([
@@ -52,6 +56,7 @@ export const router = createBrowserRouter([
         element: <ProtectedRoute allowedRoles={['USER']} />,
         children: [
           { path: APP_ROUTES.CITIZEN_WALLET, element: <CitizenWalletPage /> },
+          { path: APP_ROUTES.CITIZEN_BENEFITS_REGISTER, element: <CitizenBenefitsRegisterPage /> },
           { path: APP_ROUTES.CITIZEN_SCAN_COPAY, element: <CitizenScanCopayPage /> },
           { path: APP_ROUTES.CITIZEN_SLIP, element: <CitizenPaymentSlipPage /> },
           { path: APP_ROUTES.CITIZEN_TRANSACTIONS, element: <CitizenTransactionsPage /> },
@@ -68,6 +73,8 @@ export const router = createBrowserRouter([
       {
         element: <ProtectedRoute allowedRoles={['MERCHANT']} />,
         children: [
+          { path: APP_ROUTES.MERCHANT_HOME, element: <MerchantHomePage /> },
+          { path: APP_ROUTES.MERCHANT_PROFILE, element: <MerchantProfilePage /> },
           { path: APP_ROUTES.MERCHANT_POS_QR, element: <MerchantPosQrPage /> },
           { path: APP_ROUTES.MERCHANT_SALES, element: <MerchantSalesHistoryPage /> },
         ],
@@ -89,6 +96,10 @@ export const router = createBrowserRouter([
             path: APP_ROUTES.ADMIN_DASHBOARD,
             element: <DashboardPage />,
           },
+          { path: APP_ROUTES.ADMIN_MERCHANT_APPLICATIONS, element: <AdminMerchantApplicationsPage /> },
+          { path: APP_ROUTES.ADMIN_MERCHANT_LOCATION_REQUESTS, element: <AdminMerchantLocationRequestsPage /> },
+          { path: APP_ROUTES.ADMIN_MERCHANTS, element: <AdminMerchantsPage /> },
+          { path: `${APP_ROUTES.ADMIN_MERCHANTS}/:merchantId/edit`, element: <MerchantProfilePage /> },
           {
             path: APP_ROUTES.ADMIN_FRAUD_ALERTS,
             element: <AdminFraudAlertsPage />,
@@ -109,6 +120,7 @@ export const router = createBrowserRouter([
         path: APP_ROUTES.DASHBOARD,
         element: <Navigate to={APP_ROUTES.ADMIN_DASHBOARD} replace />,
       },
+      { path: '*', element: <NotFoundPage /> },
     ],
   },
 

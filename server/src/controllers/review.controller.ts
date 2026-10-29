@@ -51,7 +51,7 @@ export const getReviewByTransaction = async (req: Request, res: Response): Promi
   try {
     const paramResult = transactionIdParamSchema.safeParse(req.params);
     if (!paramResult.success) {
-      const errorMessage = paramResult.error.errors.map((e) => e.message).join(', ');
+      const errorMessage = paramResult.error.issues.map((e) => e.message).join(', ');
       sendError(res, errorMessage || 'รูปแบบรหัสธุรกรรมไม่ถูกต้อง', 400);
       return;
     }
@@ -101,7 +101,7 @@ export const getMerchantReviews = async (req: Request, res: Response): Promise<v
   try {
     const paramResult = merchantIdParamSchema.safeParse(req.params);
     if (!paramResult.success) {
-      const errorMessage = paramResult.error.errors.map((e) => e.message).join(', ');
+      const errorMessage = paramResult.error.issues.map((e) => e.message).join(', ');
       sendError(res, errorMessage || 'รหัสร้านค้าไม่ถูกต้อง', 400);
       return;
     }

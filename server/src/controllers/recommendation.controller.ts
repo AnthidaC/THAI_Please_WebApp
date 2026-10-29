@@ -24,7 +24,7 @@ export const getNearbyRecommendations = async (req: Request, res: Response): Pro
     // 1. ตรวจสอบความถูกต้องของ Query Parameters (latitude, longitude, radiusKm, limit)
     const parseResult = getRecommendationsQuerySchema.safeParse(req.query);
     if (!parseResult.success) {
-      const errorMessage = parseResult.error.errors.map((e) => e.message).join(', ');
+      const errorMessage = parseResult.error.issues.map((e) => e.message).join(', ');
       sendError(res, errorMessage || 'พารามิเตอร์ค้นหาไม่ถูกต้อง', 400, parseResult.error.format());
       return;
     }
@@ -91,7 +91,7 @@ export const recordRecommendationClick = async (req: Request, res: Response): Pr
     // 2. ตรวจสอบความถูกต้องของ URL Parameter (:recommendationId)
     const parseResult = recommendationTrackingParamSchema.safeParse(req.params);
     if (!parseResult.success) {
-      const errorMessage = parseResult.error.errors.map((e) => e.message).join(', ');
+      const errorMessage = parseResult.error.issues.map((e) => e.message).join(', ');
       sendError(res, errorMessage || 'รหัสคำแนะนำไม่ถูกต้อง', 400, parseResult.error.format());
       return;
     }

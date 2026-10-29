@@ -41,7 +41,7 @@ const withId = (
 export const listAdminBadges = (req: Request, res: Response) => {
   const parsed = badgeListQuerySchema.safeParse(req.query);
   if (!parsed.success) {
-    sendError(res, 'Invalid Badge filters', 400, parsed.error.errors.map((issue) => ({
+    sendError(res, 'Invalid Badge filters', 400, parsed.error.issues.map((issue) => ({
       field: issue.path.join('.'),
       message: issue.message,
     })));

@@ -469,7 +469,7 @@ test('merchantApplicationSchema: Rejects registration with non-canonical categor
 
   assert.equal(result.success, false);
   if (!result.success) {
-    assert.match(result.error.errors[0].message, /รหัสหมวดหมู่ไม่ถูกต้อง/);
+    assert.match(result.error.issues[0].message, /รหัสหมวดหมู่ไม่ถูกต้อง/);
   }
 });
 
@@ -492,7 +492,7 @@ test('createMerchantApplication: Persists application with validated category_id
   const input = {
     businessType: 'INDIVIDUAL' as const,
     taxId: '1234567890123',
-    shopName: 'น้ำผลไม้ปั่นสด',
+    businessName: 'น้ำผลไม้ปั่นสด',
     contactName: 'สุรชัย',
     categoryId: 'BEVERAGE' as const,
     email: 'surachai@example.com',

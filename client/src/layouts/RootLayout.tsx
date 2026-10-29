@@ -2,7 +2,6 @@ import React from 'react';
 import { Outlet, ScrollRestoration } from 'react-router-dom';
 import { Navbar } from '../components/common/Navbar';
 import { ScrollToTop } from '../components/common/ScrollToTop';
-import { PaymentPinGate } from '../components/payment/PaymentPinGate';
 
 export const RootLayout: React.FC = () => {
   return (
@@ -10,7 +9,6 @@ export const RootLayout: React.FC = () => {
       {/* เลื่อนหน้าจอขึ้นบนสุดเสมอเมื่อเปลี่ยนหน้า (Route change) รองรับทุกอุปกรณ์ */}
       <ScrollToTop />
       <ScrollRestoration />
-      <PaymentPinGate />
 
       {/* Unified Responsive Navigation (Top bar on Desktop, Top & Bottom Nav on Mobile) */}
       <Navbar />

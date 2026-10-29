@@ -7,20 +7,27 @@ import { CANONICAL_CATEGORY_IDS, CanonicalCategoryId } from '../constants/catego
  */
 export const merchantApplicationSchema = z.object({
   businessType: z.enum(['INDIVIDUAL', 'JURISTIC'], {
-    errorMap: () => ({ message: 'ประเภทธุรกิจต้องเป็น INDIVIDUAL หรือ JURISTIC' }),
+    error: 'ประเภทธุรกิจต้องเป็น INDIVIDUAL หรือ JURISTIC',
   }),
   taxId: z
-    .string({ required_error: 'กรุณาระบุเลขประจำตัวผู้เสียภาษี' })
+    .string({ error: 'กรุณาระบุเลขประจำตัวผู้เสียภาษี' })
     .trim()
     .min(10, 'เลขประจำตัวผู้เสียภาษีต้องมีความยาวอย่างน้อย 10 หลัก')
     .max(20, 'เลขประจำตัวผู้เสียภาษีต้องมีความยาวไม่เกิน 20 หลัก'),
-  shopName: z
-    .string({ required_error: 'กรุณาระบุชื่อร้านค้า' })
+  businessName: z
+    .string({ error: 'กรุณาระบุชื่อร้านค้า' })
     .trim()
     .min(1, 'กรุณาระบุชื่อร้านค้า')
-    .max(100, 'ชื่อร้านค้าต้องมีความยาวไม่เกิน 100 ตัวอักษร'),
+    .max(100, 'ชื่อร้านค้าต้องมีความยาวไม่เกิน 100 ตัวอักษร')
+    .optional(),
+  shopName: z
+    .string({ error: 'กรุณาระบุชื่อร้านค้า' })
+    .trim()
+    .min(1, 'กรุณาระบุชื่อร้านค้า')
+    .max(100, 'ชื่อร้านค้าต้องมีความยาวไม่เกิน 100 ตัวอักษร')
+    .optional(),
   contactName: z
-    .string({ required_error: 'กรุณาระบุชื่อผู้ติดต่อ' })
+    .string({ error: 'กรุณาระบุชื่อผู้ติดต่อ' })
     .trim()
     .min(1, 'กรุณาระบุชื่อผู้ติดต่อ')
     .max(100, 'ชื่อผู้ติดต่อต้องมีความยาวไม่เกิน 100 ตัวอักษร'),
@@ -37,33 +44,67 @@ export const merchantApplicationSchema = z.object({
     .nullable()
     .optional(),
   email: z
-    .string({ required_error: 'กรุณาระบุอีเมล' })
+    .string({ error: 'กรุณาระบุอีเมล' })
     .trim()
     .email('รูปแบบอีเมลไม่ถูกต้อง')
     .max(254, 'อีเมลต้องมีความยาวไม่เกิน 254 ตัวอักษร'),
   phone: z
-    .string({ required_error: 'กรุณาระบุหมายเลขโทรศัพท์' })
+    .string({ error: 'กรุณาระบุหมายเลขโทรศัพท์' })
     .trim()
     .min(9, 'หมายเลขโทรศัพท์ต้องมีความยาวอย่างน้อย 9 หลัก')
     .max(30, 'หมายเลขโทรศัพท์ต้องมีความยาวไม่เกิน 30 หลัก'),
   password: z
-    .string({ required_error: 'กรุณากำหนดรหัสผ่าน' })
+    .string({ error: 'กรุณากำหนดรหัสผ่าน' })
     .min(6, 'รหัสผ่านต้องมีความยาวอย่างน้อย 6 ตัวอักษร')
     .max(100, 'รหัสผ่านต้องมีความยาวไม่เกิน 100 ตัวอักษร'),
   address: z
-    .string({ required_error: 'กรุณาระบุที่อยู่ร้านค้า' })
+    .string({ error: 'กรุณาระบุที่อยู่ร้านค้า' })
     .trim()
     .min(5, 'ที่อยู่ต้องมีความยาวอย่างน้อย 5 ตัวอักษร')
     .max(500, 'ที่อยู่ต้องมีความยาวไม่เกิน 500 ตัวอักษร'),
   latitude: z
-    .number({ required_error: 'กรุณาระบุพิกัดละติจูด' })
+    .number({ error: 'กรุณาระบุพิกัดละติจูด' })
     .min(-90, 'ละติจูดต้องอยู่ระหว่าง -90 ถึง 90')
     .max(90, 'ละติจูดต้องอยู่ระหว่าง -90 ถึง 90'),
   longitude: z
-    .number({ required_error: 'กรุณาระบุพิกัดลองจิจูด' })
+    .number({ error: 'กรุณาระบุพิกัดลองจิจูด' })
     .min(-180, 'ลองจิจูดต้องอยู่ระหว่าง -180 ถึง 180')
     .max(180, 'ลองจิจูดต้องอยู่ระหว่าง -180 ถึง 180'),
+})
+  .superRefine((value, context) => {
+    if (!value.businessName && !value.shopName) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['businessName'],
+        message: 'กรุณาระบุชื่อร้านค้า',
+      });
+    }
+  })
+  .transform(({ businessName, shopName, ...input }) => ({
+    ...input,
+    businessName: businessName ?? shopName ?? '',
+  }));
+
+export const merchantApplicationDecisionSchema = z.object({
+  action: z.enum(['APPROVE', 'REJECT']),
+  note: z.string().trim().max(1000).optional(),
+}).superRefine((value, context) => {
+  if (value.action === 'REJECT' && (!value.note || value.note.length < 10)) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['note'],
+      message: 'กรุณาระบุเหตุผลการปฏิเสธอย่างน้อย 10 ตัวอักษร',
+    });
+  }
 });
+
+const loginSchema = z.object({
+  email: z.string({ error: 'กรุณาระบุอีเมล' }).trim().email('รูปแบบอีเมลไม่ถูกต้อง').max(254).transform((value) => value.toLowerCase()),
+  password: z.string({ error: 'กรุณาระบุรหัสผ่าน' }).min(1, 'กรุณาระบุรหัสผ่าน').max(100),
+});
+
+export const merchantLoginSchema = loginSchema;
+export const staffLoginSchema = loginSchema;
 
 /**
  * Validation schema สำหรับการอัปเดตหมวดหมู่ของร้านค้าโดยตรง
