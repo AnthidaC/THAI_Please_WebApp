@@ -56,7 +56,7 @@ const main = async () => {
     const tables = [
       'users', 'merchants', 'merchant_applications', 'staff_accounts', 'auth_identities', 'campaigns', 'campaign_periods',
       'wallets', 'wallet_period_quotas', 'transactions', 'wallet_transactions', 'fraud_checks', 'referrals',
-      'rewards', 'user_rewards', 'reviews', 'badges', 'badge_condition_types', 'badge_tiers', 'user_badges',
+      'rewards', 'user_rewards', 'reviews', 'badges', 'condition_types', 'badge_tiers', 'user_badges',
       'user_badge_history', 'quests', 'user_quests', 'payment_pins', 'payment_qr_codes',
     ];
     for (const table of tables) {
@@ -266,7 +266,7 @@ const main = async () => {
     assert.deepEqual(achievements.body.data, []);
     assert.equal((await fetchJson(baseUrl, '/me/badges')).response.status, 401);
 
-    const conditionType = await db.badge_condition_types.create({
+    const conditionType = await db.condition_types.create({
       data: {
         condition_key: 'transaction_count',
         display_name: 'จำนวนรายการที่สำเร็จ',

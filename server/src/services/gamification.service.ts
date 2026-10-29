@@ -89,7 +89,7 @@ const mapQuest = (row: any) => ({
   rewardName: row.rewards?.reward_name ?? null,
   name: row.quest_name,
   description: row.description,
-  type: row.quest_type,
+  conditionType: row.condition_type,
   targetValue: row.target_value.toString(),
   startsAt: toIso(row.starts_at),
   endsAt: toIso(row.ends_at),
@@ -98,21 +98,45 @@ const mapQuest = (row: any) => ({
   participantCount: row._count?.user_quests ?? 0,
 });
 
-const mapReward = (row: any) => ({
+const mapReward = (row: any, redeemedCount = 0) => ({
   id: row.reward_id,
   name: row.reward_name,
   description: row.description,
   type: row.reward_type,
   discountType: row.discount_type,
   discountValue: row.discount_value?.toString() ?? null,
+  quotaLimit: row.quota_limit == null ? null : Number(row.quota_limit),
   validDays: row.valid_days,
   status: row.status,
   createdAt: toIso(row.created_at),
   issuedCount: row._count?.user_rewards ?? 0,
+  redeemedCount,
 });
+
+const loadRewardRecord = async (db: any, rewardId: string) => {
+  const row = await db.rewards.findUnique({
+    where: { reward_id: rewardId },
+    include: { _count: { select: { user_rewards: true } } },
+  });
+  if (!row) throw new GamificationServiceError('Record not found', 404);
+  const redeemedCount = await db.user_rewards.count({
+    where: { reward_id: rewardId, status: 'used' },
+  });
+  return mapReward(row, redeemedCount);
+};
 
 const assertDateRange = (start: Date, end: Date) => {
   if (start >= end) throw new GamificationServiceError('End date must be after start date', 400);
+};
+
+const assertQuestConditionTypeRegistered = async (conditionType: string) => {
+  const registeredType = await prisma.condition_types.findUnique({
+    where: { condition_key: conditionType },
+    select: { condition_type_id: true },
+  });
+  if (!registeredType) {
+    throw new GamificationServiceError('Quest condition type is not registered', 400);
+  }
 };
 
 const assertCampaignShares = (governmentShare: number, citizenShare: number) => {
@@ -309,13 +333,14 @@ export const gamificationService = {
     } })).map(mapQuest)
   ),
   createQuest: (input: any) => withDatabaseErrors(async () => {
+    await assertQuestConditionTypeRegistered(input.conditionType);
     assertDateRange(input.startsAt, input.endsAt);
     return mapQuest(await prisma.quests.create({ data: {
       campaign_id: input.campaignId ?? null,
       reward_id: input.rewardId ?? null,
       quest_name: input.questName,
       description: input.description ?? null,
-      quest_type: input.questType,
+      condition_type: input.conditionType,
       target_value: input.targetValue,
       starts_at: input.startsAt,
       ends_at: input.endsAt,
@@ -325,13 +350,16 @@ export const gamificationService = {
   updateQuest: (id: string, input: any) => withDatabaseErrors(async () => {
     const current = await prisma.quests.findUnique({ where: { quest_id: id } });
     if (!current) throw new GamificationServiceError('Record not found', 404);
+    if (input.conditionType !== undefined && input.conditionType !== current.condition_type) {
+      await assertQuestConditionTypeRegistered(input.conditionType);
+    }
     assertDateRange(input.startsAt ?? current.starts_at, input.endsAt ?? current.ends_at);
     return mapQuest(await prisma.quests.update({ where: { quest_id: id }, data: {
       ...(input.campaignId !== undefined && { campaign_id: input.campaignId }),
       ...(input.rewardId !== undefined && { reward_id: input.rewardId }),
       ...(input.questName !== undefined && { quest_name: input.questName }),
       ...(input.description !== undefined && { description: input.description }),
-      ...(input.questType !== undefined && { quest_type: input.questType }),
+      ...(input.conditionType !== undefined && { condition_type: input.conditionType }),
       ...(input.targetValue !== undefined && { target_value: input.targetValue }),
       ...(input.startsAt !== undefined && { starts_at: input.startsAt }),
       ...(input.endsAt !== undefined && { ends_at: input.endsAt }),
@@ -340,20 +368,36 @@ export const gamificationService = {
     }, include: { campaigns: { select: { campaign_name: true } }, rewards: { select: { reward_name: true } }, _count: { select: { user_quests: true } } } }));
   }),
 
-  listRewards: () => withDatabaseErrors(async () =>
-    (await prisma.rewards.findMany({ orderBy: { created_at: 'desc' }, include: { _count: { select: { user_rewards: true } } } })).map(mapReward)
-  ),
+  listRewards: () => withDatabaseErrors(async () => {
+    const rows = await prisma.rewards.findMany({
+      orderBy: { created_at: 'desc' },
+      include: { _count: { select: { user_rewards: true } } },
+    });
+    if (!rows.length) return [];
+
+    const redemptionCounts = await prisma.user_rewards.groupBy({
+      by: ['reward_id'],
+      where: { reward_id: { in: rows.map((row) => row.reward_id) }, status: 'used' },
+      _count: { _all: true },
+    });
+    const redeemedByReward = new Map(
+      redemptionCounts.map((row) => [row.reward_id, row._count._all])
+    );
+    return rows.map((row) => mapReward(row, redeemedByReward.get(row.reward_id) ?? 0));
+  }),
   createReward: (input: any) => withDatabaseErrors(async () => {
     assertRewardDiscount(input.rewardType, input.discountType, input.discountValue);
-    return mapReward(await prisma.rewards.create({ data: {
+    const row = await prisma.rewards.create({ data: {
       reward_name: input.rewardName,
       description: input.description ?? null,
       reward_type: input.rewardType,
       discount_type: input.discountType ?? null,
       discount_value: input.discountValue ?? null,
+      quota_limit: input.quotaLimit ?? null,
       valid_days: input.validDays,
       status: input.status,
-    }, include: { _count: { select: { user_rewards: true } } } }));
+    } });
+    return loadRewardRecord(prisma, row.reward_id);
   }),
   updateReward: (id: string, input: any) => withDatabaseErrors(async () => {
     const current = await prisma.rewards.findUnique({ where: { reward_id: id } });
@@ -363,16 +407,18 @@ export const gamificationService = {
       input.discountType !== undefined ? input.discountType : current.discount_type,
       input.discountValue !== undefined ? input.discountValue : (current.discount_value == null ? null : Number(current.discount_value))
     );
-    return mapReward(await prisma.rewards.update({ where: { reward_id: id }, data: {
+    await prisma.rewards.update({ where: { reward_id: id }, data: {
       ...(input.rewardName !== undefined && { reward_name: input.rewardName }),
       ...(input.description !== undefined && { description: input.description }),
       ...(input.rewardType !== undefined && { reward_type: input.rewardType }),
       ...(input.discountType !== undefined && { discount_type: input.discountType }),
       ...(input.discountValue !== undefined && { discount_value: input.discountValue }),
+      ...(input.quotaLimit !== undefined && { quota_limit: input.quotaLimit }),
       ...(input.validDays !== undefined && { valid_days: input.validDays }),
       ...(input.status !== undefined && { status: input.status }),
       updated_at: new Date(),
-    }, include: { _count: { select: { user_rewards: true } } } }));
+    } });
+    return loadRewardRecord(prisma, id);
   }),
 
 };
