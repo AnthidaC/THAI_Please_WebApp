@@ -15,7 +15,10 @@ export const Navbar: React.FC = () => {
   const isMerchant = role === 'MERCHANT';
   // แสดงแถบนำทางของร้านค้าเฉพาะผู้ใช้ร้านค้าที่ผ่านการยืนยันตัวตนแล้วเท่านั้น (Authenticated Merchant)
   const isMerchantAuthenticated = isMerchant && isAuthenticated;
-  const navItems = isMerchant && !isMerchantAuthenticated ? [] : NAV_BY_ROLE[role];
+  const navItems =
+    role === 'PUBLIC' || role === 'GOVERNMENT_EXECUTIVE' || (isMerchant && !isMerchantAuthenticated)
+      ? []
+      : NAV_BY_ROLE[role];
   const RoleIcon = ROLE_LABEL[role].icon;
   const isAdmin = role === 'ADMIN';
 
@@ -50,10 +53,12 @@ export const Navbar: React.FC = () => {
 
           {/* Desktop & Tablet Navigation Links — เฉพาะเมนูของบทบาทปัจจุบัน (ซ่อนบนมือถือ) */}
           <div className="hidden md:flex items-center space-x-1 lg:space-x-1.5 text-xs font-medium">
-            {navItems.map(({ to, label, fullLabel, icon: Icon }) => (
+            {navItems.map(({ to, label, fullLabel, icon }) => {
+              const Icon = icon ?? LogOut;
+              return (
               <NavLink
                 key={to}
-                to={to}
+                to={to ?? APP_ROUTES.HOME}
                 end={to === APP_ROUTES.HOME}
                 className={({ isActive }) =>
                   `inline-flex items-center space-x-1.5 px-2.5 lg:px-3 py-1.5 rounded-pill transition whitespace-nowrap ${
@@ -71,7 +76,8 @@ export const Navbar: React.FC = () => {
                   <span className="lg:hidden">{label}</span>
                 </span>
               </NavLink>
-            ))}
+              );
+            })}
           </div>
 
           {/* User Session Info / Auth */}
@@ -107,11 +113,13 @@ export const Navbar: React.FC = () => {
       {/* 2. MOBILE BOTTOM NAVIGATION BAR — แสดงเฉพาะเมนูของบทบาทปัจจุบัน (Thumb-friendly) */}
       {navItems.length > 1 && (
         <div className="fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-md border-t border-hairline px-1 sm:px-2 pt-1 pb-[max(0.25rem,env(safe-area-inset-bottom))] flex justify-around items-end shadow-[0_-2px_12px_rgba(0,0,0,0.08)] md:hidden">
-          {navItems.map(({ to, label, icon: Icon, primary }) =>
+          {navItems.map(({ to, label, icon, primary }) => {
+            const Icon = icon ?? LogOut;
+            return (
             primary ? (
               <NavLink
                 key={to}
-                to={to}
+                to={to ?? APP_ROUTES.HOME}
                 end={to === APP_ROUTES.HOME}
                 aria-label={label}
                 className="flex flex-col items-center -mt-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue rounded-full"
@@ -134,7 +142,7 @@ export const Navbar: React.FC = () => {
             ) : (
               <NavLink
                 key={to}
-                to={to}
+                to={to ?? APP_ROUTES.HOME}
                 end={to === APP_ROUTES.HOME}
                 aria-label={label}
                 className={({ isActive }) =>
@@ -147,7 +155,8 @@ export const Navbar: React.FC = () => {
                 <span className="text-[10px] mt-0.5 whitespace-nowrap">{label}</span>
               </NavLink>
             )
-          )}
+            );
+          })}
         </div>
       )}
     </>

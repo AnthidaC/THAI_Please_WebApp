@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import { Home, Wallet, ScanLine, Store, User, QrCode, ShieldAlert, TrendingUp, Star, Megaphone } from 'lucide-react';
+import { Home, Wallet, ScanLine, Store, User, QrCode, ShieldAlert, TrendingUp, Star, Megaphone, ClipboardCheck, BriefcaseBusiness } from 'lucide-react';
 import { APP_ROUTES } from '../../constants/routes';
 
 /**
@@ -15,7 +15,7 @@ import { APP_ROUTES } from '../../constants/routes';
  * 4. แนะนำร้าน (Recommended Stores)
  * 5. โปรไฟล์ส่วนตัว (Profile) - มีทางไปหน้าเกมและหน้าตั้งค่าอยู่ภายใน
  */
-export type NavRole = 'CITIZEN' | 'MERCHANT' | 'ADMIN';
+export type NavRole = 'PUBLIC' | 'CITIZEN' | 'MERCHANT' | 'ADMIN' | 'GOVERNMENT_EXECUTIVE';
 
 export interface NavItem {
   label: string;
@@ -23,6 +23,8 @@ export interface NavItem {
   href?: string;
   icon?: LucideIcon;
   comingSoon?: boolean;
+  fullLabel?: string;
+  primary?: boolean;
 }
 
 export const CITIZEN_HOME_CARDS: NavItem[] = [
@@ -45,7 +47,7 @@ export const PUBLIC_ACTIONS = {
   merchantRegister: { label: 'ร้านค้า', to: APP_ROUTES.MERCHANT_REGISTER },
 } as const;
 
-export const NAV_BY_ROLE: Record<Exclude<NavRole, 'PUBLIC'>, NavItem[]> = {
+export const NAV_BY_ROLE: Record<Exclude<NavRole, 'PUBLIC' | 'GOVERNMENT_EXECUTIVE'>, NavItem[]> = {
   CITIZEN: [
     { to: APP_ROUTES.HOME, label: 'หน้าแรก', fullLabel: 'หน้าหลัก', icon: Home },
     { to: APP_ROUTES.CITIZEN_WALLET, label: 'กระเป๋าเงิน', fullLabel: 'กระเป๋าเงิน', icon: Wallet },
@@ -64,15 +66,15 @@ export const NAV_BY_ROLE: Record<Exclude<NavRole, 'PUBLIC'>, NavItem[]> = {
   ],
 };
 
-export const ROLE_LABEL: Record<NavRole, string> = {
-  PUBLIC: 'โครงการไทยช่วยไทยพลัส',
-  CITIZEN: 'ประชาชน',
-  MERCHANT: 'ร้านค้า',
-  ADMIN: 'ผู้ดูแลระบบ / ผู้บริหาร',
-  GOVERNMENT_EXECUTIVE: 'ผู้บริหารภาครัฐ',
+export const ROLE_LABEL: Record<NavRole, { label: string; icon: LucideIcon }> = {
+  PUBLIC: { label: 'โครงการไทยช่วยไทยพลัส', icon: Home },
+  CITIZEN: { label: 'ประชาชน', icon: User },
+  MERCHANT: { label: 'ร้านค้า', icon: Store },
+  ADMIN: { label: 'ผู้ดูแลระบบ / ผู้บริหาร', icon: ShieldAlert },
+  GOVERNMENT_EXECUTIVE: { label: 'ผู้บริหารภาครัฐ', icon: BriefcaseBusiness },
 };
 
-export function resolveNavRole(userRole?: string): NavRole {
+export function resolveNavRole(userRole?: string, _pathname?: string): NavRole {
   if (userRole === 'MERCHANT') return 'MERCHANT';
   if (userRole === 'ADMIN' || userRole === 'STAFF') return 'ADMIN';
   if (userRole === 'GOVERNMENT_EXECUTIVE' || userRole === 'GOV_EXECUTIVE' || userRole === 'EXECUTIVE') return 'GOVERNMENT_EXECUTIVE';
