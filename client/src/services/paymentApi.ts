@@ -157,10 +157,12 @@ export interface TransactionItem {
 
 export interface QrPaymentStatusResponse {
   qrReference: string;
-  status: 'ACTIVE' | 'USED' | 'SUSPENDED' | 'EXPIRED' | 'REJECTED';
+  status: 'ACTIVE' | 'USED' | 'SUSPENDED' | 'EXPIRED' | 'REJECTED' | 'SCANNED';
   shopName?: string;
   totalAmount?: number;
   expiresAt?: string;
+  scannedAt?: string | null;
+  isScanned?: boolean;
   paidTransaction?: {
     transactionId: string;
     customerName: string;
@@ -366,6 +368,24 @@ export const getQrPaymentStatus = async (
   return res.data.data;
 };
 
+export interface MerchantStreamEvent {
+  type: 'CONNECTED' | 'PAYMENT_RECEIVED' | 'QR_SCANNED';
+  merchantId?: string;
+  qrReference?: string;
+  status?: string;
+  expiresAt?: string;
+  scannedAt?: string;
+  totalAmount?: number;
+  paidTransaction?: {
+    transactionId: string;
+    customerName: string;
+    totalAmount: number;
+    governmentCopayAmount: number;
+    citizenPaidAmount: number;
+    completedAt: string;
+  };
+}
+
 /** Fetch streaming supports Bearer auth, unlike the browser's native EventSource. */
 export const streamQrPaymentStatus = async (
   reference: string,
@@ -393,6 +413,47 @@ export const streamQrPaymentStatus = async (
       }
     }
   } finally { reader.releaseLock(); }
+};
+
+/**
+ * Server-Sent Events (SSE) ระดับร้านค้าทั้งระบบ
+ * ติดตามเงินเข้าและสถานะสแกน QR แบบต่อเนื่อง ไม่ว่าจะเปิดอยู่หน้าจอใด หรือกำลังสร้างบิลถัดไป
+ */
+export const streamMerchantPayments = async (
+  onEvent: (event: MerchantStreamEvent) => void,
+  signal: AbortSignal
+) => {
+  const token = localStorage.getItem('auth_token');
+  const response = await fetch(axios.getUri({ url: '/payment/merchant/stream' }), {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    signal,
+  });
+  if (!response.ok || !response.body) throw new Error('Unable to stream merchant payments');
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      let end: number;
+      while ((end = buffer.indexOf('\n\n')) !== -1) {
+        const event = buffer.slice(0, end);
+        buffer = buffer.slice(end + 2);
+        const data = event.split('\n').find((line) => line.startsWith('data: '));
+        if (data) {
+          try {
+            onEvent(JSON.parse(data.slice(6)));
+          } catch {
+            // ignore malformed frame
+          }
+        }
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
 };
 
 export const getQrDetails = async (

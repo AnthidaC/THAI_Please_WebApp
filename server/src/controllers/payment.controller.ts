@@ -102,8 +102,24 @@ export const streamQrPaymentStatus = async (req: Request, res: Response): Promis
       res.end();
     };
 
+    // ฟังก์ชันรับ Event เมื่อลูกค้าสแกน QR Code เข้าสู่ขั้นตอนชำระเงิน (Real-time Scan Notification)
+    const onQrScanned = (scannedInfo: any) => {
+      res.write(
+        `data: ${JSON.stringify({
+          qrReference: reference,
+          status: 'SCANNED',
+          shopName: currentStatus.shopName,
+          totalAmount: currentStatus.totalAmount,
+          expiresAt: scannedInfo.expiresAt,
+          scannedAt: scannedInfo.scannedAt,
+          isScanned: true,
+        })}\n\n`
+      );
+    };
+
     // สมัครรับ Event การชำระเงินของ QR นี้ครั้งเดียว
     paymentService.qrPaymentEvents.once(`payment:${reference}`, onPaymentCompleted);
+    paymentService.qrPaymentEvents.on(`scanned:${reference}`, onQrScanned);
 
     // ส่ง Heartbeat ทุก 15 วินาที เพื่อรักษาการเชื่อมต่อไม่ให้ถูกตัด
     const heartbeatTimer = setInterval(() => {
@@ -114,6 +130,55 @@ export const streamQrPaymentStatus = async (req: Request, res: Response): Promis
     req.on('close', () => {
       clearInterval(heartbeatTimer);
       paymentService.qrPaymentEvents.off(`payment:${reference}`, onPaymentCompleted);
+      paymentService.qrPaymentEvents.off(`scanned:${reference}`, onQrScanned);
+    });
+  } catch (error: any) {
+    res.end();
+  }
+};
+
+/**
+ * Server-Sent Events (SSE) ระดับร้านค้า (Merchant-Wide Stream)
+ * แจ้งเตือนเมื่อมีเงินเข้าหรือมีลูกค้าสแกน QR ใดๆ ของร้านค้าแบบ Real-Time ทันที
+ * รองรับกรณีร้านค้าสร้าง QR หลายรายการต่อเนื่องกันโดยไม่ต้องเปิดหน้ารอ
+ */
+export const streamMerchantPayments = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const merchantId = res.locals.paymentMerchantId;
+    if (!merchantId) {
+      res.status(403).json({ status: 'error', message: 'ไม่พบร้านค้าที่ผูกกับบัญชีนี้' });
+      return;
+    }
+
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache, no-transform',
+      'Connection': 'keep-alive',
+      'X-Accel-Buffering': 'no',
+    });
+
+    res.write('retry: 3000\n\n');
+    res.write(`data: ${JSON.stringify({ type: 'CONNECTED', merchantId })}\n\n`);
+
+    const onPayment = (payload: any) => {
+      res.write(`data: ${JSON.stringify({ type: 'PAYMENT_RECEIVED', ...payload })}\n\n`);
+    };
+
+    const onScanned = (payload: any) => {
+      res.write(`data: ${JSON.stringify({ type: 'QR_SCANNED', ...payload })}\n\n`);
+    };
+
+    paymentService.qrPaymentEvents.on(`merchant:${merchantId}:payment`, onPayment);
+    paymentService.qrPaymentEvents.on(`merchant:${merchantId}:scanned`, onScanned);
+
+    const heartbeatTimer = setInterval(() => {
+      res.write(': heartbeat\n\n');
+    }, 15000);
+
+    req.on('close', () => {
+      clearInterval(heartbeatTimer);
+      paymentService.qrPaymentEvents.off(`merchant:${merchantId}:payment`, onPayment);
+      paymentService.qrPaymentEvents.off(`merchant:${merchantId}:scanned`, onScanned);
     });
   } catch (error: any) {
     res.end();

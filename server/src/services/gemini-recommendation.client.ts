@@ -6,6 +6,7 @@ import {
   IAiRecommendationClient,
   AiRecommendationClient,
 } from './ai-recommendation.client';
+import { UserPreferenceInput } from '../utils/recommendation-scoring';
 
 export interface GeminiRecommendationClientConfig {
   enabled: boolean;
@@ -65,17 +66,23 @@ export class GeminiRecommendationClient implements IAiRecommendationClient {
    */
   private buildCompactPrompt(
     candidates: CandidateMerchant[],
-    preferredCategories?: string[]
+    preferredCategories?: UserPreferenceInput[]
   ): string {
     const preferencesText =
       preferredCategories && preferredCategories.length > 0
-        ? `User Preferences: [${preferredCategories.join(', ')}]`
+        ? `User Preferences: [${preferredCategories
+            .map((p) =>
+              typeof p === 'string'
+                ? p
+                : `${p.categoryId}(w=${p.preferenceWeight !== undefined ? p.preferenceWeight : 1.0})`
+            )
+            .join(', ')}]`
         : 'User Preferences: General dining and street food';
 
     const candidatesList = candidates
       .map(
         (c, idx) =>
-          `#${idx + 1} id="${c.merchantId}", name="${c.shopName}", dist="${c.formattedDistance}", rating=${c.averageRating}, tx24h=${c.transactionCount24h}, baseScore=${c.baseScore}`
+          `#${idx + 1} id="${c.merchantId}", name="${c.shopName}", cat="${c.categoryId || 'NONE'}", dist="${c.formattedDistance}", rating=${c.averageRating}, tx24h=${c.transactionCount24h}, baseScore=${c.baseScore}`
       )
       .join('\n');
 

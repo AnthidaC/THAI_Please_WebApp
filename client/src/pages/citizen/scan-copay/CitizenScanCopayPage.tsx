@@ -26,12 +26,14 @@ import {
   DiscountValidationResult,
 } from '../../../services/paymentApi';
 import { APP_ROUTES } from '../../../constants/routes';
+import { useAuthStore } from '../../../stores/authStore';
 import { QrCameraScanner } from '../../../components/payment/QrCameraScanner';
 import { usePaymentPinStatus } from '../../../hooks/usePaymentPinStatus';
 import { PaymentPinConfirmation } from '../../../components/payment/PaymentPinConfirmation';
 
 export const CitizenScanCopayPage: React.FC = () => {
   const navigate = useNavigate();
+  const clearAuth = useAuthStore(state => state.clearAuth);
 
   // พิกัด GPS ผู้ใช้ — ดึงเงียบ ๆ เบื้องหลังเพื่อส่งให้ระบบตรวจสอบ (ไม่แสดงให้ผู้ใช้เห็น)
   const [userLocation, setUserLocation] = useState<{ lat: number; lon: number }>({
@@ -71,8 +73,8 @@ export const CitizenScanCopayPage: React.FC = () => {
     return () => navigator.geolocation.clearWatch(watchId);
   }, []);
 
-  // ตรวจสอบเวลานับถอยหลังของ QR ขณะอยู่ที่หน้าพรีวิว Co-pay (อายุ 3 นาที)
-  const [previewSecondsRemaining, setPreviewSecondsRemaining] = useState<number>(180);
+  // ตรวจสอบเวลานับถอยหลังของเซสชันชำระเงินหลังสแกนสำเร็จ (ขยายเป็น 15 นาทีตามมาตรฐานเป๋าตัง/ไทยช่วยไทย)
+  const [previewSecondsRemaining, setPreviewSecondsRemaining] = useState<number>(900);
 
   useEffect(() => {
     if (!scannedData?.qrData?.expiresAt) return;
@@ -87,7 +89,7 @@ export const CitizenScanCopayPage: React.FC = () => {
         setScannedData(null);
         setShowPinConfirmation(false);
         setQrReference('');
-        setCheckoutError('QR หมดอายุ กรุณาทำรายการใหม่');
+        setCheckoutError('เซสชันชำระเงินหมดอายุ (เกิน 15 นาที) กรุณาสแกน QR ใหม่อีกครั้ง');
       }
     };
 
@@ -122,6 +124,22 @@ export const CitizenScanCopayPage: React.FC = () => {
       setCheckoutError(errorMsg);
     },
   });
+
+  // กู้คืนเซสชัน QR ที่สแกนค้างไว้อัตโนมัติ (เช่น หลังผู้ใช้ปลดล็อก/รีเซ็ต PIN สำเร็จแล้วกลับมาหน้าจ่ายเงิน)
+  useEffect(() => {
+    const savedPending = sessionStorage.getItem('thai-please:pending-checkout-qr');
+    if (!savedPending) return;
+    sessionStorage.removeItem('thai-please:pending-checkout-qr');
+    try {
+      const parsed = JSON.parse(savedPending);
+      if (parsed?.ref) {
+        setQrReference(parsed.ref);
+        previewMutation.mutate({ ref: parsed.ref, code: parsed.code });
+      }
+    } catch {
+      // ignore invalid storage
+    }
+  }, []);
 
   // Mutation ตรวจสอบความถูกต้องของคูปองหรือโค้ดคำชวนของเพื่อน
   const discountMutation = useMutation({
@@ -338,9 +356,14 @@ export const CitizenScanCopayPage: React.FC = () => {
                         <span className="font-mono text-[11px] sm:text-xs text-ink-muted truncate max-w-[180px] sm:max-w-xs">
                           Ref: {scannedData.qrData.qrReference}
                         </span>
-                        <span className="inline-flex items-center space-x-1 rounded-pill bg-blue-50 px-2 py-0.5 text-[10px] font-mono font-bold text-brand-blue border border-blue-200 shrink-0">
-                          <Clock className="h-3 w-3" />
-                          <span>อายุ QR: {formattedPreviewTimer} น.</span>
+                        <span className="inline-flex items-center space-x-1.5 rounded-pill bg-emerald-50 px-2.5 py-0.5 text-[10px] sm:text-[11px] font-semibold text-emerald-800 border border-emerald-200 shrink-0">
+                          <CheckCircle2 className="h-3 w-3 text-emerald-600 shrink-0" />
+                          <span className="inline-flex items-center gap-1">
+                            <span>สแกนสำเร็จ</span>
+                            <span className="text-emerald-400">•</span>
+                            <Clock className="h-2.5 w-2.5 text-emerald-700 shrink-0" />
+                            <span className="font-mono">{formattedPreviewTimer} น.</span>
+                          </span>
                         </span>
                       </div>
                     </div>
@@ -636,6 +659,21 @@ export const CitizenScanCopayPage: React.FC = () => {
         onConfirm={pin => checkoutMutation.mutate(pin)}
         onClose={() => { setShowPinConfirmation(false); setPinError(null); }}
         onEdit={() => setPinError(null)}
+        onForgot={() => {
+          if (scannedData?.qrData?.qrReference) {
+            sessionStorage.setItem(
+              'thai-please:pending-checkout-qr',
+              JSON.stringify({
+                ref: scannedData.qrData.qrReference,
+                code: appliedDiscount?.code || undefined,
+              })
+            );
+          }
+          sessionStorage.setItem('thai-please:pin-reset-intent', '1');
+          sessionStorage.setItem('thai-please:pin-reset-return', APP_ROUTES.CITIZEN_SCAN_COPAY);
+          clearAuth();
+          navigate(APP_ROUTES.LOGIN, { state: { from: { pathname: APP_ROUTES.CITIZEN_WALLET } } });
+        }}
       />
     </div>
   );

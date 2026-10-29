@@ -217,13 +217,14 @@ export const AdminCampaignsPage: React.FC = () => {
   const conditionTypesQuery = useQuery({
     queryKey: ['admin', 'gamification', 'condition-types'],
     queryFn: () => gamificationApi.conditionTypes(),
-    enabled: resource === 'badges' || conditionTypesOpen,
+    enabled: resource === 'badges' || resource === 'missions' || conditionTypesOpen,
   });
 
   const campaigns = campaignsQuery.data ?? [];
   const missions = missionsQuery.data ?? [];
   const rewards = rewardsQuery.data ?? [];
   const badges = badgesQuery.data ?? [];
+  const conditionTypes = conditionTypesQuery.data ?? [];
   const activeCampaigns = campaigns.filter((item) => isActive(item.status)).length;
   const activeMissions = missions.filter((item) => isActive(item.status)).length;
   const activeRewards = rewards.filter((item) => isActive(item.status)).length;
@@ -266,7 +267,7 @@ export const AdminCampaignsPage: React.FC = () => {
     const searchable = resource === 'campaigns'
       ? `${(record as CampaignRecord).name}`
       : resource === 'missions'
-        ? `${(record as MissionRecord).name} ${(record as MissionRecord).campaignName ?? ''} ${(record as MissionRecord).type}`
+        ? `${(record as MissionRecord).name} ${(record as MissionRecord).campaignName ?? ''} ${(record as MissionRecord).conditionType}`
         : resource === 'rewards'
           ? `${(record as RewardRecord).name} ${(record as RewardRecord).type}`
           : `${(record as BadgeRecord).name} ${(record as BadgeRecord).conditionType}`;
@@ -341,10 +342,12 @@ export const AdminCampaignsPage: React.FC = () => {
     }
     if (resource === 'missions') {
       const item = record as MissionRecord;
+      const measurementUnit = conditionTypes.find((condition) => condition.key === item.conditionType)?.measurementUnit;
+      const targetUnit = measurementUnit === 'amount' ? 'บาท' : measurementUnit === 'count' ? 'ครั้ง' : '';
       return [
-        <div key="primary" className="flex items-start gap-3"><div className="mt-0.5 rounded-xl bg-violet-50 p-2 text-violet-700"><Target className="h-4 w-4" /></div><div><p className="font-semibold text-ink">{item.name}</p><p className="mt-1 max-w-[260px] truncate text-xs text-ink-muted">{item.description || item.type}</p></div></div>,
+        <div key="primary" className="flex items-start gap-3"><div className="mt-0.5 rounded-xl bg-violet-50 p-2 text-violet-700"><Target className="h-4 w-4" /></div><div><p className="font-semibold text-ink">{item.name}</p><p className="mt-1 max-w-[260px] truncate text-xs text-ink-muted">{item.description || item.conditionType}</p></div></div>,
         <div key="links" className="min-w-[145px]"><p className="text-sm text-ink">{item.campaignName || 'ไม่ผูกแคมเปญ'}</p><p className="mt-1 text-xs text-ink-muted">รางวัล: {item.rewardName || 'ยังไม่กำหนด'}</p></div>,
-        <div key="target" className="min-w-[100px]"><p className="font-mono text-sm font-medium text-ink">{formatNumber(item.targetValue)}</p><p className="mt-1 text-xs text-ink-muted">เป้าหมาย · {item.participantCount} คน</p></div>,
+        <div key="target" className="min-w-[100px]"><p className="font-mono text-sm font-medium text-ink">{formatNumber(item.targetValue)}{targetUnit ? ` ${targetUnit}` : ''}</p><p className="mt-1 text-xs text-ink-muted">ผู้เข้าร่วม {item.participantCount} คน</p></div>,
         <div key="date" className="min-w-[145px]"><p className="text-sm text-ink">{formatDate(item.startsAt)}</p><p className="mt-1 text-xs text-ink-muted">ถึง {formatDate(item.endsAt)}</p></div>,
         <div key="status"><StatusPill status={item.status} /></div>,
       ];
@@ -358,7 +361,7 @@ export const AdminCampaignsPage: React.FC = () => {
         <div key="primary" className="flex items-start gap-3"><div className="mt-0.5 rounded-xl bg-emerald-50 p-2 text-emerald-700"><Gift className="h-4 w-4" /></div><div><p className="font-semibold text-ink">{item.name}</p><p className="mt-1 max-w-[250px] truncate text-xs text-ink-muted">{item.description || (item.type === 'coupon' ? 'คูปองสิทธิประโยชน์' : 'ส่วนลด')}</p></div></div>,
         <div key="type" className="min-w-[100px]"><p className="text-sm font-semibold text-ink">{item.type === 'coupon' ? 'คูปอง' : 'ส่วนลด'}</p><p className="mt-1 text-xs text-ink-muted">อายุ {item.validDays} วัน</p></div>,
         <div key="value" className="min-w-[100px]"><p className="font-mono text-sm font-semibold text-ink">{valueLabel}</p><p className="mt-1 text-xs text-ink-muted">มูลค่ารางวัล</p></div>,
-        <div key="count" className="min-w-[100px]"><p className="font-mono text-sm font-medium text-ink">{formatNumber(item.issuedCount)}</p><p className="mt-1 text-xs text-ink-muted">มอบให้ผู้ใช้</p></div>,
+        <div key="count" className="min-w-[112px]"><p className="font-mono text-sm font-medium text-ink">{item.quotaLimit === null ? formatNumber(item.issuedCount) : `${formatNumber(item.redeemedCount)} / ${formatNumber(item.quotaLimit)}`}</p><p className="mt-1 text-xs text-ink-muted">{item.quotaLimit === null ? 'มอบให้ผู้ใช้' : 'ใช้แล้ว / โควตา'}</p>{item.quotaLimit !== null && <p className="mt-1 text-[11px] text-ink-muted">เหลือ {formatNumber(Math.max(0, item.quotaLimit - item.redeemedCount))} · ออกแล้ว {formatNumber(item.issuedCount)}</p>}</div>,
         <div key="status"><StatusPill status={item.status} /></div>,
       ];
     }
@@ -503,7 +506,7 @@ export const AdminCampaignsPage: React.FC = () => {
         <p className="mt-4 flex items-center justify-center gap-1.5 text-center text-xs text-ink-muted"><CircleDollarSign className="h-3.5 w-3.5" />การแก้ไขสถานะจะไม่ลบคูปองที่ออกให้หรือเหรียญตราที่ประชาชนได้รับแล้ว</p>
       </div>
 
-      {editor && <RecordEditorDialog resource={editor.resource} record={editor.record} campaigns={campaigns} rewards={rewards} conditionTypes={conditionTypesQuery.data ?? []} conditionTypesError={conditionTypesQuery.isError} saving={mutation.isPending} onManageConditionTypes={() => setConditionTypesOpen(true)} onClose={() => setEditor(null)} onSave={handleSave} />}
+      {editor && <RecordEditorDialog resource={editor.resource} record={editor.record} campaigns={campaigns} rewards={rewards} conditionTypes={conditionTypes} conditionTypesError={conditionTypesQuery.isError} saving={mutation.isPending} onManageConditionTypes={() => setConditionTypesOpen(true)} onClose={() => setEditor(null)} onSave={handleSave} />}
       {conditionTypesOpen && <ConditionTypeManagementPanel onClose={() => setConditionTypesOpen(false)} />}
     </div>
   );

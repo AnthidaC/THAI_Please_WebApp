@@ -19,7 +19,15 @@ async function main() {
       });
       await new Promise((resolve, reject) => {
         const timer = setTimeout(() => reject(new Error('Vite startup timed out')), 30000);
-        vite.stdout.on('data', data => { if (data.toString().includes('Local:')) { clearTimeout(timer); resolve(); } });
+        const onData = data => {
+          const text = data.toString();
+          if (text.includes('Local:') || text.includes('5176')) {
+            clearTimeout(timer);
+            resolve();
+          }
+        };
+        vite.stdout.on('data', onData);
+        vite.stderr.on('data', onData);
         vite.once('error', error => { clearTimeout(timer); reject(error); });
         vite.once('exit', code => { clearTimeout(timer); reject(new Error(`Vite exited: ${code}`)); });
       });
@@ -27,7 +35,8 @@ async function main() {
     browser = await puppeteer.launch({ executablePath: browserPath, headless: true });
     const page = await browser.newPage();
     const errors = [];
-    page.on('pageerror', error => errors.push(error.message));
+    page.on('pageerror', error => { console.error('PAGE ERROR:', error.message); errors.push(error.message); });
+    page.on('console', msg => { if (msg.type() === 'error') console.error('CONSOLE ERROR:', msg.text()); });
     const user = { id: '11111111-1111-4111-8111-111111111111', name: 'PIN UI Test', role: 'USER' };
     const token = `ui.${Buffer.from(JSON.stringify({ userId: user.id, role: 'CITIZEN' })).toString('base64url')}.mock`;
     const configured = new Set();
@@ -66,7 +75,14 @@ async function main() {
           body.data = { isSet: true };
         }
       } else if (url.pathname.endsWith('/wallet/balance')) {
-        body.data = { balance: 1000, eligibilityStatus: 'ELIGIBLE', dailyQuotaRemaining: 150 };
+        body.data = {
+          balance: 1000, eligibilityStatus: 'ELIGIBLE', dailyQuotaRemaining: 150,
+          dailyQuotaLimit: 200, dailyQuotaUsed: 50, totalQuotaRemaining: 1000,
+          periodQuota: { enabled: false, status: 'ACTIVE' },
+          monthlyCycle: { currentMonthName: 'ตุลาคม 2569', validUntilDate: '31 ตุลาคม 2569' }
+        };
+      } else if (url.pathname.endsWith('/transactions/buyer/history')) {
+        body.data = [];
       } else if (url.pathname.endsWith('/payment/qr/QR-UI-TEST')) {
         body.data = { qrData: { qrReference: 'QR-UI-TEST', merchantId: 'shop', shopName: 'UI Test Shop', totalAmount: 200,
           estimatedGovCopay: 120, estimatedCitizenPay: 80, expiresAt: new Date(Date.now() + 180000).toISOString() },
@@ -88,7 +104,7 @@ async function main() {
     await page.setViewport({ width: 1440, height: 1000 });
     await page.goto(base, { waitUntil: 'networkidle0' });
     await page.waitForSelector('dialog[open]');
-    await page.waitForSelector('dialog input[aria-label="PIN ใหม่ (6 หลัก)"]');
+    await page.waitForSelector('dialog [data-pin-digit="1"]');
     assert.equal(await page.$eval('dialog', element => element.getAttribute('aria-labelledby')), 'payment-pin-gate-title');
     await page.keyboard.press('Escape');
     assert.ok(await page.$('dialog[open]'), 'Escape must not bypass required setup');
@@ -101,18 +117,29 @@ async function main() {
     assert.ok(box.left >= 0 && box.right <= 390 && box.height <= 844);
     assert.ok(box.scrollWidth <= box.clientWidth, 'Modal must not overflow horizontally');
     await page.screenshot({ path: path.join(screenshots, 'mobile.png') });
-    await page.type('dialog input[aria-label="PIN ใหม่ (6 หลัก)"]', '123456');
-    await page.type('dialog input[aria-label="ยืนยัน PIN ใหม่"]', '654321');
-    assert.equal(await page.$eval('dialog button[type="submit"]', element => element.disabled), true);
-    await page.$eval('dialog input[aria-label="ยืนยัน PIN ใหม่"]', element => { element.focus(); element.select(); });
-    await page.keyboard.type('123456');
-    await page.click('dialog button[type="submit"]');
+
+    // Step 1: Enter initial PIN via keypad
+    const enterKeypadDigits = async digits => {
+      for (const digit of digits) await page.click(`#payment-pin-gate [data-pin-digit="${digit}"]`);
+    };
+    await enterKeypadDigits('123456');
+
+    // Step 2: Enter mismatched confirmation PIN
+    await page.waitForFunction(() => document.querySelector('dialog')?.textContent.includes('ขั้นตอนที่ 2 จาก 2'));
+    await enterKeypadDigits('654321');
+    await page.waitForFunction(() => document.querySelector('dialog [role="alert"]')?.textContent.includes('ไม่ตรงกัน'));
+
+    // Step 2: Enter matching confirmation PIN
+    await enterKeypadDigits('123456');
     await page.waitForFunction(() => document.querySelector('dialog [role="alert"]')?.textContent.includes('ลองใหม่'));
     assert.ok(await page.$('dialog[open]'), 'Save failure must keep the setup dialog open');
-    await page.click('dialog button[type="submit"]');
+
+    // Retry Step 2 with matching PIN
+    await enterKeypadDigits('123456');
     await page.waitForFunction(() => !document.querySelector('dialog[open]'));
     assert.equal(saves, 2);
     assert.notEqual(await page.evaluate(() => document.body.style.overflow), 'hidden');
+
     // Trigger a session change in-place to verify per-account query isolation.
     await page.evaluate(async () => {
       const { useAuthStore } = await import('/src/stores/authStore.ts');
@@ -121,7 +148,9 @@ async function main() {
       useAuthStore.getState().setAuth(second, sessionToken);
     });
     await page.waitForSelector('dialog[open]');
-    assert.equal(await page.$eval('dialog input[aria-label="PIN ใหม่ (6 หลัก)"]', element => element.value), '');
+    await page.waitForSelector('dialog [data-pin-digit="1"]');
+    assert.equal(await page.$eval('dialog [role="status"]', element => element.getAttribute('aria-label')), 'กรอกรหัสแล้ว 0 จาก 6 หลัก');
+
     await page.evaluate(async () => {
       const { useAuthStore } = await import('/src/stores/authStore.ts');
       useAuthStore.getState().setAuth({ id: 'merchant', role: 'MERCHANT' }, 'ui.' + btoa(JSON.stringify({ role: 'MERCHANT' })) + '.mock');
@@ -144,11 +173,11 @@ async function main() {
       await page.$eval('#btn-confirm-checkout', button => button.click());
       await page.waitForSelector('#payment-pin-confirmation[open]');
     };
-    const enterPaymentPin = async digits => { for (const digit of digits) await page.click(`[data-pin-digit="${digit}"]`); };
+    const enterPaymentPin = async digits => { for (const digit of digits) await page.click(`#payment-pin-confirmation [data-pin-digit="${digit}"]`); };
     await openPaymentPin();
     assert.equal(paymentAttempts, 0);
     await enterPaymentPin('123'); assert.equal(paymentAttempts, 0);
-    await page.click('[aria-label="กลับไปตรวจสอบยอดชำระ"]');
+    await page.click('#payment-pin-confirmation [aria-label="กลับไปตรวจสอบยอดชำระ"]');
     await page.waitForFunction(() => !document.querySelector('#payment-pin-confirmation[open]'));
     assert.equal(paymentAttempts, 0, 'Cancel must not submit a payment');
     await openPaymentPin();
@@ -158,13 +187,58 @@ async function main() {
     assert.equal(paymentAttempts, 1);
     allowPayment = true; await enterPaymentPin('123456');
     await page.waitForFunction(() => document.querySelector('#payment-pin-confirmation').innerText.includes('กำลังยืนยันการชำระเงิน'));
-    assert.equal(await page.$eval('[data-pin-digit="1"]', element => element.disabled), true);
+    assert.equal(await page.$eval('#payment-pin-confirmation [data-pin-digit="1"]', element => element.disabled), true);
     await page.keyboard.type('123456');
     assert.equal(paymentAttempts, 2, 'Pending authorization must not submit a second request');
     await page.waitForFunction(() => location.pathname.includes('/citizen/slip/'));
+
+    // Verify Wallet Security Settings (Bank-style Change PIN & Forgot PIN)
+    await page.evaluate(async (sessionUser, sessionToken) => {
+      const { useAuthStore } = await import('/src/stores/authStore.ts');
+      useAuthStore.getState().setAuth(sessionUser, sessionToken);
+      history.pushState({}, '', '/citizen/wallet'); window.dispatchEvent(new PopStateEvent('popstate'));
+    }, user, token);
+    await page.waitForSelector('#btn-wallet-security');
+    await page.click('#btn-wallet-security');
+    await page.waitForSelector('#bank-pin-dialog[open]');
+    assert.equal(await page.$eval('#bank-pin-dialog-title', el => el.textContent.trim()), 'กรอกรหัส PIN เดิม');
+    await page.screenshot({ path: path.join(screenshots, 'change-pin-step1.png') });
+
+    // Test Forgot PIN transition from step 1
+    await page.waitForSelector('#btn-forgot-pin');
+    await page.click('#btn-forgot-pin');
+    await page.waitForSelector('#btn-forgot-pin-relogin');
+    assert.ok(await page.$eval('#bank-pin-dialog', el => el.textContent.includes('ลืมรหัส PIN')));
+    await page.screenshot({ path: path.join(screenshots, 'forgot-pin-dialog.png') });
+    // Go back to PIN entry
+    await page.click('#bank-pin-dialog button[aria-label="ย้อนกลับ"]');
+    await page.waitForSelector('#bank-pin-dialog [data-pin-digit="1"]');
+
+    // Enter Step 1: current PIN (123456)
+    const enterChangeDigits = async digits => {
+      for (const digit of digits) await page.click(`#bank-pin-dialog [data-pin-digit="${digit}"]`);
+    };
+    await enterChangeDigits('123456');
+
+    // Step 2: new PIN
+    await page.waitForFunction(() => document.querySelector('#bank-pin-dialog')?.textContent.includes('ขั้นตอนที่ 2 จาก 3'));
+    assert.equal(await page.$eval('#bank-pin-dialog-title', el => el.textContent.trim()), 'ตั้งรหัส PIN ใหม่');
+    await enterChangeDigits('987654');
+
+    // Step 3: confirm PIN (mismatched)
+    await page.waitForFunction(() => document.querySelector('#bank-pin-dialog')?.textContent.includes('ขั้นตอนที่ 3 จาก 3'));
+    assert.equal(await page.$eval('#bank-pin-dialog-title', el => el.textContent.trim()), 'ยืนยันรหัส PIN ใหม่');
+    await enterChangeDigits('111111');
+    await page.waitForFunction(() => document.querySelector('#bank-pin-dialog [role="alert"]')?.textContent.includes('ไม่ตรงกัน'));
+
+    // Step 3: confirm PIN (matching)
+    await enterChangeDigits('987654');
+    await page.waitForFunction(() => !document.querySelector('#bank-pin-dialog[open]'));
+
     assert.deepEqual(errors, []);
     console.log('PASS: automatic first-session setup, required confirmation, retry, close after save, mobile layout and account isolation');
     console.log('PASS: review then full-screen PIN, no payment before six digits, cancel, error retry, pending request protection and success');
+    console.log('PASS: bank-style standalone change PIN, 3-step verification, forgot PIN panel navigation, and mismatch handling');
     console.log(`Screenshots: ${screenshots}`);
   } finally { if (browser) await browser.close(); if (vite) vite.kill(); }
 }

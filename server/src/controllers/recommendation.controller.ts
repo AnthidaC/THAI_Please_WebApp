@@ -7,15 +7,18 @@ import {
   recommendationTrackingService,
   RecommendationTrackingError,
 } from '../services/recommendation-tracking.service';
+import { preferenceService } from '../services/preference.service';
 import { getRecommendationsQuerySchema } from '../validations/recommendation.validation';
 import { recommendationTrackingParamSchema } from '../validations/recommendation-tracking.validation';
 import { sendSuccess, sendError } from '../utils/response';
+import { UserPreferenceInput } from '../utils/recommendation-scoring';
 
 /**
  * ดึงรายการร้านค้าแนะนำรอบตัวผู้ใช้ (AI Near-Me Discovery)
  * GET /api/recommendations/near-me
  * - รองรับทั้ง Authenticated Citizen และ Guest (ตามนโยบายระบบ)
  * - บันทึก Recommendation Served Log เฉพาะผู้ใช้ที่เข้าสู่ระบบ
+ * - โหลด Category Preferences พร้อม preference_weight ของผู้ใช้ที่ล็อกอิน (รักษา Tenant/User Isolation)
  * - แปลงและตรวจสอบ Query Parameter อย่างปลอดภัยด้วย Zod
  */
 export const getNearbyRecommendations = async (req: Request, res: Response): Promise<void> => {
@@ -34,6 +37,25 @@ export const getNearbyRecommendations = async (req: Request, res: Response): Pro
     // หากเป็น Guest จะได้ undefined/null ซึ่งระบบจะส่งคำแนะนำปกติโดยไม่บันทึก Impression Log
     const userId = req.user?.userId || null;
 
+    // โหลดประเภทร้านค้าที่ผู้ใช้สนใจ (Citizen Category Preferences) พร้อม preference_weight สำหรับคำนวณคะแนน
+    let userPreferredCategories: UserPreferenceInput[] | undefined = undefined;
+    if (userId) {
+      try {
+        const userPrefs = await preferenceService.getUserPreferences(userId);
+        if (userPrefs && userPrefs.preferences.length > 0) {
+          userPreferredCategories = userPrefs.preferences.map((p) => ({
+            categoryId: p.categoryId,
+            preferenceWeight: p.preferenceWeight,
+          }));
+        }
+      } catch (prefErr: any) {
+        console.warn(
+          '[RecommendationController] Failed to load user preferences for recommendations:',
+          prefErr?.message
+        );
+      }
+    }
+
     // 3. ประมวลผลค้นหาและจัดอันดับร้านค้า (2-Stage Hybrid + Fallback)
     const result = await recommendationService.getRecommendations({
       userId,
@@ -41,6 +63,7 @@ export const getNearbyRecommendations = async (req: Request, res: Response): Pro
       longitude,
       radiusKm,
       limit,
+      userPreferredCategories,
     });
 
     sendSuccess(res, result, 'ดึงข้อมูลร้านค้าแนะนำสำเร็จ');

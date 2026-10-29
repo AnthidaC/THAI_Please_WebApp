@@ -6,6 +6,7 @@ import { paymentPinService } from './payment-pin.service';
 import { getBangkokDateKey, getDatabaseDateKey, toBangkokDatabaseDate } from '../utils/bangkok-date';
 import { walletService } from './wallet.service';
 import { awardAfterActivity } from './achievements/badgeAwardEngine';
+import { referralService } from './referral.service';
 import {
   fraudService,
   calculateHaversineDistance,
@@ -24,6 +25,7 @@ export interface DiscountValidationResult {
   referrerUserId?: string;
   referralId?: string;
   userRewardId?: string;
+  rewardId?: string;
 }
 
 export interface CopayCalculationResult {
@@ -58,6 +60,7 @@ export interface DynamicQrData {
   estimatedGovCopay: number;
   estimatedCitizenPay: number;
   status?: 'ACTIVE' | 'USED' | 'SUSPENDED' | 'EXPIRED' | 'REJECTED';
+  scannedAt?: string;
   paidTransaction?: {
     transactionId: string;
     customerName: string;
@@ -169,8 +172,12 @@ export class PaymentService {
         if (referral.merchant_id && params.merchantId && referral.merchant_id !== params.merchantId) {
           throw new Error('โค้ดนี้สามารถใช้ได้เฉพาะกับร้านค้าที่กำหนดเท่านั้น');
         }
+        if (referral.merchant_id && params.userId) {
+          await referralService.assertRefereeEligibleAtMerchant(params.userId, referral.merchant_id);
+        }
 
-        const discountAmount = Math.min(params.totalAmount, Number(referral.discount_amount || 30));
+        // UC 2.4.3: ผู้ถูกชวนไม่ได้รับส่วนลด (ได้รับส่วนลด ฿0 เสมอ แม้เป็นโค้ดเก่าที่มี discount_amount)
+        const discountAmount = 0;
         const referrerName = referral.users_referrals_referrer_user_idTousers.full_name;
 
         return {
@@ -179,7 +186,7 @@ export class PaymentService {
           discountAmount,
           discountType: 'FIXED',
           discountSource: 'FRIEND_REFERRAL',
-          sourceDescription: `ส่วนลด ฿${discountAmount.toFixed(0)} จากโค้ดคำชวนของเพื่อน (${referrerName})`,
+          sourceDescription: `โค้ดคำชวนเพื่อนจาก (${referrerName})`,
           referrerName,
           referrerUserId: referral.referrer_user_id,
           referralId: referral.referral_id,
@@ -205,8 +212,17 @@ export class PaymentService {
         if (userReward.status !== 'available') {
           throw new Error('คูปองนี้ถูกใช้งานไปแล้วหรือหมดสิทธิ์');
         }
-        if (userReward.expires_at && new Date(userReward.expires_at).getTime() < Date.now()) {
+        if (userReward.expires_at && new Date(userReward.expires_at).getTime() <= Date.now()) {
           throw new Error('คูปองนี้หมดอายุแล้ว');
+        }
+
+        if (userReward.rewards.quota_limit !== null) {
+          const redeemedCount = await prisma.user_rewards.count({
+            where: { reward_id: userReward.reward_id, status: 'used' },
+          });
+          if (redeemedCount >= userReward.rewards.quota_limit) {
+            throw new Error('รางวัลนี้ถูกใช้ครบโควตาแล้ว');
+          }
         }
 
         let discountVal = 0;
@@ -226,6 +242,7 @@ export class PaymentService {
           discountSource: 'COUPON',
           sourceDescription: `คูปองส่วนลด: ${userReward.rewards.reward_name} (ลด ฿${finalDiscount.toFixed(0)})`,
           userRewardId: userReward.user_reward_id,
+          rewardId: userReward.reward_id,
         };
       }
     } catch (e: any) {
@@ -391,6 +408,8 @@ export class PaymentService {
       shopName: qrData.shopName,
       totalAmount: qrData.totalAmount,
       expiresAt: qrData.expiresAt,
+      scannedAt: qrData.scannedAt || null,
+      isScanned: Boolean(qrData.scannedAt),
       paidTransaction: qrData.paidTransaction || null,
     };
   }
@@ -544,6 +563,36 @@ export class PaymentService {
         walletInfo.periodQuota.enabled ? walletInfo.periodQuota.currentPeriod?.quotaRemaining ?? 0 : undefined
       );
     }
+
+    // เมื่อสแกน QR สำเร็จและเข้าสู่หน้าจอชำระเงิน:
+    // ขยายเวลาทำรายการ (Checkout Window 15 นาที) เพื่อให้ลูกค้ามีเวลาตรวจสอบยอดและกรอก PIN โดยไม่ถูกตัดเวลา 3 นาทีของ QR
+    const CHECKOUT_SESSION_MS = 15 * 60 * 1000;
+    const checkoutExpiresAt = new Date(Date.now() + CHECKOUT_SESSION_MS);
+    qrData.scannedAt = qrData.scannedAt || new Date().toISOString();
+    if (new Date(qrData.expiresAt).getTime() < checkoutExpiresAt.getTime()) {
+      qrData.expiresAt = checkoutExpiresAt.toISOString();
+    }
+    await prisma.payment_qr_codes.updateMany({
+      where: { qr_reference: qrReference, status: 'ACTIVE' },
+      data: {
+        payload: JSON.parse(JSON.stringify(qrData)),
+        expires_at: new Date(qrData.expiresAt),
+      },
+    });
+
+    this.qrPaymentEvents.emit(`scanned:${qrReference}`, {
+      qrReference,
+      status: qrData.status,
+      expiresAt: qrData.expiresAt,
+      scannedAt: qrData.scannedAt,
+    });
+    this.qrPaymentEvents.emit(`merchant:${qrData.merchantId}:scanned`, {
+      qrReference,
+      status: qrData.status,
+      expiresAt: qrData.expiresAt,
+      scannedAt: qrData.scannedAt,
+      totalAmount: qrData.totalAmount,
+    });
 
     return {
       qrData,
@@ -720,6 +769,37 @@ export class PaymentService {
       });
       if (claim.count !== 1) throw new Error('QR นี้ถูกชำระแล้ว ถูกยกเลิก หรือหมดอายุ กรุณาตรวจสอบประวัติ');
 
+      if (discountInfo?.userRewardId) {
+        if (!discountInfo.rewardId) throw new Error('ไม่พบข้อมูลรางวัลของคูปองนี้');
+
+        // Revalidate user_rewards.expires_at atomically inside the checkout transaction
+        const userReward = await tx.user_rewards.findUnique({
+          where: { user_reward_id: discountInfo.userRewardId },
+        });
+        if (!userReward || userReward.user_id !== params.userId || userReward.status !== 'available') {
+          throw new Error('คูปองนี้ถูกใช้งานไปแล้วหรือหมดสิทธิ์');
+        }
+        if (userReward.expires_at && new Date(userReward.expires_at).getTime() <= completedAtDate.getTime()) {
+          throw new Error('คูปองนี้หมดอายุแล้ว');
+        }
+
+        const lockedRewards = await tx.$queryRaw<Array<{ quota_limit: number | null }>>`
+          SELECT quota_limit
+          FROM rewards
+          WHERE reward_id = ${discountInfo.rewardId}::uuid
+          FOR UPDATE
+        `;
+        const reward = lockedRewards[0];
+        if (!reward) throw new Error('ไม่พบรางวัลของคูปองนี้');
+        if (reward.quota_limit !== null) {
+          const redeemedCount = await tx.user_rewards.count({
+            where: { reward_id: discountInfo.rewardId, status: 'used' },
+          });
+          if (redeemedCount >= reward.quota_limit) {
+            throw new Error('รางวัลนี้ถูกใช้ครบโควตาแล้ว');
+          }
+        }
+      }
       await tx.$queryRaw`SELECT wallet_id FROM wallets WHERE wallet_id = ${wallet.walletId}::uuid FOR UPDATE`;
       const currentWallet = await tx.wallets.findUnique({
         where: { wallet_id: wallet.walletId },
@@ -737,6 +817,13 @@ export class PaymentService {
       const today = getBangkokDateKey(completedAtDate);
       const lastReset = getDatabaseDateKey(currentWallet.last_quota_reset_date);
       const dailyQuotaUsed = lastReset === today ? Number(currentWallet.daily_quota_used) : 0;
+      if (
+        Number(currentWallet.balance) !== wallet.balance ||
+        dailyQuotaUsed !== wallet.dailyQuotaUsed ||
+        Number(currentWallet.total_quota_remaining) !== wallet.totalQuotaRemaining
+      ) {
+        throw new Error('ข้อมูลกระเป๋าเงินเปลี่ยนแปลง กรุณาตรวจสอบยอดและลองชำระใหม่');
+      }
       const dailyQuotaRemaining = Math.max(0, Number(currentWallet.campaigns.daily_quota_limit) - dailyQuotaUsed);
       const configuredPeriods = await tx.campaign_periods.findMany({
         where: { campaign_id: currentWallet.campaign_id! },
@@ -823,14 +910,22 @@ export class PaymentService {
         if (redeemed.count !== 1) throw new Error('โค้ดคำชวนถูกใช้งานแล้ว กรุณาตรวจสอบใหม่');
       } else if (discountInfo?.userRewardId) {
         const redeemed = await tx.user_rewards.updateMany({
-          where: { user_reward_id: discountInfo.userRewardId, user_id: params.userId, status: 'available' },
+          where: {
+            user_reward_id: discountInfo.userRewardId,
+            user_id: params.userId,
+            status: 'available',
+            OR: [
+              { expires_at: null },
+              { expires_at: { gt: completedAtDate } },
+            ],
+          },
           data: {
             status: 'used',
             transaction_id: newTx.transaction_id,
             used_at: completedAtDate,
           },
         });
-        if (redeemed.count !== 1) throw new Error('คูปองถูกใช้งานแล้ว กรุณาตรวจสอบใหม่');
+        if (redeemed.count !== 1) throw new Error('คูปองถูกใช้งานแล้วหรือหมดอายุ กรุณาตรวจสอบใหม่');
       }
 
       // 4.4 บันทึกประวัติการเคลื่อนไหวของกระเป๋าเงิน
@@ -889,6 +984,10 @@ export class PaymentService {
     };
     // ส่งสัญญาณ Real-time ผ่าน SSE ไปยังหน้าจอ POS ของร้านค้าทันที (0 ms Latency)
     this.qrPaymentEvents.emit(`payment:${params.qrReference}`, qrData.paidTransaction);
+    this.qrPaymentEvents.emit(`merchant:${qrData.merchantId}:payment`, {
+      qrReference: params.qrReference,
+      paidTransaction: qrData.paidTransaction,
+    });
 
     // หลัง commit เท่านั้น: ประเมิน Badge จากยอดที่บันทึกสำเร็จแล้ว
     // ถ้า Badge ผิดพลาด ระบบจะ log และไม่กระทบผลการชำระเงิน
@@ -903,6 +1002,18 @@ export class PaymentService {
         ['referral_count'],
         'referral conversion'
       );
+      if (discountInfo?.code && params.userId && qrData?.merchantId) {
+        try {
+          await referralService.processReferralConversion({
+            referralCode: discountInfo.code,
+            refereeUserId: params.userId,
+            merchantId: qrData.merchantId,
+            transactionId: transactionRecord.transaction_id,
+          });
+        } catch (refErr) {
+          console.error('[Payment] Referral conversion reward processing error:', refErr);
+        }
+      }
     }
 
     return {
@@ -933,8 +1044,14 @@ export class PaymentService {
    * สำหรับใช้ในการทดสอบ Unit Test หรือจำลองสถานะ QR Code หมดอายุ (ตั้งเวลาถอยหลังเป็นอดีต)
    */
   public async _simulateExpireQr(qrReference: string): Promise<void> {
+    const qrData = await qrStore.get(qrReference);
+    if (qrData) {
+      qrData.status = 'EXPIRED';
+      qrData.expiresAt = new Date(Date.now() - 5000).toISOString();
+      await qrStore.set(qrReference, qrData);
+    }
     await prisma.payment_qr_codes.updateMany({
-      where: { qr_reference: qrReference, status: 'ACTIVE' },
+      where: { qr_reference: qrReference },
       data: { expires_at: new Date(Date.now() - 5000), status: 'EXPIRED' },
     });
   }

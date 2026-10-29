@@ -1,3 +1,5 @@
+import { UserPreferenceInput } from '../utils/recommendation-scoring';
+
 /**
  * โครงสร้างข้อมูลร้านค้าผู้สมัคร (Candidate Merchant) จาก Stage 1
  */
@@ -9,6 +11,7 @@ export interface CandidateMerchant {
   averageRating: number;
   transactionCount24h: number;
   baseScore: number; // คะแนนปกติ 0.00 - 1.00 จาก Rule-based Stage 1
+  categoryId?: string | null; // Canonical Category ID (5 Categories)
   contextKeywordHints?: string[]; // คำสำคัญช่วยวิเคราะห์บริบท (ไม่ใช่หมวดหมู่ยืนยันทางการ)
 }
 
@@ -16,7 +19,7 @@ export interface CandidateMerchant {
  * โครงสร้างข้อมูลคำขอจัดอันดับใหม่ (Reranking Request)
  */
 export interface RerankingRequest {
-  userPreferredCategories?: string[];
+  userPreferredCategories?: UserPreferenceInput[];
   candidates: CandidateMerchant[];
   maxOutputLimit?: number; // จำนวนร้านค้าสูงสุดที่ต้องการคืนกลับ (Default 5)
 }

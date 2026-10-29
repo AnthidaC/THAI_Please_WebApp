@@ -45,7 +45,7 @@ const withDatabaseErrors = async <T>(operation: () => Promise<T>): Promise<T> =>
 export const adminConditionTypeService = {
   list: (filters: { implementation_status?: string; handler_registered?: 'true' | 'false' }) =>
     withDatabaseErrors(async () => {
-      const rows = await prisma.badge_condition_types.findMany({
+      const rows = await prisma.condition_types.findMany({
         where: filters.implementation_status ? { implementation_status: filters.implementation_status } : undefined,
         orderBy: [{ implementation_status: 'asc' }, { display_name: 'asc' }],
         include: conditionTypeInclude,
@@ -57,7 +57,7 @@ export const adminConditionTypeService = {
     }),
 
   get: (id: string) => withDatabaseErrors(async () => {
-    const row = await prisma.badge_condition_types.findUnique({
+    const row = await prisma.condition_types.findUnique({
       where: { condition_type_id: id },
       include: conditionTypeInclude,
     });
@@ -66,7 +66,7 @@ export const adminConditionTypeService = {
   }),
 
   create: (input: ConditionTypeCreateInput) => withDatabaseErrors(async () => {
-    const row = await prisma.badge_condition_types.create({
+    const row = await prisma.condition_types.create({
       data: {
         condition_key: input.conditionKey,
         display_name: input.displayName,
@@ -81,17 +81,17 @@ export const adminConditionTypeService = {
   update: (id: string, input: ConditionTypeUpdateInput) => withDatabaseErrors(async () =>
     prisma.$transaction(async (tx) => {
       const rows = await tx.$queryRaw<Array<{ condition_type_id: string }>>`
-        SELECT condition_type_id FROM public.badge_condition_types
+        SELECT condition_type_id FROM public.condition_types
         WHERE condition_type_id = ${id}::uuid FOR UPDATE
       `;
       if (!rows.length) throw new AdminConditionTypeServiceError('ไม่พบประเภทเงื่อนไขนี้', 404);
 
-      const current = await tx.badge_condition_types.findUniqueOrThrow({ where: { condition_type_id: id } });
+      const current = await tx.condition_types.findUniqueOrThrow({ where: { condition_type_id: id } });
       if (input.implementationStatus === 'ready' && !badgeConditionRegistry.has(current.condition_key)) {
         throw new AdminConditionTypeServiceError('ยังไม่มีตัวประมวลผลในระบบ จึงตั้งสถานะพร้อมใช้งานไม่ได้', 409);
       }
 
-      const row = await tx.badge_condition_types.update({
+      const row = await tx.condition_types.update({
         where: { condition_type_id: id },
         data: {
           ...(input.displayName !== undefined && { display_name: input.displayName }),

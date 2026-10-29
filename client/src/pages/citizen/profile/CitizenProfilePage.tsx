@@ -18,6 +18,11 @@ import {
   CheckCircle2,
   ArrowRight,
   Info,
+  Star,
+  Store,
+  SlidersHorizontal,
+  Users,
+  Gift,
 } from 'lucide-react';
 import { useAuthStore } from '../../../stores/authStore';
 import { APP_ROUTES } from '../../../constants/routes';
@@ -193,62 +198,127 @@ export const CitizenProfilePage: React.FC = () => {
           </div>
         </section>
 
-        {/* ================= 4. ทางไปหน้าเกม (GAME & ACHIEVEMENTS PORTAL) ================= */}
-        <section aria-labelledby="game-portal-heading" className="bg-gradient-to-br from-indigo-900 via-brand-blue to-blue-700 text-white rounded-3xl p-5 sm:p-6 shadow-md shadow-blue-900/10 relative overflow-hidden">
-          {/* Decorative Background Accents */}
-          <div className="absolute top-0 right-0 -mr-8 -mt-8 w-40 h-40 bg-white/10 rounded-full blur-2xl pointer-events-none" />
-          <div className="absolute bottom-0 right-20 -mb-6 w-32 h-32 bg-amber-400/15 rounded-full blur-xl pointer-events-none" />
+        {/* ================= ประวัติการรีวิวของฉัน ================= */}
+        <section aria-label="ประวัติการรีวิวร้านค้า" className="bg-white rounded-2xl border border-hairline p-4 sm:p-5 flex items-center justify-between shadow-xs">
+          <div className="space-y-1">
+            <p className="text-xs text-ink-muted flex items-center gap-1.5">
+              <Star className="h-3.5 w-3.5 text-amber-500 fill-amber-500" />
+              <span>ประวัติการรีวิวของฉัน</span>
+            </p>
+            <p className="text-sm font-semibold text-ink">
+              ร้านค้าที่คุณเคยให้คะแนน
+            </p>
+            <p className="text-[11px] text-ink-muted">
+              ตรวจสอบดาวและความคิดเห็นที่คุณเคยให้แก่ร้านค้าชุมชน
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate(APP_ROUTES.CITIZEN_REVIEW, { state: { from: 'profile' } })}
+            className="px-3.5 py-2 text-xs font-semibold text-ink-body bg-surface-soft hover:bg-gray-200 rounded-pill transition border border-hairline shrink-0"
+          >
+            ดูรีวิว
+          </button>
+        </section>
 
-          <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-5">
-            <div className="space-y-2 max-w-xl">
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-pill bg-white/15 backdrop-blur-md text-amber-300 border border-white/20 text-xs font-bold">
-                <Gamepad2 className="h-3.5 w-3.5 text-amber-300" />
-                <span>ทางไปหน้าเกม &amp; เหรียญตราความสำเร็จ</span>
+        {/* ================= 4. ศูนย์รวมภารกิจและรางวัล (GAMIFICATION CENTER - UC 2.4) ================= */}
+        <section aria-labelledby="gamification-hub-heading" className="bg-white rounded-3xl border border-hairline p-5 sm:p-6 shadow-sm space-y-4">
+          <div className="flex items-center justify-between border-b border-hairline/80 pb-3">
+            <div className="flex items-center gap-2">
+              <div className="p-2 rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 text-white shadow-xs">
+                <Trophy className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 id="gamification-hub-heading" className="text-base sm:text-lg font-bold text-ink flex items-center gap-2">
+                  <span>ศูนย์รวมภารกิจและรางวัล (Gamification Center)</span>
+                  <span className="text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-pill">
+                    UC 2.4
+                  </span>
+                </h2>
+                <p className="text-xs text-ink-muted">
+                  ทำภารกิจ สะสมเหรียญตรา และชวนเพื่อนเพื่อรับสิทธิประโยชน์และคูปองส่วนลดพิเศษ
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* 2.4.1 หน้ากระดานภารกิจและเหรียญตรา (Quests & Badges) [Dev 4] */}
+            <div className="bg-gradient-to-br from-indigo-900 via-brand-blue to-blue-700 text-white rounded-2xl p-5 shadow-sm relative overflow-hidden flex flex-col justify-between space-y-4">
+              <div className="absolute top-0 right-0 -mr-6 -mt-6 w-32 h-32 bg-white/10 rounded-full blur-xl pointer-events-none" />
+              <div className="relative z-10 space-y-2">
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-pill bg-white/15 backdrop-blur-md text-amber-300 border border-white/20 text-[11px] font-bold">
+                  <Gamepad2 className="h-3 w-3 text-amber-300" />
+                  <span>2.4.1 ภารกิจ &amp; ตราประทับ (Quests &amp; Badges)</span>
+                </div>
+                <h3 className="text-base font-bold text-white flex items-center gap-1.5">
+                  <span>ล่าเหรียญตราความสำเร็จ</span>
+                  <Award className="h-4 w-4 text-amber-300" />
+                </h3>
+                <p className="text-xs text-blue-100 leading-relaxed">
+                  สะสมความคืบหน้าจากการสแกนจ่าย Co-pay รีวิวร้านค้าชุมชน และคำชวนเพื่อน เพื่อปลดล็อกตราประทับ
+                </p>
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  <div className="bg-white/15 backdrop-blur-md border border-white/20 px-2.5 py-1 rounded-lg text-xs font-medium">
+                    ปลดล็อกแล้ว: <strong className="text-white font-mono">{isBadgesLoading ? '...' : unlockedBadges.length}</strong> / {badgeList.length} ตรา
+                  </div>
+                  {nextTargetBadge && (
+                    <div className="bg-white/10 backdrop-blur-md border border-white/20 px-2.5 py-1 rounded-lg text-[11px] text-blue-100">
+                      ถัดไป: <strong>{nextTargetBadge.name}</strong>
+                    </div>
+                  )}
+                </div>
               </div>
 
-              <h2 id="game-portal-heading" className="text-lg sm:text-xl font-bold tracking-tight text-white flex items-center gap-2">
-                <span>เกมล่าเหรียญรางวัล &amp; ภารกิจ Co-pay</span>
-                <Trophy className="h-5 w-5 text-amber-300 fill-amber-300/30" />
-              </h2>
-
-              <p className="text-xs sm:text-sm text-blue-100 leading-relaxed">
-                สะสมความคืบหน้าจากการช้อปปิ้งสแกนจ่าย Co-pay รีวิวร้านค้าชุมชน และคำชวนเพื่อน
-                เพื่อปลดล็อกเหรียญตราประจำขั้นและรับสิทธิประโยชน์สุดพิเศษในโครงการ
-              </p>
-
-              {/* Progress Summary Chips */}
-              <div className="flex flex-wrap items-center gap-2.5 pt-2">
-                <div className="bg-white/10 backdrop-blur-md border border-white/20 px-3 py-1.5 rounded-xl text-xs flex items-center gap-2 font-medium">
-                  <Award className="h-4 w-4 text-amber-300" />
-                  <span>
-                    ปลดล็อกแล้ว:{' '}
-                    <strong className="text-white font-mono font-bold">
-                      {isBadgesLoading ? '...' : unlockedBadges.length}
-                    </strong>{' '}
-                    / {badgeList.length} เหรียญตรา
-                  </span>
-                </div>
-
-                {nextTargetBadge && (
-                  <div className="bg-white/10 backdrop-blur-md border border-white/20 px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5 text-blue-100">
-                    <Sparkles className="h-3.5 w-3.5 text-amber-300" />
-                    <span>ภารกิจถัดไป: <strong>{nextTargetBadge.name}</strong></span>
-                  </div>
-                )}
+              <div className="relative z-10 pt-2">
+                <button
+                  type="button"
+                  onClick={() => navigate(APP_ROUTES.CITIZEN_ACHIEVEMENTS)}
+                  className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white text-brand-blue font-bold text-xs sm:text-sm shadow-sm hover:bg-blue-50 active:scale-95 transition"
+                >
+                  <Gamepad2 className="h-4 w-4 text-brand-blue" />
+                  <span>เข้าสู่หน้าภารกิจ &amp; เหรียญตรา</span>
+                  <ArrowRight className="h-4 w-4 text-brand-blue" />
+                </button>
               </div>
             </div>
 
-            {/* CTA Button to Game Page */}
-            <div className="shrink-0">
-              <button
-                type="button"
-                onClick={() => navigate(APP_ROUTES.CITIZEN_ACHIEVEMENTS)}
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-white text-brand-blue font-bold text-sm shadow-lg shadow-black/10 hover:bg-blue-50 active:scale-95 transition"
-              >
-                <Gamepad2 className="h-4 w-4 text-brand-blue" />
-                <span>เข้าสู่หน้าเกม &amp; เหรียญตรา</span>
-                <ArrowRight className="h-4 w-4 text-brand-blue" />
-              </button>
+            {/* 2.4.3 หน้าแชร์โค้ดแนะนำเพื่อน (Merchant Referral) [Dev 3] */}
+            <div className="bg-gradient-to-br from-emerald-800 via-teal-700 to-emerald-600 text-white rounded-2xl p-5 shadow-sm relative overflow-hidden flex flex-col justify-between space-y-4">
+              <div className="absolute top-0 right-0 -mr-6 -mt-6 w-32 h-32 bg-white/10 rounded-full blur-xl pointer-events-none" />
+              <div className="relative z-10 space-y-2">
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-pill bg-white/15 backdrop-blur-md text-emerald-200 border border-white/20 text-[11px] font-bold">
+                  <Users className="h-3 w-3 text-emerald-200" />
+                  <span>2.4.3 แนะนำเพื่อน (Merchant Referral)</span>
+                </div>
+                <h3 className="text-base font-bold text-white flex items-center gap-1.5">
+                  <span>ชวนเพื่อนรับคูปอง ฿40</span>
+                  <Gift className="h-4 w-4 text-amber-300" />
+                </h3>
+                <p className="text-xs text-emerald-50 leading-relaxed">
+                  แชร์รหัสร้านโปรดที่คุณเคยชำระเงินสำเร็จ รับคูปอง ฿40 ทุกๆ 5 ร้านค้าที่แนะนำเพื่อนใหม่สำเร็จ (คูปองมีอายุ 14 วัน)
+                </p>
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  <div className="bg-white/15 backdrop-blur-md border border-white/20 px-2.5 py-1 rounded-lg text-xs font-medium">
+                    รางวัล: <strong className="text-amber-300 font-mono">฿40</strong> ต่อ 5 ร้านสำเร็จ
+                  </div>
+                  <div className="bg-white/10 backdrop-blur-md border border-white/20 px-2.5 py-1 rounded-lg text-[11px] text-emerald-100">
+                    อายุคูปอง: <strong>14 วัน</strong>
+                  </div>
+                </div>
+              </div>
+
+              <div className="relative z-10 pt-2">
+                <button
+                  type="button"
+                  onClick={() => navigate(APP_ROUTES.CITIZEN_REFERRALS)}
+                  className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white text-emerald-800 font-bold text-xs sm:text-sm shadow-sm hover:bg-emerald-50 active:scale-95 transition"
+                >
+                  <Users className="h-4 w-4 text-emerald-800" />
+                  <span>เปิดหน้าระบบชวนเพื่อน (Referral)</span>
+                  <ArrowRight className="h-4 w-4 text-emerald-800" />
+                </button>
+              </div>
             </div>
           </div>
         </section>
@@ -275,7 +345,7 @@ export const CitizenProfilePage: React.FC = () => {
             </span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 pt-1">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 pt-1">
             {/* 5.1 PIN Security Settings */}
             <div className="rounded-2xl border border-hairline bg-surface-soft/60 p-4 space-y-3 flex flex-col justify-between">
               <div className="space-y-1.5">
@@ -336,9 +406,43 @@ export const CitizenProfilePage: React.FC = () => {
                 </button>
               </div>
             </div>
-          </div>
 
-          {/* 5.3 Program Terms & Privacy */}
+            {/* 5.3 Citizen Category Preferences (UC 2.5.3) */}
+            <div className="rounded-2xl border border-hairline bg-surface-soft/60 p-4 space-y-3 flex flex-col justify-between">
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2 text-sm font-bold text-ink">
+                  <SlidersHorizontal className="h-4 w-4 text-brand-blue" />
+                  <span>ประเภทร้านค้าที่สนใจ</span>
+                </div>
+                <p className="text-xs text-ink-muted leading-relaxed">
+                  เลือกประเภทสินค้าและบริการที่คุณชื่นชอบเพื่อช่วยให้ AI แนะนำร้านค้าได้ตรงใจคุณ
+                </p>
+                <div className="pt-1">
+                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold bg-blue-50 text-brand-blue px-2.5 py-0.5 rounded-pill border border-blue-200">
+                    <Sparkles className="h-3 w-3" />
+                    <span>5 หมวดหมู่ทางการ (UC 2.5.3)</span>
+                  </span>
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => navigate(APP_ROUTES.CITIZEN_PREFERENCES)}
+                  className="flex w-full items-center justify-between rounded-2xl border border-hairline bg-white px-4 py-3 text-left text-xs sm:text-sm font-medium text-ink transition hover:bg-surface-soft"
+                >
+                  <div className="flex items-center gap-2">
+                    <Store className="h-4 w-4 text-brand-blue" />
+                    <span>ตั้งค่าหมวดหมู่ที่สนใจ</span>
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-ink-muted" />
+                </button>
+              </div>
+            </div>
+
+            </div>
+
+          {/* 5.5 Program Terms & Privacy */}
           <div className="rounded-2xl border border-hairline p-4 bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-ink-muted">
             <div className="flex items-start gap-2.5">
               <Info className="h-4 w-4 text-brand-blue shrink-0 mt-0.5" />

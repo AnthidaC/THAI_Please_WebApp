@@ -19,6 +19,7 @@
     "test:auth": "tsx --test src/tests/auth-middleware.test.ts src/tests/auth-demo-login.test.ts",
     "test:badges": "tsx src/tests/badge-management.test.ts && tsx src/tests/admin-badge-auth.test.ts && tsx src/tests/badge-award.test.ts && tsx src/tests/condition-type.test.ts",
     "test:periods": "tsx src/tests/campaign-periods.test.ts && tsx src/tests/gamification-period-allocation.test.ts && tsx ../client/tests/campaign-period-dates.test.ts",
+    "test:review": "tsx src/tests/review-audit.test.ts",
     "badges:reconcile": "tsx src/scripts/reconcile-badges.ts"
   },
   "dependencies": {
