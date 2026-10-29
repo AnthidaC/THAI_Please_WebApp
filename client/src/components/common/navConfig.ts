@@ -13,6 +13,7 @@ import {
   LayoutDashboard,
   ClipboardCheck,
   BriefcaseBusiness,
+  Activity,
 } from 'lucide-react';
 import { APP_ROUTES } from '../../constants/routes';
 
@@ -176,6 +177,7 @@ export const NAV_BY_ROLE: Record<'CITIZEN' | 'MERCHANT' | 'ADMIN', RoleNavItem[]
   ],
   ADMIN: [
     { to: APP_ROUTES.ADMIN_DASHBOARD, label: 'แดชบอร์ด', fullLabel: 'แดชบอร์ดผู้ดูแล', icon: LayoutDashboard },
+    { to: APP_ROUTES.ADMIN_SOCIAL_IMPACT, label: 'ผลกระทบสังคม', fullLabel: 'ผลกระทบทางสังคม', icon: Activity },
     { to: APP_ROUTES.ADMIN_FRAUD_ALERTS, label: 'ตรวจทุจริต', fullLabel: 'ตรวจจับทุจริต', icon: ShieldAlert },
     { to: APP_ROUTES.ADMIN_CAMPAIGNS, label: 'แคมเปญ', fullLabel: 'แคมเปญและสิทธิประโยชน์', icon: Megaphone },
   ],

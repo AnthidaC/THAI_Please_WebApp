@@ -34,6 +34,7 @@ export const APP_ROUTES = {
   ADMIN_MERCHANT_APPLICATIONS: '/admin/merchant-applications',
   ADMIN_MERCHANT_LOCATION_REQUESTS: '/admin/merchant-location-requests',
   ADMIN_MERCHANTS: '/admin/merchants',
+  ADMIN_SOCIAL_IMPACT: '/admin/social-impact',
   ADMIN_FRAUD_ALERTS: '/admin/fraud-alerts',
   ADMIN_CAMPAIGNS: '/admin/campaigns',
 } as const;

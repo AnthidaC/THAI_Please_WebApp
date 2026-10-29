@@ -101,8 +101,7 @@ const mockDashboard = ({ level, from, to, parentProvinceCode, parentDistrictCode
 
 export const getImpactDashboard = async (params: DashboardParams): Promise<ImpactDashboardData> => {
   if (!apiEnabled) return mockDashboard(params);
-  const response = await api.get<{ status: 'success'; data: ApiDashboard }>('/v1/dashboard', {
-    params: {
+  const response = await api.get<{ status: 'success'; data: ApiDashboard }>('/admin/social-impact/dashboard', {    params: {
       level: params.level, code: params.parentProvinceCode ?? params.parentDistrictCode,
       provinceName: params.level === 'province' ? undefined : params.features.find((feature) => feature.properties.pro_th)?.properties.pro_th,
       from: params.from, to: params.to,

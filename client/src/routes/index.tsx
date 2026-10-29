@@ -40,6 +40,7 @@ import { AdminFraudAlertsPage } from '../pages/admin/fraud-alerts/AdminFraudAler
 import { AdminMerchantApplicationsPage } from '../pages/admin/merchant-applications/AdminMerchantApplicationsPage';
 import { AdminMerchantLocationRequestsPage } from '../pages/admin/merchant-location-requests/AdminMerchantLocationRequestsPage';
 import { AdminMerchantsPage } from '../pages/admin/merchants/AdminMerchantsPage';
+import { AdminSocialImpactPage } from '../pages/admin/social-impact/AdminSocialImpactPage';
 const AdminCampaignsPage = React.lazy(() => import('../pages/admin/campaigns/AdminCampaignsPage').then((module) => ({ default: module.AdminCampaignsPage })));
 
 export const router = createBrowserRouter([
@@ -102,6 +103,7 @@ export const router = createBrowserRouter([
           { path: APP_ROUTES.ADMIN_MERCHANT_LOCATION_REQUESTS, element: <AdminMerchantLocationRequestsPage /> },
           { path: APP_ROUTES.ADMIN_MERCHANTS, element: <AdminMerchantsPage /> },
           { path: `${APP_ROUTES.ADMIN_MERCHANTS}/:merchantId/edit`, element: <MerchantProfilePage /> },
+          { path: APP_ROUTES.ADMIN_SOCIAL_IMPACT, element: <AdminSocialImpactPage /> },
           {
             path: APP_ROUTES.ADMIN_FRAUD_ALERTS,
             element: <AdminFraudAlertsPage />,
