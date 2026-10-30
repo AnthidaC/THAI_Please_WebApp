@@ -56,5 +56,5 @@ export const SocialImpactBoundaryMap: React.FC<Props> = ({ level, features, area
     return () => { window.removeEventListener('resize', resize); map.remove(); };
   }, [areas, features, level, onSelect]);
 
-  return <div ref={containerRef} className="h-[55vh] min-h-[360px] w-full" role="img" aria-label={`แผนที่ผลกระทบระดับ${level === 'province' ? 'จังหวัด' : level === 'district' ? 'อำเภอ' : 'ตำบล'}`} />;
+  return <div ref={containerRef} className="relative z-0 isolate h-[55vh] min-h-[360px] w-full" role="img" aria-label={`แผนที่ผลกระทบระดับ${level === 'province' ? 'จังหวัด' : level === 'district' ? 'อำเภอ' : 'ตำบล'}`} />;
 };

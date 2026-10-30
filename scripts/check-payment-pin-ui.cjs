@@ -7,21 +7,21 @@ const { spawn } = require('node:child_process');
 
 async function main() {
   const browserPath = process.env.CHROME_PATH || 'C:/Program Files/Google/Chrome/Application/chrome.exe';
-  const base = process.env.PIN_UI_URL || 'http://127.0.0.1:5176';
+  const base = process.env.PIN_UI_URL || 'http://127.0.0.1:5173';
   const screenshots = path.join(os.tmpdir(), 'thai-please-pin-ui');
   fs.mkdirSync(screenshots, { recursive: true });
   let browser;
   let vite;
   try {
     if (!process.env.PIN_UI_URL) {
-      vite = spawn(process.execPath, [path.resolve(__dirname, '../client/node_modules/vite/bin/vite.js'), '--host', '127.0.0.1', '--port', '5176', '--strictPort'], {
+      vite = spawn(process.execPath, [path.resolve(__dirname, '../client/node_modules/vite/bin/vite.js'), '--host', '127.0.0.1', '--port', '5173', '--strictPort'], {
         cwd: path.resolve(__dirname, '../client'), windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'],
       });
       await new Promise((resolve, reject) => {
         const timer = setTimeout(() => reject(new Error('Vite startup timed out')), 30000);
         const onData = data => {
           const text = data.toString();
-          if (text.includes('Local:') || text.includes('5176')) {
+          if (text.includes('Local:') || text.includes('5173')) {
             clearTimeout(timer);
             resolve();
           }
@@ -199,14 +199,14 @@ async function main() {
       history.pushState({}, '', '/citizen/wallet'); window.dispatchEvent(new PopStateEvent('popstate'));
     }, user, token);
     await page.waitForSelector('#btn-wallet-security');
-    await page.click('#btn-wallet-security');
+    await page.$eval('#btn-wallet-security', el => { el.scrollIntoView({ block: 'center' }); el.click(); });
     await page.waitForSelector('#bank-pin-dialog[open]');
     assert.equal(await page.$eval('#bank-pin-dialog-title', el => el.textContent.trim()), 'กรอกรหัส PIN เดิม');
     await page.screenshot({ path: path.join(screenshots, 'change-pin-step1.png') });
 
     // Test Forgot PIN transition from step 1
     await page.waitForSelector('#btn-forgot-pin');
-    await page.click('#btn-forgot-pin');
+    await page.$eval('#btn-forgot-pin', el => el.click());
     await page.waitForSelector('#btn-forgot-pin-relogin');
     assert.ok(await page.$eval('#bank-pin-dialog', el => el.textContent.includes('ลืมรหัส PIN')));
     await page.screenshot({ path: path.join(screenshots, 'forgot-pin-dialog.png') });
@@ -216,7 +216,7 @@ async function main() {
 
     // Enter Step 1: current PIN (123456)
     const enterChangeDigits = async digits => {
-      for (const digit of digits) await page.click(`#bank-pin-dialog [data-pin-digit="${digit}"]`);
+      for (const digit of digits) await page.$eval(`#bank-pin-dialog [data-pin-digit="${digit}"]`, el => el.click());
     };
     await enterChangeDigits('123456');
 

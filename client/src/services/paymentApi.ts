@@ -276,6 +276,9 @@ export interface FraudAlertItem {
   riskScore: number;
   fraudReason: string;
   decision: string;
+  transactionStatus?: string;
+  transactionCreatedAt?: string;
+  transactionCompletedAt?: string | null;
   userLat: number;
   userLon: number;
   merchantLat: number;

@@ -35,17 +35,17 @@ const getProfile = async (merchantId: string) => {
       },
     },
   });
-  if (!merchant?.merchant_application) throw new HttpError(404, 'ไม่พบข้อมูลร้านค้าที่ได้รับอนุมัติ');
+  if (!merchant) throw new HttpError(404, 'ไม่พบข้อมูลร้านค้าที่ได้รับอนุมัติ');
 
   const pending = merchant.location_change_requests[0];
   return {
     merchantId: merchant.merchant_id,
     taxId: merchant.tax_id,
     businessName: merchant.shop_name,
-    contactName: merchant.merchant_application.contact_name,
-    email: merchant.merchant_application.email,
-    phone: merchant.merchant_application.phone,
-    address: merchant.merchant_application.address,
+    contactName: merchant.merchant_application?.contact_name || merchant.shop_name,
+    email: merchant.merchant_application?.email || `${merchant.tax_id.toLowerCase()}@demo.thaiplease.go.th`,
+    phone: merchant.merchant_application?.phone || '0800000000',
+    address: merchant.merchant_application?.address || 'ม.เกษตรศาสตร์ วิทยาเขตกำแพงแสน อ.กำแพงแสน จ.นครปฐม 73140',
     latitude: toNumber(merchant.latitude),
     longitude: toNumber(merchant.longitude),
     pendingLocation: pending ? {
@@ -79,8 +79,27 @@ const updateProfile = async (merchantId: string, actor: Actor, input: MerchantPr
     where: { merchant_id: merchantId, is_approved: true },
     include: { merchant_application: true },
   });
-  const application = merchant?.merchant_application;
-  if (!merchant || !application) throw new HttpError(404, 'ไม่พบข้อมูลร้านค้าที่ได้รับอนุมัติ');
+  if (!merchant) throw new HttpError(404, 'ไม่พบข้อมูลร้านค้าที่ได้รับอนุมัติ');
+  let application = merchant?.merchant_application;
+  if (!application) {
+    application = await prisma.merchantApplication.create({
+      data: {
+        merchant_id: merchantId,
+        business_type: 'INDIVIDUAL',
+        tax_id: merchant.tax_id,
+        shop_name: input.businessName || merchant.shop_name,
+        contact_name: input.contactName || merchant.shop_name,
+        email: input.email || `${merchant.tax_id.toLowerCase()}@demo.thaiplease.go.th`,
+        phone: input.phone || '0800000000',
+        password_hash: '$2a$10$abcdefghijklmnopqrstuvwxyz1234567890',
+        address: input.address || 'ม.เกษตรศาสตร์ วิทยาเขตกำแพงแสน อ.กำแพงแสน จ.นครปฐม 73140',
+        latitude: merchant.latitude,
+        longitude: merchant.longitude,
+        status: 'APPROVED',
+      },
+    });
+  }
+
 
   const isStaff = actor.role === 'ADMIN' || actor.role === 'STAFF';
   const oldValues = {

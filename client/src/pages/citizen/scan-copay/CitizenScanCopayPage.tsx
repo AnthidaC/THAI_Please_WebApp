@@ -794,9 +794,12 @@ export const CitizenScanCopayPage: React.FC = () => {
             );
           }
           sessionStorage.setItem('thai-please:pin-reset-intent', '1');
+          if (user?.id) {
+            sessionStorage.setItem('thai-please:pin-reset-user-id', user.id);
+          }
           sessionStorage.setItem('thai-please:pin-reset-return', APP_ROUTES.CITIZEN_SCAN_COPAY);
           clearAuth();
-          navigate(APP_ROUTES.LOGIN, { state: { from: { pathname: APP_ROUTES.CITIZEN_WALLET } } });
+          navigate(APP_ROUTES.LOGIN, { replace: true, state: { from: { pathname: APP_ROUTES.CITIZEN_SCAN_COPAY } } });
         }}
       />
     </div>

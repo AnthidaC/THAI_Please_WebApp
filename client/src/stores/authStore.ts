@@ -49,8 +49,6 @@ export const useAuthStore = create<AuthState>((set) => ({
     queryClient.clear();
     localStorage.removeItem('auth_token');
     localStorage.removeItem('auth_user');
-    sessionStorage.removeItem('thai-please:pin-reset-intent');
-    sessionStorage.removeItem('thai-please:pin-reset-return');
     set({ user: null, token: null, isAuthenticated: false });
   },
 }));
