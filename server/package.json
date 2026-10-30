@@ -11,6 +11,7 @@
     "db:generate": "npx prisma generate",
     "db:seed:dev": "tsx src/scripts/seed-merchant-onboarding-dev.ts",
     "db:studio": "npx prisma studio",
+    "db:seed:mock-missions": "tsx src/scripts/seed-mock-missions.ts",
     "db:payment:status": "tsx src/scripts/payment-schema.ts",
     "db:payment:apply": "tsx src/scripts/payment-schema.ts --apply",
     "test:engine": "tsx src/tests/payment-engine.test.ts",

@@ -15,6 +15,7 @@ import { DashboardPage } from '../pages/admin/dashboard/DashboardPage';
 import { NotFoundPage } from '../pages/notFound/NotFoundPage';
 import { MerchantHomePage } from '../pages/merchant/home/MerchantHomePage';
 import { MerchantApplicationStatusPage } from '../pages/merchant/home/MerchantApplicationStatusPage';
+import { CitizenHomePage } from '../pages/citizen/CitizenHomePage';
 import { CitizenBenefitsRegisterPage } from '../pages/citizen/CitizenBenefitsRegisterPage';
 import { MerchantProfilePage } from '../pages/merchant/profile/MerchantProfilePage';
 
@@ -24,12 +25,14 @@ import { CitizenScanCopayPage } from '../pages/citizen/scan-copay/CitizenScanCop
 import { CitizenPaymentSlipPage } from '../pages/citizen/scan-copay/CitizenPaymentSlipPage';
 import { CitizenTransactionsPage } from '../pages/citizen/transactions/CitizenTransactionsPage';
 import { CitizenAchievementsPage } from '../pages/citizen/achievements/CitizenAchievementsPage';
+import { CitizenMissionsPage } from '../pages/citizen/missions/CitizenMissionsPage';
 import { CitizenReviewPage } from '../pages/citizen/reviews/CitizenReviewPage';
 import { CitizenNearMePage } from '../pages/citizen/recommendations/CitizenNearMePage';
 import { CitizenMerchantDetailPage } from '../pages/citizen/merchants/CitizenMerchantDetailPage';
 import { CitizenPreferencesPage } from '../pages/citizen/preferences/CitizenPreferencesPage';
 import { CitizenReferralPage } from '../pages/citizen/referrals/CitizenReferralPage';
 import { CitizenProfilePage } from '../pages/citizen/profile/CitizenProfilePage';
+import { CitizenRewardsPage } from '../pages/citizen/rewards/CitizenRewardsPage';
 
 // Merchant Flow Pages
 import { MerchantPosQrPage } from '../pages/merchant/pos-qr/MerchantPosQrPage';
@@ -58,11 +61,14 @@ export const router = createBrowserRouter([
       {
         element: <ProtectedRoute allowedRoles={['USER']} />,
         children: [
+          { path: APP_ROUTES.CITIZEN_HOME, element: <CitizenHomePage /> },
           { path: APP_ROUTES.CITIZEN_WALLET, element: <CitizenWalletPage /> },
+          { path: APP_ROUTES.CITIZEN_REWARDS, element: <CitizenRewardsPage /> },
           { path: APP_ROUTES.CITIZEN_BENEFITS_REGISTER, element: <CitizenBenefitsRegisterPage /> },
           { path: APP_ROUTES.CITIZEN_SCAN_COPAY, element: <CitizenScanCopayPage /> },
           { path: APP_ROUTES.CITIZEN_SLIP, element: <CitizenPaymentSlipPage /> },
           { path: APP_ROUTES.CITIZEN_TRANSACTIONS, element: <CitizenTransactionsPage /> },
+          { path: APP_ROUTES.CITIZEN_MISSIONS, element: <CitizenMissionsPage /> },
           { path: APP_ROUTES.CITIZEN_ACHIEVEMENTS, element: <CitizenAchievementsPage /> },
           { path: APP_ROUTES.CITIZEN_REFERRALS, element: <CitizenReferralPage /> },
           { path: APP_ROUTES.CITIZEN_REVIEW, element: <CitizenReviewPage /> },

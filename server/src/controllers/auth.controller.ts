@@ -80,14 +80,27 @@ export const createAuthLoginHandler = (
 export const authLogin = createAuthLoginHandler(loginWithCredentials);
 
 const testAccountName = /(?:^|[^\p{L}\p{N}])(?:test|demo|synthetic)(?=$|[^\p{L}\p{N}])/iu;
+const selectableDemoMerchantName = 'ร้านข้าวมันไก่ป้าณี (วิสาหกิจชุมชน)';
 const testAccountNameFilter = (field: 'full_name' | 'shop_name') => ({
   OR: ['test', 'demo', 'synthetic'].map((marker) => ({
     [field]: { contains: marker, mode: 'insensitive' as const },
   })),
 });
 
-const findMarkedAccount = <T extends { name: string }>(accounts: T[]): T | null =>
-  accounts.find((account) => testAccountName.test(account.name)) ?? null;
+const demoMerchantNameFilter = () => ({
+  OR: [
+    ...testAccountNameFilter('shop_name').OR,
+    { shop_name: { equals: selectableDemoMerchantName, mode: 'insensitive' as const } },
+  ],
+});
+
+const isDemoMerchantName = (name: string): boolean =>
+  testAccountName.test(name) || name === selectableDemoMerchantName;
+
+const findMarkedAccount = <T extends { name: string }>(
+  accounts: T[],
+  matches = (name: string) => testAccountName.test(name)
+): T | null => accounts.find((account) => matches(account.name)) ?? null;
 
 export const demoLogin = createDemoLoginHandler({
   findAccount: async (role, accountId) => {
@@ -113,16 +126,19 @@ export const demoLogin = createDemoLoginHandler({
         where: {
           ...(accountId ? { merchant_id: accountId } : {}),
           is_approved: true,
-          ...testAccountNameFilter('shop_name'),
+          ...demoMerchantNameFilter(),
         },
         select: { merchant_id: true, shop_name: true, created_at: true },
         orderBy: [{ created_at: 'asc' }, { merchant_id: 'asc' }],
       });
-      const merchant = findMarkedAccount(merchants.map(({ merchant_id, shop_name, created_at }) => ({
-        id: merchant_id,
-        name: shop_name,
-        createdAt: created_at,
-      })));
+      const merchant = findMarkedAccount(
+        merchants.map(({ merchant_id, shop_name, created_at }) => ({
+          id: merchant_id,
+          name: shop_name,
+          createdAt: created_at,
+        })),
+        isDemoMerchantName
+      );
       return merchant;
     }
 
@@ -154,6 +170,32 @@ export const demoLogin = createDemoLoginHandler({
   },
   issueToken: signToken,
 });
+
+export const listDemoMerchants = async (
+  _req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const merchants = await prisma.merchants.findMany({
+      where: {
+        is_approved: true,
+        ...demoMerchantNameFilter(),
+      },
+      select: { merchant_id: true, shop_name: true, created_at: true },
+      orderBy: [{ created_at: 'asc' }, { merchant_id: 'asc' }],
+    });
+
+    res.json({
+      status: 'success',
+      data: merchants
+        .filter(({ shop_name }) => isDemoMerchantName(shop_name))
+        .map(({ merchant_id, shop_name }) => ({ id: merchant_id, name: shop_name })),
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 
 /**
  * 2.5 ดึงข้อมูลโปรไฟล์ผู้ใช้ปัจจุบันพร้อมกระเป๋าเงิน (Citizen Me & Wallet)

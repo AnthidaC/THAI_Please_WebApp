@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, CheckCircle2, Delete, KeyRound, LockKeyhole, LogOut, RefreshCw, ShieldCheck } from 'lucide-react';
 import { setPaymentPin, resetPaymentPin } from '../../services/paymentApi';
 import { usePaymentPinStatus } from '../../hooks/usePaymentPinStatus';
 import { useAuthStore } from '../../stores/authStore';
+import { APP_ROUTES } from '../../constants/routes';
 
 export type BankPinMode = 'setup' | 'change' | 'reset';
 
@@ -31,6 +33,7 @@ export const BankPinDialog = ({
   onSuccess,
   onForgot,
 }: Props) => {
+  const navigate = useNavigate();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const client = useQueryClient();
   const { token, clearAuth } = useAuthStore();
@@ -262,10 +265,13 @@ export const BankPinDialog = ({
           {mandatory && step === 'new' ? (
             <button
               type="button"
-              onClick={clearAuth}
+              onClick={() => {
+                clearAuth();
+                navigate(APP_ROUTES.HOME, { replace: true });
+              }}
               disabled={disabled}
               aria-label="ออกจากระบบ"
-              className="flex items-center gap-1.5 rounded-full py-2 pr-3 text-sm text-ink-muted transition hover:text-ink disabled:opacity-40"
+              className="flex items-center gap-1.5 rounded-full py-2 pr-3 text-sm text-ink-muted transition hover:text-ink disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue focus-visible:ring-offset-2"
             >
               <LogOut className="h-4 w-4" />ออกจากระบบ
             </button>

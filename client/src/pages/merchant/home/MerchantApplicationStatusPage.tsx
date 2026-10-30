@@ -56,7 +56,7 @@ export const MerchantApplicationStatusPage: React.FC = () => {
           {application.status === 'REJECTED' && <div className="sm:col-span-2"><dt className="text-sm text-ink-muted">เหตุผลที่ปฏิเสธ</dt><dd className="mt-1 whitespace-pre-wrap font-semibold">{application.rejectionReason || 'ไม่มีเหตุผลเพิ่มเติมจากระบบ'}</dd></div>}
         </dl>}
 
-        <button type="button" onClick={() => { clearAuth(); navigate(APP_ROUTES.LOGIN, { replace: true }); }} className="inline-flex min-h-11 items-center rounded-pill border border-hairline px-5 font-semibold text-brand-blue hover:bg-surface-soft focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-blue">
+        <button type="button" onClick={() => { clearAuth(); navigate(APP_ROUTES.HOME, { replace: true }); }} className="inline-flex min-h-11 items-center rounded-pill border border-hairline px-5 font-semibold text-brand-blue hover:bg-surface-soft focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-blue">
           ออกจากระบบ
         </button>
       </section>

@@ -49,9 +49,9 @@ export const DashboardPage: React.FC = () => {
               id="btn-dashboard-logout"
               onClick={() => {
                 clearAuth();
-                navigate(APP_ROUTES.HOME);
+                navigate(APP_ROUTES.HOME, { replace: true });
               }}
-              className="inline-flex items-center justify-center space-x-1.5 rounded-pill border border-red-200 bg-red-50 px-4 py-2 text-xs font-semibold text-status-error hover:bg-red-100 transition self-start sm:self-auto shrink-0"
+              className="inline-flex items-center justify-center space-x-1.5 rounded-pill border border-red-200 bg-red-50 px-4 py-2 text-xs font-semibold text-status-error hover:bg-red-100 transition self-start sm:self-auto shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue focus-visible:ring-offset-2"
             >
               <LogOut className="h-3.5 w-3.5" />
               <span>ออกจากระบบ</span>

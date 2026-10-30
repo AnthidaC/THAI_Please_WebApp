@@ -13,10 +13,13 @@ export const APP_ROUTES = {
   PROFILE: '/profile',
 
   // เส้นทางประชาชน (Citizen Flow)
+  CITIZEN_HOME: '/citizen/home',
   CITIZEN_WALLET: '/citizen/wallet',
+  CITIZEN_REWARDS: '/citizen/rewards',
   CITIZEN_SCAN_COPAY: '/citizen/scan-copay',
   CITIZEN_SLIP: '/citizen/slip/:id',
   CITIZEN_TRANSACTIONS: '/citizen/transactions',
+  CITIZEN_MISSIONS: '/citizen/missions',
   CITIZEN_NEAR_ME: '/citizen/near-me',
   CITIZEN_MERCHANT_DETAIL: '/citizen/merchant-detail',
   CITIZEN_REFERRALS: '/citizen/referrals',
@@ -43,7 +46,7 @@ export const APP_ROUTES = {
 export const homeRouteForRole = (role: string | undefined): string => {
   if (role === 'ADMIN') return APP_ROUTES.ADMIN_DASHBOARD;
   if (role === 'MERCHANT') return APP_ROUTES.MERCHANT_POS_QR;
-  if (role === 'USER') return APP_ROUTES.CITIZEN_WALLET;
+  if (role === 'USER') return APP_ROUTES.CITIZEN_HOME;
   return APP_ROUTES.HOME;
 };
 
