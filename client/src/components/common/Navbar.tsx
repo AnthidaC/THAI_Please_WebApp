@@ -49,37 +49,37 @@ export const Navbar: React.FC = () => {
       >
         <div className="flex items-center justify-between max-w-7xl mx-auto gap-2 sm:gap-4">
           {/* Brand Logo & Role Indicator */}
-          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+          <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
             <Link
               to={homePath}
-              className="flex items-center space-x-2 sm:space-x-2.5 select-none min-w-0 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue rounded-xl p-1 -m-1"
+              className="flex items-center space-x-2 sm:space-x-2.5 select-none shrink-0 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue rounded-xl p-1 -m-1"
               aria-label="หน้าแรก ไทยช่วยไทยพลีส"
             >
               <div className="h-8 w-8 sm:h-9 sm:w-9 shrink-0 rounded-2xl bg-gradient-to-br from-brand-blue to-blue-700 flex items-center justify-center text-white font-black text-xs sm:text-sm shadow-sm shadow-blue-500/25 group-hover:scale-105 transition-transform">
                 TP
               </div>
-              <div className="min-w-0 flex flex-col">
-                <span className="font-extrabold text-sm sm:text-base text-ink tracking-tight leading-none group-hover:text-brand-blue transition-colors">
+              <div className="flex flex-col shrink-0">
+                <span className="font-extrabold text-sm sm:text-base text-ink tracking-tight leading-none whitespace-nowrap group-hover:text-brand-blue transition-colors">
                   THAI Please
                 </span>
-                <span className="text-[10px] sm:text-[11px] text-ink-muted mt-0.5 truncate leading-none hidden sm:block">
+                <span className="text-[10px] sm:text-[11px] text-ink-muted mt-0.5 whitespace-nowrap leading-none hidden xl:block">
                   โครงการร่วมจ่าย Co-pay 60/40
                 </span>
               </div>
             </Link>
 
             {/* Role Segmentation Badge (แสดงสถานะ Role ของผู้ใช้ปัจจุบันอย่างชัดเจน) */}
-            <div className="h-5 w-px bg-slate-200 hidden sm:block" aria-hidden="true" />
-            <div className="hidden sm:flex items-center shrink-0">
+            <div className="h-5 w-px bg-slate-200 hidden lg:block" aria-hidden="true" />
+            <div className="hidden lg:flex items-center shrink-0">
               {isAuthenticated ? (
                 <span
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border shadow-2xs transition-colors ${roleConfig.badgeClass}`}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border shadow-2xs transition-colors whitespace-nowrap ${roleConfig.badgeClass}`}
                 >
                   <RoleIcon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                   <span>{roleConfig.portalLabel}</span>
                 </span>
               ) : (
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium text-slate-600 bg-slate-100 border border-slate-200/80">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium text-slate-600 bg-slate-100 border border-slate-200/80 whitespace-nowrap">
                   <span className="h-1.5 w-1.5 rounded-full bg-slate-400" aria-hidden="true" />
                   <span>บริการประชาชนทั่วไป</span>
                 </span>
