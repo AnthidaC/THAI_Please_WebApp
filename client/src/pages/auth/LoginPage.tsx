@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { isAxiosError } from 'axios';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { AlertCircle, ArrowRight, CheckCircle, LoaderCircle, LogIn, ShieldAlert, Store, User } from 'lucide-react';
+import { AlertCircle, ArrowRight, CheckCircle, LoaderCircle, LogIn, ShieldAlert } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import { APP_ROUTES, homeRouteForRole } from '../../constants/routes';
 import { authApi, type DemoLoginAccount } from '../../services/authApi';
@@ -287,9 +287,14 @@ export const LoginPage: React.FC = () => {
                   name="demoCitizenId"
                   value={selectedCitizenId}
                   onChange={(event) => {
-                    setSelectedCitizenId(event.target.value);
+                    const citizenId = event.target.value;
+                    setSelectedCitizenId(citizenId);
                     setErrorMsg(null);
-                    setDemoFillStatus(null);
+                    if (citizenId) {
+                      fillDemoCredentials(demoCitizens.find(({ id }) => id === citizenId));
+                    } else {
+                      setDemoFillStatus(null);
+                    }
                   }}
                   disabled={isLoading || isLoadingCitizens || demoCitizens.length === 0}
                   className="min-h-11 w-full rounded-lg border border-hairline bg-white px-3 py-2 text-sm text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-200 disabled:cursor-not-allowed disabled:bg-surface-soft disabled:text-ink-muted"
@@ -324,16 +329,6 @@ export const LoginPage: React.FC = () => {
                   </p>
                 )}
               </div>
-              <button
-                type="button"
-                id="btn-demo-citizen"
-                onClick={() => fillDemoCredentials(demoCitizens.find(({ id }) => id === selectedCitizenId))}
-                disabled={isLoading || isLoadingCitizens || !selectedCitizenId || !!citizenLoadError}
-                className="group flex min-h-11 w-full items-center justify-between rounded-xl border border-hairline bg-white p-3 text-left text-xs font-medium text-ink transition hover:border-blue-200 hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-200 motion-reduce:transition-none disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <span className="flex items-center gap-3"><User className="h-4 w-4 text-brand-blue" aria-hidden="true" />กรอกข้อมูลเข้าสู่ระบบประชาชนทดสอบ</span>
-                <ArrowRight className="h-4 w-4 text-ink-muted transition group-hover:translate-x-1 motion-reduce:transition-none" aria-hidden="true" />
-              </button>
             </div>
             <div className="space-y-3 rounded-xl border border-emerald-100 bg-emerald-50/40 p-3">
               <div>
@@ -345,9 +340,14 @@ export const LoginPage: React.FC = () => {
                   name="demoMerchantId"
                   value={selectedMerchantId}
                   onChange={(event) => {
-                    setSelectedMerchantId(event.target.value);
+                    const merchantId = event.target.value;
+                    setSelectedMerchantId(merchantId);
                     setErrorMsg(null);
-                    setDemoFillStatus(null);
+                    if (merchantId) {
+                      fillDemoCredentials(demoMerchants.find(({ id }) => id === merchantId));
+                    } else {
+                      setDemoFillStatus(null);
+                    }
                   }}
                   disabled={isLoading || isLoadingMerchants || demoMerchants.length === 0}
                   className="min-h-11 w-full rounded-lg border border-hairline bg-white px-3 py-2 text-sm text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200 disabled:cursor-not-allowed disabled:bg-surface-soft disabled:text-ink-muted"
@@ -382,16 +382,6 @@ export const LoginPage: React.FC = () => {
                   </p>
                 )}
               </div>
-              <button
-                type="button"
-                id="btn-demo-merchant"
-                onClick={() => fillDemoCredentials(demoMerchants.find(({ id }) => id === selectedMerchantId))}
-                disabled={isLoading || isLoadingMerchants || !selectedMerchantId || !!merchantLoadError}
-                className="group flex min-h-11 w-full items-center justify-between rounded-xl border border-hairline bg-white p-3 text-left text-xs font-medium text-ink transition hover:border-emerald-200 hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200 motion-reduce:transition-none disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <span className="flex items-center gap-3"><Store className="h-4 w-4 text-emerald-700" aria-hidden="true" />กรอกข้อมูลเข้าสู่ระบบร้านค้าทดสอบ</span>
-                <ArrowRight className="h-4 w-4 text-ink-muted transition group-hover:translate-x-1 motion-reduce:transition-none" aria-hidden="true" />
-              </button>
             </div>
             <div className="space-y-2">
               <button
