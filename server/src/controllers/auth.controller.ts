@@ -197,6 +197,29 @@ export const listDemoMerchants = async (
   }
 };
 
+export const listDemoCitizens = async (
+  _req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const citizens = await prisma.user.findMany({
+      where: testAccountNameFilter('full_name'),
+      select: { user_id: true, full_name: true },
+      orderBy: [{ created_at: 'asc' }, { user_id: 'asc' }],
+    });
+
+    res.json({
+      status: 'success',
+      data: citizens
+        .filter(({ full_name }) => testAccountName.test(full_name))
+        .map(({ user_id, full_name }) => ({ id: user_id, name: full_name })),
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 /**
  * 2.5 ดึงข้อมูลโปรไฟล์ผู้ใช้ปัจจุบันพร้อมกระเป๋าเงิน (Citizen Me & Wallet)
  */
