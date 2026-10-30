@@ -103,9 +103,10 @@ export const DashboardPage: React.FC = () => {
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Citizen Wallet */}
-            <div
+            <button
+              type="button"
               onClick={() => navigate(APP_ROUTES.CITIZEN_WALLET)}
-              className="rounded-card border border-hairline bg-white p-5 shadow-sm hover:shadow-md transition cursor-pointer group flex flex-col justify-between"
+              className="w-full appearance-none text-left rounded-card border border-hairline bg-white p-5 shadow-sm hover:shadow-md transition cursor-pointer group flex flex-col justify-between focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-blue"
             >
               <div>
                 <div className="h-10 w-10 rounded-xl bg-brand-blue-light text-brand-blue flex items-center justify-center mb-3 group-hover:scale-105 transition">
@@ -120,12 +121,13 @@ export const DashboardPage: React.FC = () => {
                 <span>เปิดกระเป๋าเงิน</span>
                 <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition" />
               </div>
-            </div>
+            </button>
 
             {/* Merchant POS */}
-            <div
+            <button
+              type="button"
               onClick={() => navigate(APP_ROUTES.MERCHANT_POS_QR)}
-              className="rounded-card border border-hairline bg-white p-5 shadow-sm hover:shadow-md transition cursor-pointer group flex flex-col justify-between"
+              className="w-full appearance-none text-left rounded-card border border-hairline bg-white p-5 shadow-sm hover:shadow-md transition cursor-pointer group flex flex-col justify-between focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-blue"
             >
               <div>
                 <div className="h-10 w-10 rounded-xl bg-emerald-50 text-status-success flex items-center justify-center mb-3 group-hover:scale-105 transition">
@@ -140,12 +142,13 @@ export const DashboardPage: React.FC = () => {
                 <span>เปิดระบบหน้าร้าน</span>
                 <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition" />
               </div>
-            </div>
+            </button>
 
             {/* Admin Fraud */}
-            <div
+            <button
+              type="button"
               onClick={() => navigate(APP_ROUTES.ADMIN_FRAUD_ALERTS)}
-              className="rounded-card border border-red-100 bg-white p-5 shadow-sm hover:shadow-md transition cursor-pointer group flex flex-col justify-between"
+              className="w-full appearance-none text-left rounded-card border border-red-100 bg-white p-5 shadow-sm hover:shadow-md transition cursor-pointer group flex flex-col justify-between focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-blue"
             >
               <div>
                 <div className="h-10 w-10 rounded-xl bg-red-50 text-status-error flex items-center justify-center mb-3 group-hover:scale-105 transition">
@@ -160,7 +163,7 @@ export const DashboardPage: React.FC = () => {
                 <span>เปิดแดชบอร์ดตรวจทุจริต</span>
                 <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition" />
               </div>
-            </div>
+            </button>
 
             {user?.role === 'ADMIN' && (
               <Link

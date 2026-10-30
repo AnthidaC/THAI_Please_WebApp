@@ -56,7 +56,7 @@ export const getOwnMerchantApplicationStatus = async (): Promise<OwnMerchantAppl
 
 export const submitMerchantApplication = async (formData: FormData): Promise<{ applicationId: string; status: string }> => {
   const response = await api.post<ApiResponse<{ applicationId: string; status: string }>>(
-    '/merchant/applications',
+    '/merchant-applications/applications',
     formData,
     { headers: { 'Content-Type': 'multipart/form-data' } }
   );
@@ -64,14 +64,14 @@ export const submitMerchantApplication = async (formData: FormData): Promise<{ a
 };
 
 export const getMerchantApplications = async (status: MerchantApplicationStatus): Promise<MerchantApplication[]> => {
-  const response = await api.get<ApiResponse<MerchantApplication[]>>('/merchant/applications', {
+  const response = await api.get<ApiResponse<MerchantApplication[]>>('/merchant-applications/applications', {
     params: { status },
   });
   return response.data.data;
 };
 
 export const getMerchantApplication = async (id: string): Promise<MerchantApplication> => {
-  const response = await api.get<ApiResponse<MerchantApplication>>(`/merchant/applications/${id}`);
+  const response = await api.get<ApiResponse<MerchantApplication>>(`/merchant-applications/applications/${id}`);
   return response.data.data;
 };
 
@@ -81,7 +81,7 @@ export const decideMerchantApplication = async (
   note?: string
 ): Promise<{ applicationId: string; status: MerchantApplicationStatus; merchantId?: string }> => {
   const response = await api.patch<ApiResponse<{ applicationId: string; status: MerchantApplicationStatus; merchantId?: string }>>(
-    `/merchant/applications/${id}/decision`,
+    `/merchant-applications/applications/${id}/decision`,
     { action, note }
   );
   return response.data.data;

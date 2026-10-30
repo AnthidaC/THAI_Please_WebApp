@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import cookieParser from 'cookie-parser';
 import routes from './routes';
+import { restrictScopedTokens } from './middlewares/auth.middleware';
 import { errorHandler } from './middlewares/error.middleware';
 import { env } from './config/env';
 
@@ -23,6 +24,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 // API routes
+app.use(restrictScopedTokens);
 app.use('/api', routes);
 
 // Global Error Handler

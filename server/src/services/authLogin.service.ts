@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { comparePassword, hashPassword } from '../utils/bcrypt';
 import { HttpError } from '../utils/http-error';
-import { signToken } from '../utils/jwt';
+import { signMerchantApplicationStatusToken, signToken } from '../utils/jwt';
 import { prisma } from '../utils/prisma';
 
 export interface LoginUser {
@@ -69,10 +69,10 @@ const findMerchantCredential: CredentialProvider = async (email) => {
     passwordHash: application.password_hash,
     authenticate: async () => {
       if (application.status === 'PENDING') {
-        return { kind: 'application-status', applicationStatus: 'PENDING', token: signToken({ userId: application.application_id, role: 'MERCHANT_APPLICATION_STATUS', tokenScope: 'MERCHANT_APPLICATION_STATUS' }) };
+        return { kind: 'application-status', applicationStatus: 'PENDING', token: signMerchantApplicationStatusToken(application.application_id) };
       }
       if (application.status === 'REJECTED') {
-        return { kind: 'application-status', applicationStatus: 'REJECTED', token: signToken({ userId: application.application_id, role: 'MERCHANT_APPLICATION_STATUS', tokenScope: 'MERCHANT_APPLICATION_STATUS' }) };
+        return { kind: 'application-status', applicationStatus: 'REJECTED', token: signMerchantApplicationStatusToken(application.application_id) };
       }
       if (application.status !== 'APPROVED' || !application.merchant?.is_approved) {
         throw new HttpError(401, INVALID_CREDENTIALS_MESSAGE);
