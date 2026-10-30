@@ -30,13 +30,16 @@ import { APP_ROUTES } from '../../constants/routes';
  *    - แนะนำร้าน (Recommended Stores)
  *    - โปรไฟล์ส่วนตัว (Profile)
  *
- * 2. MERCHANT (ร้านค้า): 3 เมนู
+ * 2. MERCHANT (ร้านค้า): 5 เมนู
+ *    - หน้าแรก / ภาพรวมร้านค้า (Merchant Home)
  *    - สถิติยอดขาย (Sales History)
  *    - สร้าง QR รับเงิน (POS Dynamic QR) - ปุ่มหลักตรงกลาง
  *    - รีวิวร้านค้า (Merchant Reviews)
+ *    - ข้อมูลร้านค้าและหมุดพิกัด (Merchant Profile)
  *
- * 3. ADMIN (ผู้ดูแลระบบ): 3 เมนู
+ * 3. ADMIN (ผู้ดูแลระบบ): 4 เมนู
  *    - แดชบอร์ดผู้ดูแล (Admin Dashboard)
+ *    - ผลกระทบทางสังคม (Social Impact)
  *    - ตรวจจับทุจริต (Fraud Alerts & Monitoring)
  *    - แคมเปญและสิทธิประโยชน์ (Campaigns & Missions)
  *
@@ -171,9 +174,11 @@ export const NAV_BY_ROLE: Record<'CITIZEN' | 'MERCHANT' | 'ADMIN', RoleNavItem[]
     { to: APP_ROUTES.PROFILE, label: 'โปรไฟล์', fullLabel: 'โปรไฟล์ส่วนตัว', icon: User },
   ],
   MERCHANT: [
+    { to: APP_ROUTES.MERCHANT_HOME, label: 'หน้าแรก', fullLabel: 'ภาพรวมร้านค้า', icon: Home },
     { to: APP_ROUTES.MERCHANT_SALES, label: 'ยอดขาย', fullLabel: 'สถิติยอดขาย', icon: TrendingUp },
     { to: APP_ROUTES.MERCHANT_POS_QR, label: 'สร้าง QR', fullLabel: 'สร้าง QR รับเงิน', icon: QrCode, primary: true },
-    { to: APP_ROUTES.MERCHANT_REVIEWS, label: 'รีวิวร้านค้า', fullLabel: 'รีวิวร้านค้า', icon: Star },
+    { to: APP_ROUTES.MERCHANT_REVIEWS, label: 'รีวิว', fullLabel: 'รีวิวร้านค้า', icon: Star },
+    { to: APP_ROUTES.MERCHANT_PROFILE, label: 'ข้อมูลร้าน', fullLabel: 'ข้อมูลร้านค้า', icon: Store },
   ],
   ADMIN: [
     { to: APP_ROUTES.ADMIN_DASHBOARD, label: 'แดชบอร์ด', fullLabel: 'แดชบอร์ดผู้ดูแล', icon: LayoutDashboard },

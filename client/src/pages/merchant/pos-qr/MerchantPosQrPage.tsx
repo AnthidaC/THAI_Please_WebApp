@@ -762,11 +762,11 @@ export const MerchantPosQrPage: React.FC = () => {
                   setPaidInfo(null);
                   setIsCustomerScanned(false);
                 } else {
-                  navigate(APP_ROUTES.HOME);
+                  navigate(APP_ROUTES.MERCHANT_HOME);
                 }
               }}
               className="flex items-center space-x-1.5 rounded-pill px-2.5 py-1.5 text-xs font-medium text-ink-muted bg-surface-soft hover:bg-gray-200 hover:text-ink transition border border-hairline shrink-0"
-              title={qrResult ? 'กลับหน้าตั้งยอด' : 'หน้าหลัก'}
+              title={qrResult ? 'กลับหน้าตั้งยอด' : 'หน้าแรก'}
             >
               <ArrowLeft className="h-4 w-4" />
               <span className="hidden sm:inline">{qrResult ? 'กลับหน้าตั้งยอด' : 'หน้าหลัก'}</span>

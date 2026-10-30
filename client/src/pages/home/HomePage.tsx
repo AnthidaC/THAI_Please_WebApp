@@ -11,8 +11,10 @@ const audienceIcons = [UserRound, Store, ShieldCheck];
 export const HomePage: React.FC = () => {
   const { isAuthenticated, user } = useAuthStore();
 
-  if (isAuthenticated && user?.role === 'USER') {
-    return <Navigate to={APP_ROUTES.CITIZEN_HOME} replace />;
+  if (isAuthenticated) {
+    if (user?.role === 'USER') return <Navigate to={APP_ROUTES.CITIZEN_HOME} replace />;
+    if (user?.role === 'MERCHANT') return <Navigate to={APP_ROUTES.MERCHANT_HOME} replace />;
+    if (user?.role === 'ADMIN' || user?.role === 'STAFF') return <Navigate to={APP_ROUTES.ADMIN_DASHBOARD} replace />;
   }
 
   return (
