@@ -24,11 +24,13 @@ import {
   getBuyerHistory,
 } from '../../../services/paymentApi';
 import { APP_ROUTES } from '../../../constants/routes';
+import { useAuthStore } from '../../../stores/authStore';
 import { WalletSecuritySettings } from '../../../components/payment/WalletSecuritySettings';
 
 export const CitizenWalletPage: React.FC = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const user = useAuthStore((state) => state.user);
   const [showTopUpModal, setShowTopUpModal] = useState(false);
   const [topUpAmount, setTopUpAmount] = useState<number>(300);
   const [topUpSuccessMsg, setTopUpSuccessMsg] = useState<string | null>(null);
@@ -41,15 +43,17 @@ export const CitizenWalletPage: React.FC = () => {
     isError: isWalletError,
     refetch: refetchWallet,
   } = useQuery({
-    queryKey: ['wallet-balance'],
+    queryKey: ['wallet-balance', user?.id],
     queryFn: getWalletBalance,
+    enabled: Boolean(user?.id),
     refetchInterval: 10000,
   });
 
   // ดึงประวัติธุรกรรมล่าสุด
   const { data: transactions, isLoading: isTxLoading } = useQuery({
-    queryKey: ['buyer-history'],
+    queryKey: ['buyer-history', user?.id],
     queryFn: getBuyerHistory,
+    enabled: Boolean(user?.id),
   });
 
   // Mutation สำหรับเติมเงิน

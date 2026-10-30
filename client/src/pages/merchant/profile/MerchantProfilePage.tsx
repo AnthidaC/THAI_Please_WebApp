@@ -136,10 +136,10 @@ export const MerchantProfilePage: React.FC = () => {
       <main className="mx-auto max-w-4xl space-y-5 px-4 py-5 sm:px-6">
         {!isStaff && user?.role === 'MERCHANT' && <MerchantStoreOnboarding merchantId={profile?.merchantId ?? user.id} />}
         <Link
-          to={isStaff ? APP_ROUTES.ADMIN_MERCHANTS : APP_ROUTES.MERCHANT_POS_QR}
+          to={isStaff ? APP_ROUTES.ADMIN_MERCHANTS : APP_ROUTES.MERCHANT_HOME}
           className="inline-flex items-center gap-2 text-xs font-semibold text-brand-blue hover:underline"
         >
-          <ArrowLeft className="h-4 w-4" /> {isStaff ? 'กลับไปรายชื่อร้านค้า' : 'กลับหน้าร้านค้า'}
+          <ArrowLeft className="h-4 w-4" /> {isStaff ? 'กลับไปรายชื่อร้านค้า' : 'กลับหน้าแรกของร้านค้า'}
         </Link>
 
         {profileQuery.isLoading ? (

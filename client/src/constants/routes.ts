@@ -44,7 +44,7 @@ export const APP_ROUTES = {
 
 export const homeRouteForRole = (role: string | undefined): string => {
   if (role === 'ADMIN') return APP_ROUTES.ADMIN_DASHBOARD;
-  if (role === 'MERCHANT') return APP_ROUTES.MERCHANT_POS_QR;
+  if (role === 'MERCHANT') return APP_ROUTES.MERCHANT_HOME;
   if (role === 'USER') return APP_ROUTES.CITIZEN_HOME;
   return APP_ROUTES.HOME;
 };

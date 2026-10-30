@@ -21,6 +21,7 @@ import {
 } from '../../../services/reviewApi';
 import { getBuyerHistory, TransactionItem } from '../../../services/paymentApi';
 import { APP_ROUTES } from '../../../constants/routes';
+import { useAuthStore } from '../../../stores/authStore';
 
 /**
  * ข้อมูลการทำรายการที่ส่งต่อผ่าน React Router Navigation State
@@ -129,6 +130,8 @@ export const CitizenReviewPage: React.FC = () => {
     retry: 1,
   });
 
+  const user = useAuthStore((state) => state.user);
+
   // 1.2 ดึงประวัติธุรกรรมเพื่อหารายการที่รอการรีวิว (Eligible Pending Reviews) เฉพาะเมื่อไม่มี transactionId
   const {
     data: buyerHistory,
@@ -138,9 +141,9 @@ export const CitizenReviewPage: React.FC = () => {
     refetch: refetchBuyerHistory,
     isFetching: isFetchingBuyerHistory,
   } = useQuery<TransactionItem[]>({
-    queryKey: ['buyer-history'],
+    queryKey: ['buyer-history', user?.id],
     queryFn: getBuyerHistory,
-    enabled: !transactionId,
+    enabled: !transactionId && Boolean(user?.id),
     retry: 1,
   });
 

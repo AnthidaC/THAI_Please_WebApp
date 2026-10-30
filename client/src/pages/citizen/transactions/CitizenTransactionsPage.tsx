@@ -16,15 +16,18 @@ import {
 } from 'lucide-react';
 import { getBuyerHistory } from '../../../services/paymentApi';
 import { APP_ROUTES } from '../../../constants/routes';
+import { useAuthStore } from '../../../stores/authStore';
 
 export const CitizenTransactionsPage: React.FC = () => {
   const navigate = useNavigate();
+  const user = useAuthStore((state) => state.user);
   const [filterType, setFilterType] = useState<'ALL' | 'SUCCESS'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
 
   const { data: transactions, isLoading, refetch, isFetching } = useQuery({
-    queryKey: ['buyer-history'],
+    queryKey: ['buyer-history', user?.id],
     queryFn: getBuyerHistory,
+    enabled: Boolean(user?.id),
   });
 
   const filtered = useMemo(() => {
