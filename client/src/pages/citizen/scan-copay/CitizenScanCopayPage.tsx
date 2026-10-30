@@ -459,11 +459,14 @@ export const CitizenScanCopayPage: React.FC = () => {
                                         handleApplyDiscount(reward.rewardCode);
                                       }}
                                       className="flex w-full min-w-0 items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-white px-3 py-2.5 text-left transition hover:border-emerald-400 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-60"
-                                      aria-label={`ใช้คูปอง ${reward.rewardName} ลด ${discountLabel}`}
+                                      aria-label={`ใช้คูปอง ${reward.rewardName} ลด ${discountLabel}; ยอดซื้อขั้นต่ำ ${reward.minimumSpend.toLocaleString('th-TH')} บาท`}
                                     >
                                       <span className="min-w-0 space-y-0.5">
                                         <span className="block truncate text-xs font-semibold text-ink">{reward.rewardName}</span>
                                         <span className="block truncate font-mono text-[10px] text-ink-muted" translate="no">{reward.rewardCode}</span>
+                                        <span className="block text-[10px] text-ink-muted">
+                                          ยอดซื้อขั้นต่ำ {reward.minimumSpend > 0 ? `฿${reward.minimumSpend.toLocaleString('th-TH', { maximumFractionDigits: 2 })}` : 'ไม่มีขั้นต่ำ'}
+                                        </span>
                                         {reward.expiresAt && (
                                           <span className="block text-[10px] text-ink-muted">
                                             ใช้ได้ถึง {new Intl.DateTimeFormat('th-TH', {

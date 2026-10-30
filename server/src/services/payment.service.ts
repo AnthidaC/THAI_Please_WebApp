@@ -225,6 +225,11 @@ export class PaymentService {
           }
         }
 
+        const minimumSpend = Number(userReward.rewards.minimum_spend);
+        if (params.totalAmount < minimumSpend) {
+          throw new Error(`ยอดซื้อขั้นต่ำสำหรับคูปองนี้คือ ฿${minimumSpend.toLocaleString('th-TH', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`);
+        }
+
         let discountVal = 0;
         if (userReward.rewards.discount_type === 'percent') {
           const pct = Number(userReward.rewards.discount_value || 10);
@@ -903,6 +908,7 @@ export class PaymentService {
           where: { referral_id: discountInfo.referralId, status: { not: 'redeemed' } },
           data: {
             status: 'redeemed',
+            referred_user_id: params.userId,
             transaction_id: newTx.transaction_id,
             converted_at: completedAtDate,
           },
@@ -1011,7 +1017,7 @@ export class PaymentService {
             transactionId: transactionRecord.transaction_id,
           });
         } catch (refErr) {
-          console.error('[Payment] Referral conversion reward processing error:', refErr);
+          console.error('[Payment] Referral conversion processing error:', refErr);
         }
       }
     }

@@ -56,6 +56,7 @@ export interface RewardRecord {
   type: string;
   discountType: string | null;
   discountValue: string | null;
+  minimumSpend: string;
   quotaLimit: number | null;
   validDays: number;
   status: RecordStatus;

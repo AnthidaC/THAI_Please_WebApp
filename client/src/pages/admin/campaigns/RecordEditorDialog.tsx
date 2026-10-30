@@ -84,6 +84,7 @@ const initialValues = (resource: ManagedResource, record: ManagedRecord | null):
       type: item?.type ?? 'discount',
       discountType: item?.discountType ?? 'percent',
       discountValue: item?.discountValue ?? '10',
+      minimumSpend: item?.minimumSpend ?? '100',
       quotaLimit: item?.quotaLimit == null ? '' : String(item.quotaLimit),
       validDays: String(item?.validDays ?? 30),
       status: item?.status ?? 'active',
@@ -414,6 +415,7 @@ export const RecordEditorDialog: React.FC<Props> = ({ resource, record, campaign
           rewardType: values.type,
           discountType: values.type === 'discount' ? values.discountType : null,
           discountValue: values.type === 'discount' ? Number(values.discountValue) : null,
+          minimumSpend: Number(values.minimumSpend),
           quotaLimit: values.quotaLimit === '' ? null : Number(values.quotaLimit),
           validDays: Number(values.validDays),
           status: values.status,
@@ -614,6 +616,9 @@ export const RecordEditorDialog: React.FC<Props> = ({ resource, record, campaign
                   </>}
                   <Field label="อายุรางวัล (วัน)" htmlFor="reward-validity"><input id="reward-validity" required type="number" min="1" max="3650" value={values.validDays} onChange={(event) => set('validDays', event.target.value)} className={inputClass} /></Field>
                 </div>
+                <Field label="ยอดซื้อขั้นต่ำ (บาท)" htmlFor="reward-minimum-spend" hint="ยอดซื้อก่อนหักส่วนลดที่ต้องถึงจึงจะใช้คูปองได้">
+                  <input id="reward-minimum-spend" name="minimumSpend" autoComplete="off" required type="number" min="0" max="99999999.99" step="0.01" inputMode="decimal" value={values.minimumSpend} onChange={(event) => set('minimumSpend', event.target.value)} className={inputClass} />
+                </Field>
                 <Field label="โควตาใช้รวม (ครั้ง)" htmlFor="reward-quota-limit" hint="นับรวมทุกผู้ใช้ · เว้นว่างเพื่อไม่จำกัด · 0 คือปิดการใช้">
                   <input id="reward-quota-limit" name="quotaLimit" aria-describedby="reward-quota-limit-hint" autoComplete="off" type="number" min="0" max="2147483647" step="1" inputMode="numeric" value={values.quotaLimit} onChange={(event) => set('quotaLimit', event.target.value)} className={inputClass} placeholder="เช่น 100…" />
                 </Field>

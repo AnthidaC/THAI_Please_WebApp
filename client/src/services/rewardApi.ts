@@ -8,6 +8,7 @@ export interface CitizenReward {
   rewardType: string;
   discountType: string | null;
   discountValue: number | null;
+  minimumSpend: number;
   status: string;
   earnedAt: string;
   expiresAt: string | null;

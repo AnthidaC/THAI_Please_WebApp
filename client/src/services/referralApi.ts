@@ -34,29 +34,11 @@ export interface ReferralFriendItem {
   redeemedAt: string | null;
 }
 
-export interface EarnedCouponItem {
-  userRewardId: string;
-  rewardCode: string;
-  rewardName: string;
-  discountValue: number;
-  status: string;
-  earnedAt: string;
-  expiresAt: string | null;
-  usedAt: string | null;
-  rewardType: 'REFEREE_WELCOME_10' | 'REFERRER_MILESTONE_40';
-}
-
 export interface ReferralStatsSummary {
   totalInvited: number;
   totalRedeemed: number;
   totalPending: number;
   totalSuccessfulMerchants?: number;
-  milestonesCompleted: number;
-  currentMilestoneProgress: number; // 0..4
-  milestoneTarget: number; // 5
-  merchantsNeededForNextMilestone?: number;
-  friendsNeededForNextMilestone: number;
-  totalMilestoneCouponsEarned: number;
 }
 
 export interface ReferralStatsResult {
@@ -68,7 +50,6 @@ export interface ReferralStatsResult {
   isMerchantCredited?: boolean;
   summary: ReferralStatsSummary;
   invitedFriends: ReferralFriendItem[];
-  earnedCoupons: EarnedCouponItem[];
 }
 
 export interface ReferralValidationState {
@@ -104,7 +85,7 @@ export const referralApi = {
   },
 
   /**
-   * ดึงสถิติคำชวนเพื่อน ไมล์สโตน และรายการเพื่อน
+   * ดึงสถิติและรายการคำชวนเพื่อน
    */
   async getReferralStats(merchantId?: string): Promise<ReferralStatsResult> {
     const params: Record<string, string> = {};

@@ -1,5 +1,6 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
 import { getMyMissions } from '../../services/missionApi';
 import {
@@ -34,13 +35,25 @@ export const CitizenMissionPortal: React.FC = () => {
     queryFn: getMyMissions,
     enabled: isCitizen,
   });
-  const [conditionFilter, setConditionFilter] = useState('all');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const conditionFilter = searchParams.get('condition') ?? 'all';
   const missions = data ?? [];
   const conditionOptions = useMemo(() => {
     const options = new Map<string, string>();
     missions.forEach((mission) => options.set(mission.conditionType, mission.conditionDisplayName));
+    if (!options.has('referral_count')) {
+      options.set('referral_count', 'จำนวนผู้ใช้ที่แนะนำ');
+    }
     return Array.from(options.entries());
   }, [missions]);
+  const updateConditionFilter = (condition: string) => {
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      if (condition === 'all') next.delete('condition');
+      else next.set('condition', condition);
+      return next;
+    }, { replace: true });
+  };
   const filteredMissions = useMemo(
     () => conditionFilter === 'all'
       ? missions
@@ -111,7 +124,7 @@ export const CitizenMissionPortal: React.FC = () => {
                   id="mission-condition-filter"
                   name="missionCondition"
                   value={conditionFilter}
-                  onChange={(event) => setConditionFilter(event.target.value)}
+                  onChange={(event) => updateConditionFilter(event.target.value)}
                   className="min-h-11 w-full rounded-lg border border-hairline bg-white px-3 py-2 text-sm text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-200"
                 >
                   <option value="all">ทุกประเภท</option>
@@ -130,7 +143,7 @@ export const CitizenMissionPortal: React.FC = () => {
                 <p className="text-sm text-ink-muted">ไม่พบภารกิจประเภทนี้</p>
                 <button
                   type="button"
-                  onClick={() => setConditionFilter('all')}
+                  onClick={() => updateConditionFilter('all')}
                   className="mt-3 inline-flex min-h-11 items-center justify-center rounded-lg px-4 text-sm font-semibold text-brand-blue hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-200"
                 >
                   แสดงทุกภารกิจ
