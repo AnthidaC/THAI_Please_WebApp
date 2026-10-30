@@ -62,10 +62,22 @@ export const DashboardPage: React.FC = () => {
     staleTime: 15000,
   });
 
-  // 3. ดึงจำนวนคำขอเปิดร้านค้าที่รอการพิจารณา (Pending Merchant Applications)
+  // 3. ดึงจำนวนคำขอเปิดร้านค้าแยกตามสถานะ (PENDING / APPROVED / REJECTED)
   const { data: pendingApplications, isLoading: isAppsLoading } = useQuery({
     queryKey: ['admin-dashboard-pending-apps'],
     queryFn: () => getMerchantApplications('PENDING'),
+    staleTime: 30000,
+  });
+
+  const { data: approvedApplications } = useQuery({
+    queryKey: ['admin-dashboard-approved-apps'],
+    queryFn: () => getMerchantApplications('APPROVED'),
+    staleTime: 30000,
+  });
+
+  const { data: rejectedApplications } = useQuery({
+    queryKey: ['admin-dashboard-rejected-apps'],
+    queryFn: () => getMerchantApplications('REJECTED'),
     staleTime: 30000,
   });
 
@@ -96,6 +108,8 @@ export const DashboardPage: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['admin-dashboard-social-summary'] }),
       queryClient.invalidateQueries({ queryKey: ['admin-dashboard-fraud-dossiers'] }),
       queryClient.invalidateQueries({ queryKey: ['admin-dashboard-pending-apps'] }),
+      queryClient.invalidateQueries({ queryKey: ['admin-dashboard-approved-apps'] }),
+      queryClient.invalidateQueries({ queryKey: ['admin-dashboard-rejected-apps'] }),
       queryClient.invalidateQueries({ queryKey: ['admin-dashboard-approved-merchants'] }),
       queryClient.invalidateQueries({ queryKey: ['admin-dashboard-location-requests'] }),
       queryClient.invalidateQueries({ queryKey: ['admin-dashboard-campaigns'] }),
@@ -121,6 +135,9 @@ export const DashboardPage: React.FC = () => {
   const pendingChecksCount = fraudData?.summary.totalPendingChecks ?? 20;
 
   const pendingAppsCount = pendingApplications?.length ?? 0;
+  const approvedAppsCount = approvedApplications?.length ?? 0;
+  const rejectedAppsCount = rejectedApplications?.length ?? 0;
+
   const approvedMerchantsCount = approvedMerchants?.length ?? 14;
   const pendingLocationCount = locationRequests?.length ?? 0;
   const activeCampaignsCount = campaigns?.length ?? 3;
@@ -417,7 +434,7 @@ export const DashboardPage: React.FC = () => {
               </div>
             </div>
 
-            {/* 2. การอนุมัติและทะเบียนร้านค้า */}
+            {/* 2. การอนุมัติและทะเบียนร้านค้า (พร้อมการ์ดสรุปใบสมัคร PENDING / APPROVED / REJECTED) */}
             <div className="rounded-card border border-slate-200/90 bg-white p-5 sm:p-6 shadow-xs hover:shadow-md transition flex flex-col justify-between">
               <div>
                 <div className="flex items-center justify-between mb-3.5">
@@ -443,18 +460,43 @@ export const DashboardPage: React.FC = () => {
                   พิจารณาอนุมัติคำขอลงทะเบียนร้านค้าใหม่ ตรวจสอบเอกสารจดทะเบียนพาณิชย์ และพิจารณาคำขอย้ายพิกัดหน้าร้านค้าเพื่อให้ประชาชนใช้งาน Co-pay ได้อย่างถูกต้อง
                 </p>
 
-                <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
-                  <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/70">
-                    <span className="text-[11px] text-ink-muted block">ร้านค้าที่อนุมัติแล้ว</span>
-                    <span className="text-sm font-bold font-mono text-ink mt-0.5 block">
-                      {approvedMerchantsCount} ร้านค้า
-                    </span>
+                {/* สรุปสถานะใบสมัครร้านค้า (PENDING / APPROVED / REJECTED) */}
+                <div className="mt-4 space-y-2.5">
+                  <div className="text-[11px] font-semibold text-ink-muted">สรุปสถานะใบสมัครร้านค้า</div>
+                  <div className="grid grid-cols-3 gap-2 text-xs">
+                    <div className="p-2.5 rounded-xl bg-amber-50/80 border border-amber-200/80">
+                      <span className="text-[10px] sm:text-[11px] text-amber-800 font-medium block">รอตรวจ (PENDING)</span>
+                      <span className="text-sm sm:text-base font-bold font-mono text-amber-900 mt-0.5 block">
+                        {pendingAppsCount}
+                      </span>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-emerald-50/80 border border-emerald-200/80">
+                      <span className="text-[10px] sm:text-[11px] text-emerald-800 font-medium block">อนุมัติ (APPROVED)</span>
+                      <span className="text-sm sm:text-base font-bold font-mono text-emerald-900 mt-0.5 block">
+                        {approvedAppsCount}
+                      </span>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-rose-50/80 border border-rose-200/80">
+                      <span className="text-[10px] sm:text-[11px] text-rose-800 font-medium block">ปฏิเสธ (REJECTED)</span>
+                      <span className="text-sm sm:text-base font-bold font-mono text-rose-900 mt-0.5 block">
+                        {rejectedAppsCount}
+                      </span>
+                    </div>
                   </div>
-                  <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/70">
-                    <span className="text-[11px] text-ink-muted block">คำขอย้ายพิกัดรอตรวจ</span>
-                    <span className="text-sm font-bold font-mono text-ink mt-0.5 block">
-                      {pendingLocationCount} รายการ
-                    </span>
+
+                  <div className="grid grid-cols-2 gap-2 text-xs pt-0.5">
+                    <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/70">
+                      <span className="text-[11px] text-ink-muted block">ร้านค้าที่เปิดบริการแล้ว</span>
+                      <span className="text-xs sm:text-sm font-bold font-mono text-ink mt-0.5 block">
+                        {approvedMerchantsCount} ร้านค้า
+                      </span>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/70">
+                      <span className="text-[11px] text-ink-muted block">คำขอย้ายพิกัดรอตรวจ</span>
+                      <span className="text-xs sm:text-sm font-bold font-mono text-ink mt-0.5 block">
+                        {pendingLocationCount} รายการ
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -565,8 +607,6 @@ export const DashboardPage: React.FC = () => {
 
           </div>
         </section>
-
-
 
         {/* ========================================================= */}
         {/* 5. SECURITY AUDIT & SESSION DIAGNOSTICS */}

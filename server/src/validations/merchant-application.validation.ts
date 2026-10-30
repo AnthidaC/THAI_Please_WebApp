@@ -1,6 +1,15 @@
 import { z } from 'zod';
 import { CANONICAL_CATEGORY_IDS, CanonicalCategoryId } from '../constants/categories';
 
+const toCoordinate = (val: unknown) => {
+  if (typeof val === 'number') return val;
+  if (typeof val === 'string' && val.trim() !== '') {
+    const parsed = Number(val);
+    return Number.isNaN(parsed) ? val : parsed;
+  }
+  return val;
+};
+
 /**
  * Validation schema สำหรับการลงทะเบียนใบสมัครร้านค้า (Merchant Application / Onboarding)
  * ออกแบบสำหรับ Dev 1 โดยผนวกรวม category_id เข้าสู่กระบวนการกรอกข้อมูลอย่างปลอดภัย
@@ -32,17 +41,21 @@ export const merchantApplicationSchema = z.object({
     .min(1, 'กรุณาระบุชื่อผู้ติดต่อ')
     .max(100, 'ชื่อผู้ติดต่อต้องมีความยาวไม่เกิน 100 ตัวอักษร'),
   categoryId: z
-    .string()
-    .trim()
-    .transform((val) => val.toUpperCase())
-    .refine(
-      (val): val is CanonicalCategoryId => (CANONICAL_CATEGORY_IDS as readonly string[]).includes(val),
-      {
-        message: `รหัสหมวดหมู่ไม่ถูกต้อง ต้องเป็นหนึ่งใน: ${CANONICAL_CATEGORY_IDS.join(', ')}`,
-      }
-    )
-    .nullable()
-    .optional(),
+    .preprocess(
+      (val) => (typeof val === 'string' && val.trim() === '' ? undefined : val),
+      z
+        .string()
+        .trim()
+        .transform((val) => val.toUpperCase())
+        .refine(
+          (val): val is CanonicalCategoryId => (CANONICAL_CATEGORY_IDS as readonly string[]).includes(val),
+          {
+            message: `รหัสหมวดหมู่ไม่ถูกต้อง ต้องเป็นหนึ่งใน: ${CANONICAL_CATEGORY_IDS.join(', ')}`,
+          }
+        )
+        .nullable()
+        .optional()
+    ),
   email: z
     .string({ error: 'กรุณาระบุอีเมล' })
     .trim()
@@ -62,14 +75,20 @@ export const merchantApplicationSchema = z.object({
     .trim()
     .min(5, 'ที่อยู่ต้องมีความยาวอย่างน้อย 5 ตัวอักษร')
     .max(500, 'ที่อยู่ต้องมีความยาวไม่เกิน 500 ตัวอักษร'),
-  latitude: z
-    .number({ error: 'กรุณาระบุพิกัดละติจูด' })
-    .min(-90, 'ละติจูดต้องอยู่ระหว่าง -90 ถึง 90')
-    .max(90, 'ละติจูดต้องอยู่ระหว่าง -90 ถึง 90'),
-  longitude: z
-    .number({ error: 'กรุณาระบุพิกัดลองจิจูด' })
-    .min(-180, 'ลองจิจูดต้องอยู่ระหว่าง -180 ถึง 180')
-    .max(180, 'ลองจิจูดต้องอยู่ระหว่าง -180 ถึง 180'),
+  latitude: z.preprocess(
+    toCoordinate,
+    z
+      .number({ error: 'กรุณาระบุพิกัดละติจูด' })
+      .min(-90, 'ละติจูดต้องอยู่ระหว่าง -90 ถึง 90')
+      .max(90, 'ละติจูดต้องอยู่ระหว่าง -90 ถึง 90')
+  ),
+  longitude: z.preprocess(
+    toCoordinate,
+    z
+      .number({ error: 'กรุณาระบุพิกัดลองจิจูด' })
+      .min(-180, 'ลองจิจูดต้องอยู่ระหว่าง -180 ถึง 180')
+      .max(180, 'ลองจิจูดต้องอยู่ระหว่าง -180 ถึง 180')
+  ),
 })
   .superRefine((value, context) => {
     if (!value.businessName && !value.shopName) {

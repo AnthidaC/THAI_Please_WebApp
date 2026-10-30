@@ -37,8 +37,9 @@ import { APP_ROUTES } from '../../constants/routes';
  *    - รีวิวร้านค้า (Merchant Reviews)
  *    - ข้อมูลร้านค้าและหมุดพิกัด (Merchant Profile)
  *
- * 3. ADMIN (ผู้ดูแลระบบ): 4 เมนู
+ * 3. ADMIN (ผู้ดูแลระบบ): 5 เมนู
  *    - แดชบอร์ดผู้ดูแล (Admin Dashboard)
+ *    - อนุมัติร้านค้า (Merchant Applications Approval)
  *    - ผลกระทบทางสังคม (Social Impact)
  *    - ตรวจจับทุจริต (Fraud Alerts & Monitoring)
  *    - แคมเปญและสิทธิประโยชน์ (Campaigns & Missions)
@@ -182,6 +183,7 @@ export const NAV_BY_ROLE: Record<'CITIZEN' | 'MERCHANT' | 'ADMIN', RoleNavItem[]
   ],
   ADMIN: [
     { to: APP_ROUTES.ADMIN_DASHBOARD, label: 'แดชบอร์ด', fullLabel: 'แดชบอร์ดผู้ดูแล', icon: LayoutDashboard },
+    { to: APP_ROUTES.ADMIN_MERCHANT_APPLICATIONS, label: 'อนุมัติร้านค้า', fullLabel: 'อนุมัติร้านค้า', icon: ClipboardCheck },
     { to: APP_ROUTES.ADMIN_SOCIAL_IMPACT, label: 'ผลกระทบสังคม', fullLabel: 'ผลกระทบทางสังคม', icon: Activity },
     { to: APP_ROUTES.ADMIN_FRAUD_ALERTS, label: 'ตรวจทุจริต', fullLabel: 'ตรวจจับทุจริต', icon: ShieldAlert },
     { to: APP_ROUTES.ADMIN_CAMPAIGNS, label: 'แคมเปญ', fullLabel: 'แคมเปญและสิทธิประโยชน์', icon: Megaphone },

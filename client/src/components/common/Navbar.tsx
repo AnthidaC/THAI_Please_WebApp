@@ -1,9 +1,11 @@
 import React from 'react';
 import { NavLink, Link, useNavigate, useLocation } from 'react-router-dom';
 import { LogOut, LogIn } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '../../stores/authStore';
 import { APP_ROUTES, homeRouteForRole } from '../../constants/routes';
 import { ROLE_CONFIG, getNavItems, resolveNavRole } from './navConfig';
+import { getMerchantApplications } from '../../services/merchantApplicationApi';
 
 export const Navbar: React.FC = () => {
   const navigate = useNavigate();
@@ -20,6 +22,16 @@ export const Navbar: React.FC = () => {
   const roleConfig = ROLE_CONFIG[role];
   const isMerchant = role === 'MERCHANT';
   const isAdmin = role === 'ADMIN';
+
+  // ดึงจำนวนคำขอร้านค้ารอตรวจสอบจริง (PENDING) เฉพาะเมื่อเป็น ADMIN และเข้าสู่ระบบแล้ว (ห้ามใช้ค่า static)
+  const { data: pendingApplications } = useQuery({
+    queryKey: ['navbar-pending-merchant-applications'],
+    queryFn: () => getMerchantApplications('PENDING'),
+    enabled: isAdmin && isAuthenticated,
+    staleTime: 30000,
+    refetchInterval: 60000,
+  });
+  const pendingAppsCount = pendingApplications?.length ?? 0;
 
   // ลิงก์โปรไฟล์ของผู้ใช้งานตามบทบาท (ร้านค้า -> ข้อมูลร้านค้า, ประชาชน -> โปรไฟล์ส่วนตัว)
   const profileRoute = isMerchant
@@ -121,6 +133,12 @@ export const Navbar: React.FC = () => {
                       <span className="hidden lg:inline">{fullLabel ?? label}</span>
                       <span className="lg:hidden">{label}</span>
                     </span>
+                    {/* Badge จำนวนใบสมัครรออนุมัติสำหรับผู้ดูแลระบบ */}
+                    {isAdmin && to === APP_ROUTES.ADMIN_MERCHANT_APPLICATIONS && pendingAppsCount > 0 && (
+                      <span className="ml-1 inline-flex items-center justify-center min-w-4 h-4 px-1 text-[10px] font-bold text-white bg-amber-500 rounded-full shadow-2xs">
+                        {pendingAppsCount > 99 ? '99+' : pendingAppsCount}
+                      </span>
+                    )}
                   </NavLink>
                 ))}
               </div>
@@ -264,7 +282,14 @@ export const Navbar: React.FC = () => {
                   }`
                 }
               >
-                <Icon className="h-5 w-5" aria-hidden="true" />
+                <div className="relative">
+                  <Icon className="h-5 w-5" aria-hidden="true" />
+                  {isAdmin && to === APP_ROUTES.ADMIN_MERCHANT_APPLICATIONS && pendingAppsCount > 0 && (
+                    <span className="absolute -top-1 -right-2 inline-flex items-center justify-center min-w-4 h-4 px-1 text-[9px] font-bold text-white bg-amber-500 rounded-full">
+                      {pendingAppsCount > 99 ? '99+' : pendingAppsCount}
+                    </span>
+                  )}
+                </div>
                 <span className="text-[10px] mt-0.5 whitespace-nowrap">{label}</span>
               </NavLink>
             )

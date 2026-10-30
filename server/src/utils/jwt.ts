@@ -26,7 +26,7 @@ export const isAllowedMerchantApplicationStatusRequest = (
 
 export const signToken = (
   payload: TokenPayload,
-  expiresIn: jwt.SignOptions['expiresIn'] = env.JWT_EXPIRES_IN,
+  expiresIn: jwt.SignOptions['expiresIn'] = env.JWT_EXPIRES_IN as jwt.SignOptions['expiresIn'],
 ): string => {
   return jwt.sign(payload, env.JWT_SECRET, {
     expiresIn,

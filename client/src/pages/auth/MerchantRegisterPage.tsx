@@ -12,6 +12,10 @@ type DocumentKey = 'storePhoto' | 'bankProof' | 'businessRegistration' | 'compan
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const ACCEPTED_FILE_TYPES = ['image/jpeg', 'image/png', 'application/pdf'];
 
+// FEATURE FLAG: ควบคุมการบังคับอัปโหลดเอกสารร้านค้า
+// Default = true (บังคับเอกสาร) ยกเว้นกำหนด VITE_MERCHANT_REQUIRE_DOCUMENTS=false ชัดเจนใน .env
+const REQUIRE_DOCUMENTS = import.meta.env.VITE_MERCHANT_REQUIRE_DOCUMENTS !== 'false';
+
 export const MerchantRegisterPage: React.FC = () => {
   const [businessType, setBusinessType] = useState<BusinessType>('INDIVIDUAL');
   const [businessName, setBusinessName] = useState('');
@@ -69,8 +73,8 @@ export const MerchantRegisterPage: React.FC = () => {
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const missingCommonDocuments = !documents.storePhoto || !documents.bankProof;
-    const missingCompanyCertificate = businessType === 'JURISTIC' && !documents.companyCertificate;
+    const missingCommonDocuments = REQUIRE_DOCUMENTS && (!documents.storePhoto || !documents.bankProof);
+    const missingCompanyCertificate = REQUIRE_DOCUMENTS && businessType === 'JURISTIC' && !documents.companyCertificate;
 
     if (missingCommonDocuments || missingCompanyCertificate || !taxId.match(/^\d{13}$/) || !addressSelection?.subdistrictCode) {
       setErrorMessage(!addressSelection?.subdistrictCode
@@ -106,9 +110,10 @@ export const MerchantRegisterPage: React.FC = () => {
       setDocuments({});
       setIsSubmitted(true);
     } catch (error) {
-      const message = isAxiosError<{ message?: string }>(error)
-        ? error.response?.data?.message
+      const data = isAxiosError<{ message?: string; errors?: Array<{ field: string; message: string }> }>(error)
+        ? error.response?.data
         : undefined;
+      const message = data?.errors?.map((e) => e.message).join(', ') || data?.message;
       setErrorMessage(message || 'ส่งคำขอไม่สำเร็จ กรุณาลองอีกครั้ง');
     } finally {
       setIsSubmitting(false);
@@ -263,24 +268,27 @@ export const MerchantRegisterPage: React.FC = () => {
           </div>
         </section>
 
-        <section className="space-y-3 border-t border-hairline pt-4">
-          <div>
-            <h3 className="text-sm font-bold text-ink">เอกสารประกอบการตรวจสอบ</h3>
-            <p className="mt-1 text-[11px] leading-relaxed text-ink-muted">
-              เอกสารตัวอย่างที่แนะนำ อาจต้องปรับตามหลักเกณฑ์ของโครงการและประเภทร้านค้า
-            </p>
-          </div>
-          {documentField('storePhoto', 'รูปหน้าร้านหรือจุดขายที่เห็นชื่อร้าน', true, 'ควรเป็นภาพปัจจุบันที่ช่วยยืนยันว่ามีสถานที่ประกอบการจริง')}
-          {documentField('bankProof', 'หลักฐานบัญชีธนาคารหรือ PromptPay ในนามผู้สมัคร/กิจการ', true)}
-          {businessType === 'INDIVIDUAL'
-            ? documentField('businessRegistration', 'ทะเบียนพาณิชย์หรือหลักฐานการประกอบกิจการ')
-            : (
-              <>
-                {documentField('companyCertificate', 'หนังสือรับรองนิติบุคคลฉบับล่าสุด', true)}
-                {documentField('authorization', 'เอกสารผู้มีอำนาจลงนามหรือหนังสือมอบอำนาจ')}
-              </>
-            )}
-        </section>
+        {/* FEATURE FLAG: ซ่อนส่วนอัปโหลดเอกสารชั่วคราวเมื่อ REQUIRE_DOCUMENTS=false (เปิดคืนโดยตั้ง VITE_MERCHANT_REQUIRE_DOCUMENTS=true ใน .env) */}
+        {REQUIRE_DOCUMENTS && (
+          <section className="space-y-3 border-t border-hairline pt-4">
+            <div>
+              <h3 className="text-sm font-bold text-ink">เอกสารประกอบการตรวจสอบ</h3>
+              <p className="mt-1 text-[11px] leading-relaxed text-ink-muted">
+                เอกสารตัวอย่างที่แนะนำ อาจต้องปรับตามหลักเกณฑ์ของโครงการและประเภทร้านค้า
+              </p>
+            </div>
+            {documentField('storePhoto', 'รูปหน้าร้านหรือจุดขายที่เห็นชื่อร้าน', true, 'ควรเป็นภาพปัจจุบันที่ช่วยยืนยันว่ามีสถานที่ประกอบการจริง')}
+            {documentField('bankProof', 'หลักฐานบัญชีธนาคารหรือ PromptPay ในนามผู้สมัคร/กิจการ', true)}
+            {businessType === 'INDIVIDUAL'
+              ? documentField('businessRegistration', 'ทะเบียนพาณิชย์หรือหลักฐานการประกอบกิจการ')
+              : (
+                <>
+                  {documentField('companyCertificate', 'หนังสือรับรองนิติบุคคลฉบับล่าสุด', true)}
+                  {documentField('authorization', 'เอกสารผู้มีอำนาจลงนามหรือหนังสือมอบอำนาจ')}
+                </>
+              )}
+          </section>
+        )}
 
         <button type="submit" disabled={isSubmitting} className="w-full rounded-pill bg-brand-blue py-3 text-sm font-semibold text-white shadow-md transition hover:bg-brand-blue-hover disabled:opacity-60">
           {isSubmitting ? 'กำลังส่งข้อมูลและเอกสาร...' : 'ส่งคำขอสมัครร้านค้า'}
