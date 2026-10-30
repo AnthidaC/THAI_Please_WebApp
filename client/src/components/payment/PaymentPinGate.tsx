@@ -77,7 +77,7 @@ export const PaymentPinGate = () => {
       mode={isReset ? 'reset' : 'setup'}
       mandatory={!isReset}
       onClose={isReset ? handleCloseReset : undefined}
-      onSuccess={isReset ? handleResetSuccess : undefined}
+      onSuccess={handleResetSuccess}
     />
   );
 };

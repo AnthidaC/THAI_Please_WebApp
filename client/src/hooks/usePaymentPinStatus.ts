@@ -4,7 +4,8 @@ import { getPaymentPinStatus } from '../services/paymentApi';
 
 export const usePaymentPinStatus = () => {
   const { token, user, isAuthenticated } = useAuthStore();
-  const isPaymentCitizen = Boolean(isAuthenticated && token && user?.role === 'USER');
+  const role = user?.role?.toUpperCase();
+  const isPaymentCitizen = Boolean(isAuthenticated && token && (role === 'USER' || role === 'CITIZEN'));
   const query = useQuery({
     queryKey: ['payment-pin-status', token],
     queryFn: getPaymentPinStatus,
