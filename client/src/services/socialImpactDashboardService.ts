@@ -1,24 +1,38 @@
 import api from '../lib/axios';
 
 export type ImpactLevel = 'province' | 'district' | 'subdistrict';
+
 export interface ImpactArea {
   code: string;
   name: string;
   provinceCode: string;
+  districtCode?: string;
   totalCirculation: number;
   benefitedMerchantDays: number;
 }
-export interface ImpactDay { date: string; totalCirculation: number; }
+
+export interface ImpactDay {
+  date: string;
+  totalCirculation: number;
+  governmentContribution?: number;
+  citizenContribution?: number;
+  transactionCount?: number;
+}
+
 export interface ImpactDashboardData {
   source: 'mock' | 'daily_social_impact_metrics';
   level: ImpactLevel;
   areas: ImpactArea[];
   timeline: ImpactDay[];
   totalCirculation: number;
+  governmentContribution?: number;
+  citizenContribution?: number;
   benefitedMerchantDays: number;
+  transactionCount?: number;
   secondaryCityShare: number | null;
   detailUnavailable?: boolean;
 }
+
 export interface BoundaryProperties extends Record<string, unknown> {
   pro_code?: string;
   pro_th?: string;
@@ -27,12 +41,17 @@ export interface BoundaryProperties extends Record<string, unknown> {
   tam_code?: string;
   tam_th?: string;
 }
+
 export interface BoundaryFeature {
   type: 'Feature';
   properties: BoundaryProperties;
   geometry: GeoJSON.Geometry;
 }
-export interface BoundaryCollection { type: 'FeatureCollection'; features: BoundaryFeature[]; }
+
+export interface BoundaryCollection {
+  type: 'FeatureCollection';
+  features: BoundaryFeature[];
+}
 
 export const loadThailandBoundaries = async (level: ImpactLevel): Promise<BoundaryCollection> => {
   const data = level === 'province'
@@ -54,21 +73,37 @@ interface DashboardParams {
   features: BoundaryFeature[];
 }
 
-interface ApiArea { province?: string | null; totalCirculation: number; benefitedMerchantDays: number; }
+interface ApiArea {
+  code?: string;
+  name?: string;
+  province?: string | null;
+  provinceCode?: string;
+  districtCode?: string;
+  totalCirculation: number;
+  benefitedMerchantDays: number;
+}
+
 interface ApiDashboard {
   source: 'daily_social_impact_metrics';
   level: ImpactLevel;
   areas: ApiArea[];
   timeline: ImpactDay[];
   totalCirculation: number;
+  governmentContribution?: number;
+  citizenContribution?: number;
   benefitedMerchantDays: number;
-  secondaryCityShare: null;
+  transactionCount?: number;
+  secondaryCityShare: number | null;
   detailUnavailable?: boolean;
 }
 
-const apiEnabled = import.meta.env.VITE_SOCIAL_IMPACT_DASHBOARD_API === 'true';
-const areaCode = (feature: BoundaryFeature, level: ImpactLevel) => String(level === 'province' ? feature.properties.pro_code : level === 'district' ? feature.properties.amp_code : feature.properties.tam_code ?? '');
-const areaName = (feature: BoundaryFeature, level: ImpactLevel) => String(level === 'province' ? feature.properties.pro_th : level === 'district' ? feature.properties.amp_th : feature.properties.tam_th ?? '');
+// Always enable real API unless explicitly configured otherwise
+const apiDisabled = import.meta.env.VITE_SOCIAL_IMPACT_DASHBOARD_API === 'false';
+
+const areaCode = (feature: BoundaryFeature, level: ImpactLevel) =>
+  String(level === 'province' ? feature.properties.pro_code : level === 'district' ? feature.properties.amp_code : feature.properties.tam_code ?? '');
+const areaName = (feature: BoundaryFeature, level: ImpactLevel) =>
+  String(level === 'province' ? feature.properties.pro_th : level === 'district' ? feature.properties.amp_th : feature.properties.tam_th ?? '');
 
 const mockDashboard = ({ level, from, to, parentProvinceCode, parentDistrictCode, features }: DashboardParams): ImpactDashboardData => {
   const selected = features.filter((feature) => {
@@ -80,7 +115,9 @@ const mockDashboard = ({ level, from, to, parentProvinceCode, parentDistrictCode
   const areas = selected.map((feature) => {
     const numericCode = Number(areaCode(feature, level)) || 1;
     return {
-      code: areaCode(feature, level), name: areaName(feature, level), provinceCode: String(feature.properties.pro_code ?? ''),
+      code: areaCode(feature, level),
+      name: areaName(feature, level),
+      provinceCode: String(feature.properties.pro_code ?? ''),
       totalCirculation: (numericCode * 7919 % 2400000) + 50000,
       benefitedMerchantDays: (numericCode * 13 % 240) + 8,
     };
@@ -89,31 +126,102 @@ const mockDashboard = ({ level, from, to, parentProvinceCode, parentDistrictCode
   const date = new Date(`${from}T00:00:00`);
   const timeline = Array.from({ length: Math.min(days, 365) }, (_, index) => {
     const current = new Date(date.getTime() + index * 86400000);
-    return { date: current.toISOString().slice(0, 10), totalCirculation: Math.round(totalCirculation / Math.min(days, 365) * (0.7 + ((index * 17) % 60) / 100)) };
+    return {
+      date: current.toISOString().slice(0, 10),
+      totalCirculation: Math.round(totalCirculation / Math.min(days, 365) * (0.7 + ((index * 17) % 60) / 100)),
+    };
   });
   const timelineSum = timeline.reduce((sum, day) => sum + day.totalCirculation, 0);
   return {
-    source: 'mock', level, areas, timeline, totalCirculation: timelineSum,
+    source: 'mock',
+    level,
+    areas,
+    timeline,
+    totalCirculation: timelineSum,
     benefitedMerchantDays: areas.reduce((sum, area) => sum + area.benefitedMerchantDays, 0),
     secondaryCityShare: null,
   };
 };
 
 export const getImpactDashboard = async (params: DashboardParams): Promise<ImpactDashboardData> => {
-  if (!apiEnabled) return mockDashboard(params);
-  const response = await api.get<{ status: 'success'; data: ApiDashboard }>('/admin/social-impact/dashboard', {    params: {
-      level: params.level, code: params.parentProvinceCode ?? params.parentDistrictCode,
-      provinceName: params.level === 'province' ? undefined : params.features.find((feature) => feature.properties.pro_th)?.properties.pro_th,
-      from: params.from, to: params.to,
-    },
-  });
-  const result = response.data.data;
-  if (result.detailUnavailable) return { ...result, areas: [], detailUnavailable: true };
-  const provinceFeatures = params.features;
-  const areas = result.areas.flatMap((area) => {
-    const match = provinceFeatures.find((feature) => feature.properties.pro_th === area.province);
-    if (!match) return [];
-    return [{ code: String(match.properties.pro_code), name: String(area.province), provinceCode: String(match.properties.pro_code), totalCirculation: area.totalCirculation, benefitedMerchantDays: area.benefitedMerchantDays }];
-  });
-  return { ...result, areas };
+  if (apiDisabled) return mockDashboard(params);
+
+  try {
+    const codeParam = params.level === 'district'
+      ? params.parentProvinceCode
+      : params.level === 'subdistrict'
+        ? params.parentDistrictCode
+        : undefined;
+
+    const provinceNameParam = params.level === 'district' && params.parentProvinceCode
+      ? params.features.find((f) => String(f.properties.pro_code) === params.parentProvinceCode)?.properties.pro_th
+      : undefined;
+
+    const response = await api.get<{ status: 'success'; data: ApiDashboard }>('/admin/social-impact/dashboard', {
+      params: {
+        level: params.level,
+        code: codeParam,
+        provinceName: provinceNameParam,
+        from: params.from,
+        to: params.to,
+      },
+    });
+
+    const result = response.data.data;
+    if (result.detailUnavailable) return { ...result, areas: [], detailUnavailable: true };
+
+    const features = params.features;
+    const areas: ImpactArea[] = result.areas.map((area) => {
+      const areaNameStr = area.name ?? area.province ?? '';
+      const areaCodeStr = area.code ?? '';
+
+      // Match feature to ensure exact code alignment with GeoJSON layer
+      const matchedFeature = features.find((f) => {
+        if (params.level === 'province') {
+          return String(f.properties.pro_code) === areaCodeStr || f.properties.pro_th === areaNameStr;
+        }
+        if (params.level === 'district') {
+          return String(f.properties.amp_code) === areaCodeStr || f.properties.amp_th === areaNameStr;
+        }
+        return String(f.properties.tam_code) === areaCodeStr || f.properties.tam_th === areaNameStr;
+      });
+
+      const finalCode = matchedFeature
+        ? String(
+            params.level === 'province'
+              ? matchedFeature.properties.pro_code
+              : params.level === 'district'
+                ? matchedFeature.properties.amp_code
+                : matchedFeature.properties.tam_code ?? areaCodeStr
+          )
+        : areaCodeStr;
+
+      const finalName = matchedFeature
+        ? String(
+            params.level === 'province'
+              ? matchedFeature.properties.pro_th
+              : params.level === 'district'
+                ? matchedFeature.properties.amp_th
+                : matchedFeature.properties.tam_th ?? areaNameStr
+          )
+        : areaNameStr;
+
+      return {
+        code: finalCode,
+        name: finalName,
+        provinceCode: area.provinceCode ?? String(matchedFeature?.properties.pro_code ?? ''),
+        districtCode: area.districtCode,
+        totalCirculation: area.totalCirculation,
+        benefitedMerchantDays: area.benefitedMerchantDays,
+      };
+    });
+
+    return {
+      ...result,
+      areas,
+    };
+  } catch (error) {
+    console.error('Failed to fetch real social impact dashboard data, using fallback:', error);
+    return mockDashboard(params);
+  }
 };

@@ -12,7 +12,6 @@ import {
   ShieldCheck,
   ChevronRight,
 } from 'lucide-react';
-import { MerchantStoreOnboarding } from '../../../components/merchant/MerchantStoreOnboarding';
 import { APP_ROUTES } from '../../../constants/routes';
 import { useAuthStore } from '../../../stores/authStore';
 import { getMerchantHistory } from '../../../services/paymentApi';
@@ -209,8 +208,6 @@ export const MerchantHomePage: React.FC = () => {
           </div>
         </section>
 
-        {/* ระบบ Onboarding ข้อมูลร้านค้า */}
-        <MerchantStoreOnboarding merchantId={user.id} />
 
         {/* แผงทางลัดเข้าสู่หน้าต่าง ๆ (Quick Action Hub: 4 Core Modules) */}
         <section aria-labelledby="quick-actions-heading" className="space-y-3">

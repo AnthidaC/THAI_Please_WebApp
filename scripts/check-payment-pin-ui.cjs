@@ -199,14 +199,14 @@ async function main() {
       history.pushState({}, '', '/citizen/wallet'); window.dispatchEvent(new PopStateEvent('popstate'));
     }, user, token);
     await page.waitForSelector('#btn-wallet-security');
-    await page.click('#btn-wallet-security');
+    await page.$eval('#btn-wallet-security', el => { el.scrollIntoView({ block: 'center' }); el.click(); });
     await page.waitForSelector('#bank-pin-dialog[open]');
     assert.equal(await page.$eval('#bank-pin-dialog-title', el => el.textContent.trim()), 'กรอกรหัส PIN เดิม');
     await page.screenshot({ path: path.join(screenshots, 'change-pin-step1.png') });
 
     // Test Forgot PIN transition from step 1
     await page.waitForSelector('#btn-forgot-pin');
-    await page.click('#btn-forgot-pin');
+    await page.$eval('#btn-forgot-pin', el => el.click());
     await page.waitForSelector('#btn-forgot-pin-relogin');
     assert.ok(await page.$eval('#bank-pin-dialog', el => el.textContent.includes('ลืมรหัส PIN')));
     await page.screenshot({ path: path.join(screenshots, 'forgot-pin-dialog.png') });
@@ -216,7 +216,7 @@ async function main() {
 
     // Enter Step 1: current PIN (123456)
     const enterChangeDigits = async digits => {
-      for (const digit of digits) await page.click(`#bank-pin-dialog [data-pin-digit="${digit}"]`);
+      for (const digit of digits) await page.$eval(`#bank-pin-dialog [data-pin-digit="${digit}"]`, el => el.click());
     };
     await enterChangeDigits('123456');
 

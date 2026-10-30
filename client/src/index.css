@@ -30,3 +30,18 @@
   line-height: 44px !important;
   font-size: 24px !important;
 }
+
+/* ป้องกัน Leaflet controls ทะลุแถบ Navbar หรือ Modals ด้านบน */
+.leaflet-container {
+  z-index: 0 !important;
+  isolation: isolate;
+}
+
+.leaflet-pane {
+  z-index: 1 !important;
+}
+
+.leaflet-top,
+.leaflet-bottom {
+  z-index: 10 !important;
+}

@@ -22,7 +22,6 @@ import {
 } from 'lucide-react';
 import { MerchantLocationPicker } from '../../../components/common/MerchantLocationPicker';
 import { ThaiAddressSelect, ThaiAddressValue } from '../../../components/common/ThaiAddressSelect';
-import { MerchantStoreOnboarding } from '../../../components/merchant/MerchantStoreOnboarding';
 import { APP_ROUTES } from '../../../constants/routes';
 import { useAuthStore } from '../../../stores/authStore';
 import {
@@ -288,12 +287,7 @@ export const MerchantProfilePage: React.FC = () => {
                   </div>
                 </section>
 
-                {/* 2.2 Onboarding Checklist Integration */}
-                {!isStaff && (
-                  <MerchantStoreOnboarding merchantId={profile.merchantId} />
-                )}
-
-                {/* 2.3 Two-Column Detail Cards Grid */}
+                {/* 2.2 Two-Column Detail Cards Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   {/* Card A: ข้อมูลติดต่อและนิติบุคคล */}
                   <section className="rounded-3xl border border-hairline bg-white p-5 sm:p-6 shadow-2xs space-y-4">

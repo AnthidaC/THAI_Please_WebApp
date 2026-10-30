@@ -42,7 +42,24 @@ export const LoginPage: React.FC = () => {
   const [selectedMerchantId, setSelectedMerchantId] = useState('');
   const [isLoadingMerchants, setIsLoadingMerchants] = useState(import.meta.env.DEV);
   const [merchantLoadError, setMerchantLoadError] = useState<string | null>(null);
-  const from = (location.state as { from?: { pathname: string } } | null)?.from?.pathname;
+  const rawFrom = (location.state as { from?: { pathname: string } } | null)?.from?.pathname;
+
+  const resolveTargetAndValidateReset = (loggedInUser: AppUser, requestedFrom?: string): string => {
+    const targetUserId = sessionStorage.getItem('thai-please:pin-reset-user-id');
+    const resetReturn = sessionStorage.getItem('thai-please:pin-reset-return');
+
+    if (targetUserId && targetUserId !== loggedInUser.id) {
+      // บัญชีที่เข้าสู่ระบบใหม่ไม่ใช่บัญชีที่กดลืมรหัส PIN ให้ล้างข้อมูลการขอรีเซ็ตทิ้งทันที
+      sessionStorage.removeItem('thai-please:pin-reset-intent');
+      sessionStorage.removeItem('thai-please:pin-reset-user-id');
+      sessionStorage.removeItem('thai-please:pin-reset-return');
+      sessionStorage.removeItem('thai-please:pending-checkout-qr');
+      return safeTargetForRole(loggedInUser.role, requestedFrom);
+    }
+
+    const effectivePath = requestedFrom || resetReturn || undefined;
+    return safeTargetForRole(loggedInUser.role, effectivePath);
+  };
 
   const loadDemoCitizens = useCallback(async () => {
     setIsLoadingCitizens(true);
@@ -103,13 +120,13 @@ export const LoginPage: React.FC = () => {
           : 'ใบสมัครร้านค้าอยู่ระหว่างตรวจสอบ');
         return;
       }
-      if (user.role !== 'ADMIN' && user.role !== 'MERCHANT') {
+      if (user.role !== 'ADMIN' && user.role !== 'MERCHANT' && user.role !== 'USER') {
         setErrorMsg('ไม่สามารถเข้าสู่ระบบด้วยบทบาทนี้ได้');
         return;
       }
 
       setAuth(user, response.data.token);
-      navigate(safeTargetForRole(user.role, from), { replace: true });
+      navigate(resolveTargetAndValidateReset(user, rawFrom), { replace: true });
     } catch (error) {
       if (isAxiosError<LoginErrorResponse>(error)) {
         const code = error.response?.data?.code;
@@ -156,7 +173,7 @@ export const LoginPage: React.FC = () => {
     try {
       const response = await requestDemoLogin(role, accountId);
       setAuth(response.data.user, response.data.token);
-      navigate(safeTargetForRole(response.data.user.role, from), { replace: true });
+      navigate(resolveTargetAndValidateReset(response.data.user, rawFrom), { replace: true });
     } catch {
       setErrorMsg('เข้าสู่ระบบทดสอบไม่สำเร็จ กรุณาตรวจสอบบัญชีทดสอบ');
     } finally {
