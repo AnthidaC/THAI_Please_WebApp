@@ -86,3 +86,18 @@ export const decideMerchantApplication = async (
   );
   return response.data.data;
 };
+
+export interface IpLocationData {
+  latitude: number | null;
+  longitude: number | null;
+  isApproximate: boolean;
+}
+
+export const getIpLocation = async (): Promise<IpLocationData | null> => {
+  try {
+    const response = await api.get<{ success: boolean; data: IpLocationData }>('/geo/ip-location');
+    return response.data.data;
+  } catch {
+    return null;
+  }
+};

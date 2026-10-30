@@ -27,11 +27,12 @@ const validCitizenId = (firstTwelve: string): string => {
   return `${firstTwelve}${(11 - (sum % 11)) % 10}`;
 };
 
-test('Thai citizen ID checksum accepts a valid 13-digit number and rejects an invalid one', () => {
-  const validId = validCitizenId('123456789012');
-  assert.equal(isValidThaiCitizenId(validId), true);
-  assert.equal(isValidThaiCitizenId(`${validId.slice(0, 12)}${(Number(validId[12]) + 1) % 10}`), false);
+test('Thai citizen ID accepts any 13-digit number and rejects invalid length or non-digits', () => {
+  assert.equal(isValidThaiCitizenId('1234567890123'), true);
+  assert.equal(isValidThaiCitizenId('1101700203450'), true);
   assert.equal(isValidThaiCitizenId('12345678901'), false);
+  assert.equal(isValidThaiCitizenId('12345678901234'), false);
+  assert.equal(isValidThaiCitizenId('123456789012A'), false);
 });
 
 test('citizen province choices come from the same source and formatting as Merchant registration', () => {

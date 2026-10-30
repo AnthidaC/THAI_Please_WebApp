@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@googlemaps/js-api-loader": "^1.16.8",
     "@radix-ui/react-slider": "^1.6.1",
     "@tanstack/react-query": "^5.67.1",
     "@tanstack/react-query-devtools": "^5.67.1",
@@ -26,6 +27,7 @@
     "zustand": "^5.0.3"
   },
   "devDependencies": {
+    "@types/google.maps": "^3.66.9",
     "@types/leaflet": "^1.9.22",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",

@@ -1,6 +1,19 @@
 import { z } from 'zod';
 import { CANONICAL_CATEGORY_IDS, CanonicalCategoryId } from '../constants/categories';
 
+/**
+ * กรอบพิกัดสี่เหลี่ยมคลุมประเทศไทย (Thailand Bounding Box)
+ * หมายเหตุ: ค่านี้เป็นเพียง sanity check หยาบๆ เท่านั้น ไม่ใช่เส้นแบ่งแนวเขตพรมแดนจริงของประเทศ
+ * ละติจูด: ~5.61 ถึง ~20.46
+ * ลองจิจูด: ~97.34 ถึง ~105.64
+ */
+export const THAILAND_BOUNDS = {
+  MIN_LAT: 5.61,
+  MAX_LAT: 20.46,
+  MIN_LNG: 97.34,
+  MAX_LNG: 105.64,
+} as const;
+
 const toCoordinate = (val: unknown) => {
   if (typeof val === 'number') return val;
   if (typeof val === 'string' && val.trim() !== '') {
@@ -19,10 +32,9 @@ export const merchantApplicationSchema = z.object({
     error: 'ประเภทธุรกิจต้องเป็น INDIVIDUAL หรือ JURISTIC',
   }),
   taxId: z
-    .string({ error: 'กรุณาระบุเลขประจำตัวผู้เสียภาษี' })
+    .string({ error: 'กรุณาระบุเลขประจำตัว 13 หลัก' })
     .trim()
-    .min(10, 'เลขประจำตัวผู้เสียภาษีต้องมีความยาวอย่างน้อย 10 หลัก')
-    .max(20, 'เลขประจำตัวผู้เสียภาษีต้องมีความยาวไม่เกิน 20 หลัก'),
+    .regex(/^\d{13}$/, 'เลขประจำตัวต้องเป็นตัวเลข 13 หลัก'),
   businessName: z
     .string({ error: 'กรุณาระบุชื่อร้านค้า' })
     .trim()
@@ -96,6 +108,21 @@ export const merchantApplicationSchema = z.object({
         code: z.ZodIssueCode.custom,
         path: ['businessName'],
         message: 'กรุณาระบุชื่อร้านค้า',
+      });
+    }
+
+    // Sanity check: ตรวจสอบว่าพิกัดอยู่ในขอบเขตประเทศไทยหยาบๆ หรือไม่
+    const isWithinThailand =
+      value.latitude >= THAILAND_BOUNDS.MIN_LAT &&
+      value.latitude <= THAILAND_BOUNDS.MAX_LAT &&
+      value.longitude >= THAILAND_BOUNDS.MIN_LNG &&
+      value.longitude <= THAILAND_BOUNDS.MAX_LNG;
+
+    if (!isWithinThailand) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['latitude'],
+        message: 'ตำแหน่งร้านต้องอยู่ในประเทศไทย กรุณาเลื่อนหมุดให้ตรงที่ตั้งร้าน',
       });
     }
   })

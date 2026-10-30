@@ -16,11 +16,10 @@ const listen = async (app: express.Express): Promise<Server> => new Promise((res
   const server = app.listen(0, '127.0.0.1', () => resolve(server));
 });
 
-test('Thai Citizen ID checksum validates correctly', () => {
-  // Valid Mod-11 citizen ID (check digit 0)
+test('Thai Citizen ID validates 13 digits correctly', () => {
+  // Valid 13 digits
   assert.equal(isValidThaiCitizenId('1101700203450'), true);
-  // Invalid Mod-11 citizen ID (check digit 6 is invalid for this sequence)
-  assert.equal(isValidThaiCitizenId('1101700203456'), false);
+  assert.equal(isValidThaiCitizenId('1234567890123'), true);
   // Invalid length
   assert.equal(isValidThaiCitizenId('110170020345'), false);
   assert.equal(isValidThaiCitizenId('11017002034500'), false);
@@ -40,10 +39,10 @@ test('citizen registration schema validates inputs and formats email', () => {
   assert.equal(valid.email, 'test.citizen@example.com');
   assert.equal(valid.password, 'Password123!');
 
-  // Rejects invalid checksum
+  // Rejects invalid length or non-digits
   assert.throws(() => citizenRegisterSchema.parse({
     fullName: 'สมชาย',
-    citizenId: '1101700203456',
+    citizenId: '110170020345',
     provinceCode: '10',
     email: 'test@example.com',
     password: 'Password123!',

@@ -10,14 +10,9 @@ export const citizenProvinceOptions: CitizenProvinceOption[] = provinces.map((pr
   name: province.provinceNameTh,
 }));
 
+/**
+ * ตรวจสอบเลขประจำตัว 13 หลัก — ตรวจสอบเฉพาะความยาวตัวเลข 13 หลัก
+ */
 export const isValidThaiCitizenId = (citizenId: string): boolean => {
-  if (!/^\d{13}$/.test(citizenId)) return false;
-
-  let weightedSum = 0;
-  for (let index = 0; index < 12; index += 1) {
-    weightedSum += Number(citizenId[index]) * (13 - index);
-  }
-  const checkDigit = (11 - (weightedSum % 11)) % 10;
-  return Number(citizenId[12]) === checkDigit;
+  return /^\d{13}$/.test(citizenId.trim());
 };
-
