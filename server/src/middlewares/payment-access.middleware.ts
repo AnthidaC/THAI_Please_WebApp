@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { verifyToken } from '../utils/jwt';
+import { isRestrictedToken, verifyToken } from '../utils/jwt';
 import prisma from '../utils/prisma';
 
 /** Financial endpoints require a valid signed session token. */
@@ -10,6 +10,10 @@ export const authenticatePaymentSession = async (req: Request, res: Response, ne
     const token = header.slice(7).trim();
     const user = verifyToken(token);
     if (!user.userId || !user.role) throw new Error('Invalid session');
+    if (isRestrictedToken(user)) {
+      res.status(403).json({ status: 'error', message: 'Token is restricted to merchant application status' });
+      return;
+    }
     req.user = user;
     next();
   } catch {

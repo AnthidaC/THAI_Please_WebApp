@@ -1,6 +1,4 @@
 import provinces from '../data/thai-address/provinces.json';
-import { requestDemoLogin } from './demoLogin';
-import type { DemoLoginRequest } from './demoLogin';
 
 export interface CitizenProvinceOption {
   code: string;
@@ -11,14 +9,6 @@ export const citizenProvinceOptions: CitizenProvinceOption[] = provinces.map((pr
   code: String(province.provinceCode).padStart(2, '0'),
   name: province.provinceNameTh,
 }));
-
-export interface CitizenRegistrationDraft {
-  fullName: string;
-  citizenId: string;
-  provinceCode: string;
-  email: string;
-  password: string;
-}
 
 export const isValidThaiCitizenId = (citizenId: string): boolean => {
   if (!/^\d{13}$/.test(citizenId)) return false;
@@ -31,12 +21,3 @@ export const isValidThaiCitizenId = (citizenId: string): boolean => {
   return Number(citizenId[12]) === checkDigit;
 };
 
-export const submitCitizenRegistrationMock = (
-  _draft: CitizenRegistrationDraft,
-  clearSensitiveFields: () => void,
-  demoCitizenAccountId?: string,
-  login: DemoLoginRequest = requestDemoLogin,
-) => {
-  clearSensitiveFields();
-  return login('CITIZEN', demoCitizenAccountId);
-};

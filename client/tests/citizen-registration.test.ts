@@ -7,9 +7,20 @@ import provinces from '../src/data/thai-address/provinces.json';
 import {
   citizenProvinceOptions,
   isValidThaiCitizenId,
-  submitCitizenRegistrationMock,
-} from '../src/services/citizenRegistrationMock';
-import type { CitizenRegistrationDraft } from '../src/services/citizenRegistrationMock';
+} from '../src/utils/thaiCitizenId';
+
+const storage = new Map<string, string>();
+if (!('localStorage' in globalThis) || !(globalThis as any).localStorage) {
+  Object.defineProperty(globalThis, 'localStorage', {
+    configurable: true,
+    value: {
+      getItem: (key: string) => storage.get(key) ?? null,
+      setItem: (key: string, value: string) => { storage.set(key, value); },
+      removeItem: (key: string) => { storage.delete(key); },
+      clear: () => { storage.clear(); },
+    },
+  });
+}
 
 const validCitizenId = (firstTwelve: string): string => {
   const sum = [...firstTwelve].reduce((total, digit, index) => total + Number(digit) * (13 - index), 0);
@@ -30,65 +41,16 @@ test('citizen province choices come from the same source and formatting as Merch
   })));
 });
 
-test('production registration page renders the existing placeholder and no form', async () => {
-  const previousStorage = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
-  const storage = new Map<string, string>();
-  Object.defineProperty(globalThis, 'localStorage', {
-    configurable: true,
-    value: {
-      getItem: (key: string) => storage.get(key) ?? null,
-      setItem: (key: string, value: string) => { storage.set(key, value); },
-      removeItem: (key: string) => { storage.delete(key); },
-    },
-  });
-
-  try {
-    const { RegisterPageContent } = await import('../src/pages/auth/RegisterPage');
-    const markup = renderToStaticMarkup(
-      createElement(
-        MemoryRouter,
-        null,
-        createElement(RegisterPageContent, { isDevelopment: false }),
-      ),
-    );
-    assert.match(markup, /การสร้างบัญชีใหม่ยังไม่เปิดใช้/);
-    assert.doesNotMatch(markup, /<form|citizen-id|citizen-password/);
-  } finally {
-    if (previousStorage) Object.defineProperty(globalThis, 'localStorage', previousStorage);
-    else Reflect.deleteProperty(globalThis, 'localStorage');
-  }
-});
-
-test('mock registration clears sensitive form state before using the existing Citizen demo login', async () => {
-  const draft: CitizenRegistrationDraft = {
-    fullName: 'Demo Citizen',
-    citizenId: validCitizenId('123456789012'),
-    provinceCode: '10',
-    email: 'dev-citizen@example.test',
-    password: 'DevOnlyPass123!',
-  };
-  let sensitiveState = { citizenId: draft.citizenId, password: draft.password, confirmation: draft.password };
-  const loginCalls: Array<{ role: string; accountId: string | undefined }> = [];
-  const login = async (role: 'CITIZEN' | 'MERCHANT' | 'ADMIN', accountId?: string) => {
-    assert.deepEqual(sensitiveState, { citizenId: '', password: '', confirmation: '' });
-    loginCalls.push({ role, accountId });
-    return {
-      status: 'success' as const,
-      data: {
-        user: { id: 'demo-user', role: 'USER' as const, createdAt: '2026-10-30T00:00:00.000Z' },
-        token: 'mock-citizen-token',
-      },
-    };
-  };
-
-  const result = await submitCitizenRegistrationMock(
-    draft,
-    () => { sensitiveState = { citizenId: '', password: '', confirmation: '' }; },
-    'citizen-test-account',
-    login,
+test('registration page renders citizen registration form in all environments', async () => {
+  const { RegisterPage } = await import('../src/pages/auth/RegisterPage');
+  const markup = renderToStaticMarkup(
+    createElement(
+      MemoryRouter,
+      null,
+      createElement(RegisterPage),
+    ),
   );
-
-  assert.deepEqual(loginCalls, [{ role: 'CITIZEN', accountId: 'citizen-test-account' }]);
-  assert.equal(result.data.user.role, 'USER');
-  assert.deepEqual(sensitiveState, { citizenId: '', password: '', confirmation: '' });
+  assert.match(markup, /สมัครสมาชิกประชาชน/);
+  assert.match(markup, /citizen-id/);
+  assert.match(markup, /citizen-full-name/);
 });
