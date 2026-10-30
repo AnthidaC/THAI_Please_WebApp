@@ -42,6 +42,10 @@ export const checkoutCopaySchema = z.object({
     .string()
     .regex(/^\d{6}$/, 'รหัส PIN ยืนยันการชำระเงินต้องเป็นตัวเลข 6 หลัก'),
   discountCode: z.string().optional(),
+  discountCodeType: z.enum(['referral', 'coupon']).optional(),
+}).refine(data => !data.discountCode || data.discountCodeType !== undefined, {
+  message: 'กรุณาระบุประเภทโค้ดส่วนลด',
+  path: ['discountCodeType'],
 });
 
 export const setPaymentPinSchema = z.object({
@@ -61,6 +65,7 @@ export const resetPaymentPinSchema = z.object({
 
 export const validateDiscountSchema = z.object({
   code: z.string({ message: 'กรุณาระบุรหัสคูปองหรือโค้ดชวนเพื่อน' }).min(1),
+  codeType: z.enum(['referral', 'coupon']),
   merchantId: z.string().optional(),
   totalAmount: z.number().positive('ยอดเงินต้องมากกว่า 0 บาท'),
 });

@@ -201,7 +201,12 @@ export const listDemoMerchants = async (
         is_approved: true,
         ...demoMerchantNameFilter(),
       },
-      select: { merchant_id: true, shop_name: true, created_at: true },
+      select: {
+        merchant_id: true,
+        shop_name: true,
+        created_at: true,
+        merchant_application: { select: { email: true } },
+      },
       orderBy: [{ created_at: 'asc' }, { merchant_id: 'asc' }],
     });
 
@@ -209,7 +214,44 @@ export const listDemoMerchants = async (
       status: 'success',
       data: merchants
         .filter(({ shop_name }) => isDemoMerchantName(shop_name))
-        .map(({ merchant_id, shop_name }) => ({ id: merchant_id, name: shop_name })),
+        .map(({ merchant_id, shop_name, merchant_application }) => ({
+          id: merchant_id,
+          name: shop_name,
+          email: merchant_application?.email ?? null,
+        })),
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const listDemoAdmins = async (
+  _req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const identities = await prisma.auth_identities.findMany({
+      where: { account_type: 'STAFF_ACCOUNT' },
+      select: { account_id: true },
+    });
+
+    const staffAccounts = await prisma.staff_accounts.findMany({
+      where: {
+        staff_id: { in: identities.map(({ account_id }) => account_id) },
+        role: 'ADMIN',
+        is_active: true,
+        ...testAccountNameFilter('full_name'),
+      },
+      select: { staff_id: true, full_name: true, email: true },
+      orderBy: [{ created_at: 'asc' }, { staff_id: 'asc' }],
+    });
+
+    res.json({
+      status: 'success',
+      data: staffAccounts
+        .filter(({ full_name }) => testAccountName.test(full_name))
+        .map(({ staff_id, full_name, email }) => ({ id: staff_id, name: full_name, email })),
     });
   } catch (error) {
     next(error);
@@ -227,12 +269,24 @@ export const listDemoCitizens = async (
       select: { user_id: true, full_name: true },
       orderBy: [{ created_at: 'asc' }, { user_id: 'asc' }],
     });
+    const identities = await prisma.auth_identities.findMany({
+      where: {
+        account_type: 'CITIZEN_ACCOUNT',
+        account_id: { in: citizens.map(({ user_id }) => user_id) },
+      },
+      select: { account_id: true, email: true },
+    });
+    const emailByUserId = new Map(identities.map(({ account_id, email }) => [account_id, email]));
 
     res.json({
       status: 'success',
       data: citizens
         .filter(({ full_name }) => testAccountName.test(full_name))
-        .map(({ user_id, full_name }) => ({ id: user_id, name: full_name })),
+        .map(({ user_id, full_name }) => ({
+          id: user_id,
+          name: full_name,
+          email: emailByUserId.get(user_id) ?? null,
+        })),
     });
   } catch (error) {
     next(error);

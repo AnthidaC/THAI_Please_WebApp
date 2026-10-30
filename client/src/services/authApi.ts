@@ -4,6 +4,7 @@ import { AuthResponse, ApiResponse, DemoLoginRole, User } from '../types';
 export interface DemoLoginAccount {
   id: string;
   name: string;
+  email: string | null;
 }
 
 export interface CitizenRegisterPayload {
@@ -44,6 +45,11 @@ export const authApi = {
 
   listDemoMerchants: async (): Promise<DemoLoginAccount[]> => {
     const response = await api.get<ApiResponse<DemoLoginAccount[]>>('/auth/demo-merchants');
+    return response.data.data;
+  },
+
+  listDemoAdmins: async (): Promise<DemoLoginAccount[]> => {
+    const response = await api.get<ApiResponse<DemoLoginAccount[]>>('/auth/demo-admins');
     return response.data.data;
   },
 
