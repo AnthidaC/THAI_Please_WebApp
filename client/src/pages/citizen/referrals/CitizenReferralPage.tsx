@@ -34,7 +34,7 @@ export const CitizenReferralPage: React.FC = () => {
   const [selectedMerchantId, setSelectedMerchantId] = useState<string>('');
 
   // 2. Filter & UI Interaction State
-  const [friendFilter, setFriendFilter] = useState<'all' | 'redeemed' | 'pending'>('all');
+  const [merchantTab, setMerchantTab] = useState<'available' | 'credited'>('available');
   const [isCopied, setIsCopied] = useState<boolean>(false);
   const [shareFeedback, setShareFeedback] = useState<string | null>(null);
 
@@ -56,8 +56,21 @@ export const CitizenReferralPage: React.FC = () => {
     queryFn: referralApi.getEligibleMerchants,
   });
 
-  // Auto-select first eligible merchant when data arrives if none selected
-  const activeMerchantId = selectedMerchantId || (eligibleMerchants.length > 0 ? eligibleMerchants[0].merchantId : '');
+  // แยกรายชื่อร้านค้า: ร้านที่พร้อมชวน กับ ร้านที่แนะนำสำเร็จแล้ว
+  const availableMerchants = useMemo(
+    () => eligibleMerchants.filter((m) => !m.isCredited),
+    [eligibleMerchants]
+  );
+  const creditedMerchants = useMemo(
+    () => eligibleMerchants.filter((m) => m.isCredited),
+    [eligibleMerchants]
+  );
+
+  // Auto-select first available merchant (or credited if no available left)
+  const defaultMerchantId = availableMerchants.length > 0
+    ? availableMerchants[0].merchantId
+    : (eligibleMerchants.length > 0 ? eligibleMerchants[0].merchantId : '');
+  const activeMerchantId = selectedMerchantId || defaultMerchantId;
   const activeMerchant = useMemo(
     () => eligibleMerchants.find((m) => m.merchantId === activeMerchantId),
     [eligibleMerchants, activeMerchantId]
@@ -100,21 +113,14 @@ export const CitizenReferralPage: React.FC = () => {
     totalInvited: 0,
     totalRedeemed: 0,
     totalPending: 0,
-    milestonesCompleted: 0,
-    currentMilestoneProgress: 0,
-    milestoneTarget: 5,
-    friendsNeededForNextMilestone: 5,
-    totalMilestoneCouponsEarned: 0,
   };
 
   const friendsList = statsData?.invitedFriends || [];
-  const earnedCoupons = statsData?.earnedCoupons || [];
 
-  // Filter friends list
-  const filteredFriends = useMemo(() => {
-    if (friendFilter === 'all') return friendsList;
-    return friendsList.filter((f) => f.status === friendFilter);
-  }, [friendsList, friendFilter]);
+  // ประวัติการแนะนำเพื่อนสำเร็จ — แสดงเฉพาะสถานะสำเร็จแล้ว (redeemed) เท่านั้น
+  const successfulFriends = useMemo(() => {
+    return friendsList.filter((f) => f.status === 'redeemed');
+  }, [friendsList]);
 
   // Handle Copy Code
   const handleCopyCode = async (code: string) => {
@@ -130,7 +136,11 @@ export const CitizenReferralPage: React.FC = () => {
         document.body.removeChild(textArea);
       }
       setIsCopied(true);
-      setTimeout(() => setIsCopied(false), 2200);
+      setShareFeedback(`คัดลอกโค้ด "${code}" แล้ว นำไปกรอกในช่องส่วนลดที่หน้าจ่ายเงินได้เลย!`);
+      setTimeout(() => {
+        setIsCopied(false);
+        setShareFeedback(null);
+      }, 3500);
     } catch (err) {
       console.warn('Copy to clipboard failed:', err);
     }
@@ -140,24 +150,22 @@ export const CitizenReferralPage: React.FC = () => {
   const handleShareCode = async () => {
     if (!referralCodeData) return;
 
+    const shareText = `โค้ดชวนเพื่อนร้าน "${referralCodeData.shopName}": ${referralCodeData.referralCode}\n(นำโค้ดนี้ไปกรอกในช่องส่วนลด/โค้ดเพื่อน ที่หน้าสแกนจ่ายเงิน Co-pay นะครับ)`;
     const shareData = {
-      title: `โครงการไทยช่วยไทยพลีส - สิทธิ์ชวนเพื่อนร้าน ${referralCodeData.shopName}`,
-      text: `ใช้รหัสแนะนำ ${referralCodeData.referralCode} สำหรับการชำระเงินที่ร้าน ${referralCodeData.shopName}`,
-      url: referralCodeData.shareUrl,
+      title: `โค้ดชวนเพื่อนร้าน ${referralCodeData.shopName}`,
+      text: shareText,
     };
 
     if (navigator.share) {
       try {
         await navigator.share(shareData);
-        setShareFeedback('แชร์ลิงก์คำชวนสำเร็จแล้ว');
+        setShareFeedback('แชร์โค้ดชวนเพื่อนสำเร็จแล้ว');
         setTimeout(() => setShareFeedback(null), 3000);
       } catch (err) {
         // User cancelled share
       }
     } else {
-      handleCopyCode(referralCodeData.shareUrl);
-      setShareFeedback('คัดลอกลิงก์คำชวนสำหรับส่งให้เพื่อนแล้ว');
-      setTimeout(() => setShareFeedback(null), 3000);
+      handleCopyCode(referralCodeData.referralCode);
     }
   };
 
@@ -195,12 +203,6 @@ export const CitizenReferralPage: React.FC = () => {
     }
   };
 
-  // Calculate milestone progress percentage (0 - 100%)
-  const milestonePercent = Math.min(
-    100,
-    Math.round((summary.currentMilestoneProgress / summary.milestoneTarget) * 100)
-  );
-
   return (
     <div className="min-h-screen bg-surface-soft pb-24 md:pb-14 font-sans text-ink">
       {/* 1. TOP HEADER & HERO SECTION */}
@@ -227,14 +229,14 @@ export const CitizenReferralPage: React.FC = () => {
                 </span>
                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-pill bg-emerald-50 border border-emerald-200 text-status-success text-xs font-semibold">
                   <Gift className="h-3.5 w-3.5" />
-                  <span>คูปอง ฿40 ทุก 5 ร้านค้า</span>
+                  <span>ติดตามความคืบหน้าภารกิจ</span>
                 </span>
               </div>
               <h1 className="text-xl sm:text-2xl font-bold text-ink tracking-tight">
                 ระบบชวนเพื่อนสนับสนุนร้านค้าชุมชน (Merchant Referral)
               </h1>
               <p className="text-xs sm:text-sm text-ink-muted mt-0.5 leading-relaxed">
-                แนะนำร้านโปรดที่คุณเคยชำระเงินให้เพื่อนใหม่ เมื่อเพื่อนใช้สิทธิ์สำเร็จครบทุก 5 ร้านค้าที่ไม่ซ้ำกัน รับคูปองส่วนลด ฿40 ทันที (อายุ 14 วันหลังได้รับ)
+                แนะนำร้านโปรดให้เพื่อนใหม่ แล้วติดตามความสำเร็จและรางวัลจากภารกิจชวนเพื่อน
               </p>
             </div>
 
@@ -333,7 +335,7 @@ export const CitizenReferralPage: React.FC = () => {
               </h2>
               <p className="text-xs sm:text-sm text-ink-muted leading-relaxed max-w-md mx-auto">
                 ตามกฎของโครงการ THAI Please คุณต้องเคยชำระเงินสำเร็จที่ร้านค้าในโครงการอย่างน้อย 1 ครั้ง
-                จึงจะสามารถสร้างรหัสคำชวนเพื่อนสำหรับร้านค้านั้นเพื่อรับคูปอง ฿40 ได้
+                จึงจะสามารถสร้างรหัสคำชวนเพื่อนสำหรับร้านค้านั้นได้
               </p>
             </div>
             <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
@@ -363,41 +365,120 @@ export const CitizenReferralPage: React.FC = () => {
           <>
             {/* 2.1 MERCHANT SELECTOR BAR */}
             <div className="bg-white rounded-card border border-hairline p-4 sm:p-5 shadow-2xs space-y-3">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-hairline/70 pb-3">
                 <div className="flex items-center gap-2">
                   <div className="h-8 w-8 rounded-xl bg-blue-50 text-brand-blue flex items-center justify-center border border-blue-200">
                     <Store className="h-4 w-4" />
                   </div>
                   <div>
                     <h3 className="text-xs sm:text-sm font-bold text-ink">
-                      เลือกร้านค้าที่คุณต้องการแนะนำเพื่อน (Eligible Merchants)
+                      เลือกร้านค้าที่คุณต้องการแนะนำเพื่อน
                     </h3>
                     <p className="text-[11px] text-ink-muted">
-                      คุณสามารถชวนเพื่อนได้เฉพาะร้านที่คุณเคยชำระเงินสำเร็จแล้วเท่านั้น ({eligibleMerchants.length} ร้าน)
+                      {merchantTab === 'available'
+                        ? `ร้านที่คุณเคยไปใช้บริการและพร้อมสร้างโค้ชวนเพื่อน (${availableMerchants.length} ร้าน)`
+                        : `ร้านที่คุณแนะนำเพื่อนสำเร็จครบสิทธิ์แล้ว (${creditedMerchants.length} ร้าน)`}
                     </p>
                   </div>
                 </div>
+
+                {/* Sub-tab switcher: พร้อมชวน vs สำเร็จแล้ว */}
+                {creditedMerchants.length > 0 && (
+                  <div className="flex items-center gap-1 bg-surface-soft p-1 rounded-pill self-start sm:self-auto text-xs border border-hairline">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMerchantTab('available');
+                        if (availableMerchants.length > 0 && !availableMerchants.some(m => m.merchantId === activeMerchantId)) {
+                          setSelectedMerchantId(availableMerchants[0].merchantId);
+                        }
+                      }}
+                      className={`px-3 py-1 rounded-pill transition text-xs ${
+                        merchantTab === 'available'
+                          ? 'bg-brand-blue text-white font-semibold shadow-xs'
+                          : 'text-ink-muted hover:text-ink'
+                      }`}
+                    >
+                      พร้อมชวน ({availableMerchants.length})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMerchantTab('credited');
+                        if (creditedMerchants.length > 0 && !creditedMerchants.some(m => m.merchantId === activeMerchantId)) {
+                          setSelectedMerchantId(creditedMerchants[0].merchantId);
+                        }
+                      }}
+                      className={`px-3 py-1 rounded-pill transition text-xs ${
+                        merchantTab === 'credited'
+                          ? 'bg-status-success text-white font-semibold shadow-xs'
+                          : 'text-ink-muted hover:text-ink'
+                      }`}
+                    >
+                      ชวนสำเร็จแล้ว ({creditedMerchants.length})
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Horizontal Pill Selector */}
-              <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pt-1">
-                {eligibleMerchants.map((merchant) => {
-                  const isSelected = merchant.merchantId === activeMerchantId;
-                  return (
-                    <button
-                      key={merchant.merchantId}
-                      type="button"
-                      onClick={() => setSelectedMerchantId(merchant.merchantId)}
-                      className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-2xl border text-xs font-semibold transition shrink-0 ${
-                        isSelected
-                          ? 'bg-brand-blue text-white border-brand-blue shadow-xs'
-                          : merchant.isCredited
-                          ? 'bg-emerald-50 text-status-success border-emerald-200 hover:bg-emerald-100/60'
-                          : 'bg-surface-soft text-ink-body border-hairline hover:bg-gray-200'
-                      }`}
-                    >
-                      <span>{merchant.shopName}</span>
-                      {merchant.isCredited ? (
+              {merchantTab === 'available' ? (
+                availableMerchants.length > 0 ? (
+                  <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pt-1">
+                    {availableMerchants.map((merchant) => {
+                      const isSelected = merchant.merchantId === activeMerchantId;
+                      return (
+                        <button
+                          key={merchant.merchantId}
+                          type="button"
+                          onClick={() => setSelectedMerchantId(merchant.merchantId)}
+                          className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-2xl border text-xs font-semibold transition shrink-0 ${
+                            isSelected
+                              ? 'bg-brand-blue text-white border-brand-blue shadow-xs'
+                              : 'bg-surface-soft text-ink-body border-hairline hover:bg-gray-200'
+                          }`}
+                        >
+                          <span>{merchant.shopName}</span>
+                          {merchant.categoryNameTh && (
+                            <span
+                              className={`text-[10px] px-2 py-0.5 rounded-pill font-normal ${
+                                isSelected
+                                  ? 'bg-white/20 text-white'
+                                  : 'bg-white text-ink-muted border border-hairline'
+                              }`}
+                            >
+                              {merchant.categoryNameTh}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-3.5 text-xs text-emerald-900 flex items-center gap-2.5">
+                    <CheckCircle2 className="h-5 w-5 text-status-success shrink-0" />
+                    <div>
+                      <span className="font-bold">แนะนำครบทุกร้านแล้ว: </span>
+                      <span>คุณได้แนะนำเพื่อนครบทุกร้านที่คุณเคยไปใช้บริการแล้ว ({creditedMerchants.length} ร้าน) ขอบคุณที่ร่วมสนับสนุนร้านค้าชุมชน!</span>
+                    </div>
+                  </div>
+                )
+              ) : (
+                <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pt-1">
+                  {creditedMerchants.map((merchant) => {
+                    const isSelected = merchant.merchantId === activeMerchantId;
+                    return (
+                      <button
+                        key={merchant.merchantId}
+                        type="button"
+                        onClick={() => setSelectedMerchantId(merchant.merchantId)}
+                        className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-2xl border text-xs font-semibold transition shrink-0 ${
+                          isSelected
+                            ? 'bg-brand-blue text-white border-brand-blue shadow-xs'
+                            : 'bg-emerald-50 text-status-success border-emerald-200 hover:bg-emerald-100/60'
+                        }`}
+                      >
+                        <span>{merchant.shopName}</span>
                         <span
                           className={`text-[10px] px-2 py-0.5 rounded-pill font-semibold inline-flex items-center gap-1 ${
                             isSelected
@@ -408,21 +489,11 @@ export const CitizenReferralPage: React.FC = () => {
                           <CheckCircle2 className="h-3 w-3" />
                           <span>สำเร็จแล้ว</span>
                         </span>
-                      ) : merchant.categoryNameTh ? (
-                        <span
-                          className={`text-[10px] px-2 py-0.5 rounded-pill font-normal ${
-                            isSelected
-                              ? 'bg-white/20 text-white'
-                              : 'bg-white text-ink-muted border border-hairline'
-                          }`}
-                        >
-                          {merchant.categoryNameTh}
-                        </span>
-                      ) : null}
-                    </button>
-                  );
-                })}
-              </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             {/* Notification Banner when user already received invitation for this merchant */}
@@ -458,25 +529,25 @@ export const CitizenReferralPage: React.FC = () => {
                       </span>
                     ) : (
                       <span className="inline-flex items-center px-2 py-0.5 rounded-pill bg-emerald-50 border border-emerald-200 text-status-success font-mono text-[10px] font-semibold">
-                        สะสมรับ ฿40
+                        พร้อมแชร์
                       </span>
                     )}
                   </div>
                   <h2 className="text-lg sm:text-xl font-bold text-ink">
                     {isCurrentMerchantCredited
                       ? 'แนะนำเพื่อนสำหรับร้านนี้สำเร็จเรียบร้อยแล้ว'
-                      : 'ชวนเพื่อนใหม่มาใช้บริการที่ร้าน และสะสมไมล์สโตนรับคูปอง ฿40'}
+                      : 'ชวนเพื่อนใหม่มาใช้บริการที่ร้าน'}
                   </h2>
                   <p className="text-xs text-ink-muted leading-relaxed max-w-xl">
                     {isCurrentMerchantCredited ? (
                       <span>
                         มีเพื่อนนำรหัสคำชวนไปใช้ชำระเงินที่ร้าน <strong>{activeMerchant?.shopName}</strong> สำเร็จแล้ว
-                        ระบบได้นับสะสมร้านค้านี้ในไมล์สโตนของคุณเรียบร้อยแล้ว (จำกัด 1 สิทธิ์สำเร็จต่อ 1 ร้านค้าตลอดโครงการ)
+                        ระบบบันทึกความสำเร็จนี้ไว้ในประวัติการแนะนำเพื่อนแล้ว
                       </span>
                     ) : (
                       <span>
                         เมื่อเพื่อนใหม่นำรหัสไปใช้ชำระเงินที่ร้าน <strong>{activeMerchant?.shopName}</strong> สำเร็จบิลแรก
-                        ระบบจะนับสะสมร้านค้านี้ให้คุณ เมื่อสะสมครบทุก 5 ร้านค้าที่ไม่ซ้ำกัน รับคูปองส่วนลด ฿40.00 ทันที (อายุ 14 วัน)
+                        ระบบจะบันทึกความสำเร็จไว้ในประวัติการแนะนำเพื่อน และอัปเดตภารกิจที่เกี่ยวข้อง
                       </span>
                     )}
                   </p>
@@ -582,73 +653,11 @@ export const CitizenReferralPage: React.FC = () => {
               <div className="pt-3 border-t border-hairline/60 flex items-start gap-2 text-xs text-ink-muted leading-relaxed">
                 <Info className="h-4 w-4 text-brand-blue shrink-0 mt-0.5" />
                 <span>
-                  <strong>กติการางวัลไมล์สโตน (UC 2.4.3):</strong> เพื่อนต้องเป็นลูกค้าใหม่ที่ไม่เคยชำระเงินที่ร้านค้านี้มาก่อน
-                  เมื่อเพื่อนชำระเงินสำเร็จบิลแรก คุณจะสะสมร้านค้านั้น 1 ร้านค้าทันที (จำกัด 1 สิทธิ์สำเร็จต่อ 1 ร้านค้าตลอดโครงการ)
-                  เมื่อสะสมครบทุก 5 ร้านค้าที่ไม่ซ้ำกัน รับคูปองส่วนลด ฿40.00 ทันที (อายุ 14 วันหลังได้รับ)
-                </span>
+                  <strong>วิธีใช้งานโค้ด:</strong> คัดลอกรหัสนี้ส่งให้เพื่อน เมื่อเพื่อนไปที่ร้านและเปิดหน้า <strong>"สแกนจ่ายเงิน Co-pay"</strong> จะมีช่องให้กรอกโค้ดส่วนลด ให้นำรหัสนี้ไปกรอกเพื่อบันทึกสิทธิ์ (เมื่อเพื่อนชำระเงินสำเร็จบิลแรก ผู้แนะนำจะได้รับความคืบหน้าสะสมร้านค้าเพื่อรับคูปอง ฿40)</span>
               </div>
             </div>
 
-            {/* 2.3 SECTION: MILESTONE TRACKER CARD (4/5, 5/5, 10/5 Progress) */}
-            <div className="bg-gradient-to-br from-indigo-900 via-brand-blue to-blue-700 text-white rounded-3xl p-5 sm:p-6 shadow-md relative overflow-hidden">
-              <div className="relative z-10 space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="space-y-1">
-                    <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-pill bg-white/15 backdrop-blur-md text-amber-300 border border-white/20 text-xs font-bold">
-                      <Gift className="h-3.5 w-3.5 text-amber-300" />
-                      <span>ไมล์สโตนรางวัลผู้แนะนำ (Referrer Milestone)</span>
-                    </div>
-                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                      <span>สะสมร้านค้าที่ชวนเพื่อนสำเร็จ (5 ร้านค้า = คูปอง ฿40)</span>
-                    </h3>
-                  </div>
-
-                  <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl px-4 py-2 text-right">
-                    <span className="text-[11px] text-blue-100 block">คูปอง ฿40 ที่ปลดล็อกแล้ว</span>
-                    <span className="font-mono font-numeric text-2xl font-extrabold text-amber-300">
-                      {summary.milestonesCompleted} ใบ
-                    </span>
-                  </div>
-                </div>
-
-                {/* Progress Bar Display */}
-                <div className="bg-black/20 rounded-2xl p-4 border border-white/15 space-y-2">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-blue-100 flex items-center gap-1.5">
-                      <span>ความคืบหน้าสะสมร้านค้า:</span>
-                      <strong className="font-mono text-white text-sm">
-                        {summary.currentMilestoneProgress} / {summary.milestoneTarget} ร้านค้า
-                      </strong>
-                    </span>
-                    <span className="font-mono text-amber-300 font-bold">{milestonePercent}%</span>
-                  </div>
-
-                  {/* Visual Progress Bar */}
-                  <div className="h-3.5 w-full bg-white/20 rounded-full overflow-hidden p-0.5">
-                    <div
-                      className="h-full bg-gradient-to-r from-amber-400 to-amber-300 rounded-full transition-[width] duration-500 shadow-sm"
-                      style={{ width: `${milestonePercent}%` }}
-                    />
-                  </div>
-
-                  <p className="text-[11px] text-blue-100 pt-0.5">
-                    {summary.currentMilestoneProgress === 0 && (summary.totalSuccessfulMerchants ?? summary.totalRedeemed) > 0 ? (
-                      <span>🎉 คุณได้รับคูปอง ฿40.00 จากไมล์สโตนล่าสุดเรียบร้อยแล้ว! ชวนเพื่อนไปร้านค้าใหม่เพื่อรับใบถัดไป</span>
-                    ) : (
-                      <span>
-                        ต้องการร้านค้าที่เพื่อนชำระเงินสำเร็จใหม่อีก{' '}
-                        <strong className="text-white font-mono font-bold">
-                          {summary.merchantsNeededForNextMilestone ?? summary.friendsNeededForNextMilestone} ร้านค้า
-                        </strong>{' '}
-                        เพื่อรับคูปอง ฿40.00 ใบถัดไป
-                      </span>
-                    )}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* 2.4 SECTION: REFERRAL STATISTICS CARDS (3 Metric Cards) */}
+            {/* 2.3 SECTION: REFERRAL STATISTICS CARDS (3 Metric Cards) */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
               <div className="rounded-card border border-hairline bg-white p-5 shadow-sm space-y-1">
                 <div className="flex items-center justify-between">
@@ -699,112 +708,42 @@ export const CitizenReferralPage: React.FC = () => {
               </div>
             </div>
 
-            {/* 2.5 SECTION: EARNED COUPONS LIST (My Coupons from Referrals) */}
-            {earnedCoupons.length > 0 && (
-              <div className="bg-white rounded-card border border-hairline p-5 sm:p-6 shadow-sm space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Ticket className="h-4 w-4 text-brand-blue" />
-                    <h3 className="text-sm font-bold text-ink">
-                      คูปองส่วนลดที่ได้รับจากระบบชวนเพื่อน ({earnedCoupons.length} ใบ)
-                    </h3>
-                  </div>
+            {/* 2.5 SECTION: MISSION AND REWARD LINKS */}
+            <section aria-labelledby="referral-rewards-heading" className="rounded-card border border-blue-200 bg-blue-50/70 p-5 sm:p-6 shadow-sm space-y-4">
+              <div className="flex items-start gap-3">
+                <div className="h-10 w-10 rounded-xl bg-white text-brand-blue flex items-center justify-center border border-blue-200 shrink-0">
+                  <Gift aria-hidden="true" className="h-5 w-5" />
                 </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                  {earnedCoupons.map((coupon) => {
-                    const isMilestone = coupon.rewardType === 'REFERRER_MILESTONE_40';
-                    const isUsed = coupon.status === 'used';
-                    const isExpired =
-                      !isUsed &&
-                      Boolean(
-                        coupon.status === 'expired' ||
-                          (coupon.expiresAt && new Date(coupon.expiresAt).getTime() < Date.now())
-                      );
-
-                    const expiryDateFormatted = coupon.expiresAt
-                      ? new Date(coupon.expiresAt).toLocaleDateString('th-TH', {
-                          year: 'numeric',
-                          month: 'short',
-                          day: 'numeric',
-                        })
-                      : null;
-
-                    let remainingDaysText = null;
-                    if (coupon.expiresAt && !isUsed && !isExpired) {
-                      const diffMs = new Date(coupon.expiresAt).getTime() - Date.now();
-                      if (diffMs > 0) {
-                        const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-                        remainingDaysText = diffDays === 1 ? 'เหลืออีก 1 วัน' : `เหลืออีก ${diffDays} วัน`;
-                      }
-                    }
-
-                    return (
-                      <div
-                        key={coupon.userRewardId}
-                        className={`border rounded-2xl p-3.5 flex items-center justify-between gap-3 ${
-                          isExpired
-                            ? 'border-gray-200 bg-gray-50/80 opacity-80'
-                            : isUsed
-                            ? 'border-hairline bg-surface-soft/40 opacity-75'
-                            : 'border-hairline bg-surface-soft/60'
-                        }`}
-                      >
-                        <div className="space-y-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span
-                              className={`text-[10px] px-2 py-0.5 rounded-pill font-semibold ${
-                                isMilestone
-                                  ? 'bg-amber-100 text-amber-800 border border-amber-200'
-                                  : 'bg-blue-100 text-blue-800 border border-blue-200'
-                              }`}
-                            >
-                              {isMilestone ? 'ไมล์สโตน ฿40' : 'คูปองรางวัล'}
-                            </span>
-                            <span className="font-mono text-xs font-bold text-ink truncate">
-                              {coupon.rewardCode}
-                            </span>
-                          </div>
-                          <p className="text-[11px] text-ink-muted truncate">{coupon.rewardName}</p>
-                          {expiryDateFormatted && (
-                            <p className="text-[10px] text-ink-muted flex items-center gap-1.5 pt-0.5">
-                              <span>หมดอายุ: {expiryDateFormatted}</span>
-                              {remainingDaysText && (
-                                <span className="font-semibold text-amber-700">({remainingDaysText})</span>
-                              )}
-                              {isExpired && (
-                                <span className="font-semibold text-status-danger">(หมดอายุแล้ว)</span>
-                              )}
-                            </p>
-                          )}
-                        </div>
-
-                        <div className="text-right shrink-0">
-                          <span
-                            className={`font-mono text-base font-bold ${
-                              isExpired || isUsed ? 'text-ink-muted' : 'text-status-success'
-                            }`}
-                          >
-                            ฿{coupon.discountValue.toFixed(2)}
-                          </span>
-                          <span
-                            className={`block text-[10px] ${
-                              isUsed
-                                ? 'text-ink-muted font-medium'
-                                : isExpired
-                                ? 'text-status-danger font-semibold'
-                                : 'text-emerald-700 font-semibold'
-                            }`}
-                          >
-                            {isUsed ? 'ใช้งานแล้ว' : isExpired ? 'หมดอายุ' : 'พร้อมใช้งาน'}
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
+                <div className="min-w-0">
+                  <h3 id="referral-rewards-heading" className="text-sm font-bold text-ink">
+                    ติดตามภารกิจและรางวัลจากการชวนเพื่อน
+                  </h3>
+                  <p className="mt-1 text-xs leading-relaxed text-ink-muted">
+                    ระบบบันทึกการแนะนำเพื่อนที่สำเร็จไว้ในประวัติ แล้วอัปเดตภารกิจที่เกี่ยวข้อง ตรวจดูความคืบหน้าและรางวัลที่ได้รับได้จากหน้าด้านล่าง
+                  </p>
                 </div>
               </div>
-            )}
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Link
+                  to={{
+                    pathname: APP_ROUTES.CITIZEN_MISSIONS,
+                    search: '?condition=referral_count',
+                  }}
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-brand-blue px-4 py-2.5 text-xs font-semibold text-white transition-colors hover:bg-brand-blue-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue focus-visible:ring-offset-2"
+                >
+                  <Sparkles aria-hidden="true" className="h-4 w-4" />
+                  <span>ดูความคืบหน้าภารกิจ</span>
+                  <ChevronRight aria-hidden="true" className="h-4 w-4" />
+                </Link>
+                <Link
+                  to={APP_ROUTES.CITIZEN_REWARDS}
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-hairline bg-white px-4 py-2.5 text-xs font-semibold text-ink transition-colors hover:bg-surface-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue focus-visible:ring-offset-2"
+                >
+                  <Ticket aria-hidden="true" className="h-4 w-4 text-brand-blue" />
+                  <span>ดูรางวัลของฉัน</span>
+                </Link>
+              </div>
+            </section>
 
             {/* 2.6 SECTION: REFERRAL CODE VALIDATION TOOL */}
             <div className="rounded-card border border-hairline bg-white p-5 sm:p-6 shadow-sm space-y-4">
@@ -890,7 +829,12 @@ export const CitizenReferralPage: React.FC = () => {
                           • ร้านค้าที่ใช้สิทธิ์ได้: <strong>{validationResult.shopName}</strong>
                         </p>
                         <p>
-                          • สิทธิประโยชน์: <strong>คูปองส่วนลด ฿{validationResult.discountAmount?.toFixed(2)}</strong>
+                          • ส่วนลดจากรหัสคำชวน:{' '}
+                          <strong>
+                            {validationResult.discountAmount
+                              ? `฿${validationResult.discountAmount.toFixed(2)}`
+                              : 'ไม่มีส่วนลดเพิ่มเติม'}
+                          </strong>
                         </p>
                       </div>
                     </div>
@@ -911,116 +855,74 @@ export const CitizenReferralPage: React.FC = () => {
               )}
             </div>
 
-            {/* 2.7 SECTION: REFERRED FRIENDS LIST */}
+            {/* 2.7 SECTION: SUCCESSFUL REFERRAL HISTORY */}
             <div className="space-y-3">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5">
                 <div>
                   <h3 className="text-sm font-bold text-ink flex items-center gap-1.5">
                     <Clock className="h-4 w-4 text-brand-blue" />
-                    <span>ประวัติคำชวนและรายชื่อเพื่อนที่แนะนำสำหรับร้านนี้</span>
+                    <span>ประวัติการแนะนำเพื่อนสำเร็จ</span>
                   </h3>
                   <p className="text-xs text-ink-muted">
-                    แสดงสถานะการใช้สิทธิ์ของเพื่อนตามลำดับเวลาล่าสุด
+                    แสดงประวัติร้านค้าและเพื่อนที่ใช้สิทธิ์ชวนเพื่อนสำเร็จตามลำดับเวลาล่าสุด (รวมทุกร้านค้า)
                   </p>
                 </div>
 
-                <div className="flex items-center gap-1 bg-white border border-hairline p-1 rounded-pill self-start sm:self-auto text-xs">
-                  <button
-                    type="button"
-                    onClick={() => setFriendFilter('all')}
-                    className={`px-3 py-1 rounded-pill transition ${
-                      friendFilter === 'all'
-                        ? 'bg-ink text-white font-semibold shadow-xs'
-                        : 'text-ink-muted hover:text-ink'
-                    }`}
-                  >
-                    ทั้งหมด ({friendsList.length})
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setFriendFilter('redeemed')}
-                    className={`px-3 py-1 rounded-pill transition ${
-                      friendFilter === 'redeemed'
-                        ? 'bg-status-success text-white font-semibold shadow-xs'
-                        : 'text-ink-muted hover:text-ink'
-                    }`}
-                  >
-                    สำเร็จ ({summary.totalRedeemed})
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setFriendFilter('pending')}
-                    className={`px-3 py-1 rounded-pill transition ${
-                      friendFilter === 'pending'
-                        ? 'bg-amber-500 text-white font-semibold shadow-xs'
-                        : 'text-ink-muted hover:text-ink'
-                    }`}
-                  >
-                    รอใช้สิทธิ์ ({summary.totalPending})
-                  </button>
+                <div className="flex items-center gap-1.5 self-start sm:self-auto">
+                  <span className="inline-flex items-center gap-1.5 rounded-pill bg-emerald-50 px-3 py-1 text-xs font-semibold text-status-success border border-emerald-200 shadow-2xs">
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    <span>ชวนสำเร็จแล้ว {successfulFriends.length} รายการ</span>
+                  </span>
                 </div>
               </div>
 
-              {filteredFriends.length > 0 ? (
+              {successfulFriends.length > 0 ? (
                 <div className="space-y-2.5">
-                  {filteredFriends.map((friend) => (
+                  {successfulFriends.map((friend) => (
                     <article
                       key={friend.referralId}
-                      className="bg-white border border-hairline rounded-card p-4 shadow-2xs hover:shadow-xs transition flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                      className="bg-white border border-hairline rounded-card p-4 shadow-2xs hover:shadow-xs transition flex flex-col sm:flex-row sm:items-center justify-between gap-3.5"
                     >
-                      <div className="flex items-start sm:items-center gap-3 min-w-0">
-                        <div
-                          className={`h-10 w-10 rounded-2xl flex items-center justify-center shrink-0 border ${
-                            friend.status === 'redeemed'
-                              ? 'bg-emerald-50 text-status-success border-emerald-200'
-                              : 'bg-amber-50 text-amber-600 border-amber-200'
-                          }`}
-                        >
-                          {friend.status === 'redeemed' ? (
-                            <CheckCircle2 className="h-5 w-5" />
-                          ) : (
-                            <Clock className="h-5 w-5" />
-                          )}
+                      <div className="flex items-start sm:items-center gap-3.5 min-w-0">
+                        <div className="h-11 w-11 rounded-2xl flex items-center justify-center shrink-0 border bg-emerald-50 text-status-success border-emerald-200">
+                          <CheckCircle2 className="h-5 w-5" />
                         </div>
 
-                        <div className="min-w-0 space-y-0.5">
+                        <div className="min-w-0 space-y-1">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <h4 className="text-xs sm:text-sm font-bold text-ink truncate">
-                              {friend.friendName}
-                            </h4>
+                            <span className="text-xs sm:text-sm font-bold text-ink truncate flex items-center gap-1.5">
+                              <Store className="h-3.5 w-3.5 text-brand-blue shrink-0" />
+                              <span>{friend.merchantName || 'ร้านค้าชุมชน'}</span>
+                            </span>
                             <span className="font-mono font-numeric text-[11px] text-ink-muted bg-surface-soft px-2 py-0.5 rounded-pill border border-hairline">
                               {friend.referralCode}
                             </span>
                           </div>
-                          <p className="text-[11px] text-ink-muted truncate">
-                            {friend.status === 'redeemed' && friend.redeemedAt
-                              ? `ชำระเงินสำเร็จเมื่อ: ${new Date(friend.redeemedAt).toLocaleDateString('th-TH', {
+
+                          <div className="text-xs text-ink-body flex items-center gap-1.5 flex-wrap">
+                            <span className="text-ink-muted">เพื่อนที่แนะนำ:</span>
+                            <strong className="text-ink font-semibold">{friend.friendName}</strong>
+                          </div>
+
+                          <p className="text-[11px] text-ink-muted">
+                            {friend.redeemedAt
+                              ? `ชวนสำเร็จเมื่อ: ${new Date(friend.redeemedAt).toLocaleDateString('th-TH', {
                                   day: 'numeric',
                                   month: 'short',
                                   year: 'numeric',
-                                })}`
-                              : `สร้างคำชวนเมื่อ: ${new Date(friend.invitedAt).toLocaleDateString('th-TH', {
-                                  day: 'numeric',
-                                  month: 'short',
-                                  year: 'numeric',
-                                })}`}
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })} น.`
+                              : 'ชวนสำเร็จแล้ว'}
                           </p>
                         </div>
                       </div>
 
                       <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-hairline/60">
                         <div className="text-right">
-                          <span
-                            className={`inline-flex items-center px-2.5 py-0.5 rounded-pill text-[11px] font-semibold border ${
-                              friend.status === 'redeemed'
-                                ? 'bg-emerald-50 text-status-success border-emerald-200'
-                                : 'bg-amber-50 text-amber-700 border-amber-200'
-                            }`}
-                          >
-                            {friend.status === 'redeemed' ? 'สำเร็จแล้ว' : 'รอเพื่อนใช้สิทธิ์'}
-                          </span>
-                          <span className="block text-[10px] text-ink-muted mt-0.5 font-mono">
-                            คูปองเพื่อน ฿{friend.discountAmount.toFixed(2)}
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-pill text-[11px] font-semibold border bg-emerald-50 text-status-success border-emerald-200">
+                            <CheckCircle2 className="h-3 w-3" />
+                            <span>ชวนสำเร็จแล้ว</span>
                           </span>
                         </div>
                       </div>
@@ -1029,15 +931,15 @@ export const CitizenReferralPage: React.FC = () => {
                 </div>
               ) : (
                 <div className="bg-white border border-hairline rounded-card p-8 sm:p-10 text-center shadow-xs space-y-3">
-                  <div className="h-12 w-12 rounded-full bg-blue-50 text-brand-blue flex items-center justify-center mx-auto border border-blue-200">
-                    <Users className="h-6 w-6" />
+                  <div className="h-12 w-12 rounded-full bg-emerald-50 text-status-success flex items-center justify-center mx-auto border border-emerald-200">
+                    <CheckCircle2 className="h-6 w-6" />
                   </div>
                   <div>
                     <h4 className="text-sm sm:text-base font-bold text-ink">
-                      ยังไม่มีรายการเพื่อนในตัวกรองนี้
+                      ยังไม่มีประวัติการชวนเพื่อนสำเร็จ
                     </h4>
                     <p className="text-xs text-ink-muted mt-1 leading-relaxed max-w-sm mx-auto">
-                      แชร์รหัสคำชวนร้านนี้ให้เพื่อนเพื่อเริ่มต้นสะสมร้านค้าความคืบหน้ารับคูปอง ฿40
+                      เลือกร้านค้าด้านบนแล้วส่งโค้ดให้เพื่อน เมื่อเพื่อนไปใช้บริการและสแกนจ่ายเงินสำเร็จ รายการจะแสดงที่นี่
                     </p>
                   </div>
                 </div>

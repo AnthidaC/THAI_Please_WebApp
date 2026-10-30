@@ -154,6 +154,9 @@ export const CitizenRewardsPage: React.FC = () => {
                           <p className="mt-1 break-all font-mono text-xs text-ink-muted" translate="no">
                             รหัส {reward.rewardCode}
                           </p>
+                          <p className="mt-1 text-xs text-ink-muted">
+                            ยอดซื้อขั้นต่ำ {reward.minimumSpend > 0 ? bahtFormat.format(reward.minimumSpend) : 'ไม่มีขั้นต่ำ'}
+                          </p>
                         </div>
                       </div>
 

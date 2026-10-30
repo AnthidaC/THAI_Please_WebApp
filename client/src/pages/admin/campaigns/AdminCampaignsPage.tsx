@@ -361,7 +361,9 @@ export const AdminCampaignsPage: React.FC = () => {
         <div key="primary" className="flex items-start gap-3"><div className="mt-0.5 rounded-xl bg-emerald-50 p-2 text-emerald-700"><Gift className="h-4 w-4" /></div><div><p className="font-semibold text-ink">{item.name}</p><p className="mt-1 max-w-[250px] truncate text-xs text-ink-muted">{item.description || (item.type === 'coupon' ? 'คูปองสิทธิประโยชน์' : 'ส่วนลด')}</p></div></div>,
         <div key="type" className="min-w-[100px]"><p className="text-sm font-semibold text-ink">{item.type === 'coupon' ? 'คูปอง' : 'ส่วนลด'}</p><p className="mt-1 text-xs text-ink-muted">อายุ {item.validDays} วัน</p></div>,
         <div key="value" className="min-w-[100px]"><p className="font-mono text-sm font-semibold text-ink">{valueLabel}</p><p className="mt-1 text-xs text-ink-muted">มูลค่ารางวัล</p></div>,
-        <div key="count" className="min-w-[112px]"><p className="font-mono text-sm font-medium text-ink">{item.quotaLimit === null ? formatNumber(item.issuedCount) : `${formatNumber(item.redeemedCount)} / ${formatNumber(item.quotaLimit)}`}</p><p className="mt-1 text-xs text-ink-muted">{item.quotaLimit === null ? 'มอบให้ผู้ใช้' : 'ใช้แล้ว / โควตา'}</p>{item.quotaLimit !== null && <p className="mt-1 text-[11px] text-ink-muted">เหลือ {formatNumber(Math.max(0, item.quotaLimit - item.redeemedCount))} · ออกแล้ว {formatNumber(item.issuedCount)}</p>}</div>,
+        <div key="minimumSpend" className="min-w-[125px]"><p className="font-mono text-sm font-medium tabular-nums text-ink">{formatBaht(item.minimumSpend)}</p><p className="mt-1 text-xs text-ink-muted">ยอดซื้อขั้นต่ำ</p></div>,
+        <div key="quota" className="min-w-[105px]"><p className="font-mono text-sm font-medium tabular-nums text-ink">{item.quotaLimit === null ? 'ไม่จำกัด' : formatNumber(item.quotaLimit)}</p><p className="mt-1 text-xs text-ink-muted">โควตารวม</p>{item.quotaLimit !== null && <p className="mt-1 text-[11px] text-ink-muted">ใช้แล้ว {formatNumber(item.redeemedCount)}</p>}</div>,
+        <div key="issued" className="min-w-[92px]"><p className="font-mono text-sm font-medium tabular-nums text-ink">{formatNumber(item.issuedCount)}</p><p className="mt-1 text-xs text-ink-muted">มอบแล้ว</p></div>,
         <div key="status"><StatusPill status={item.status} /></div>,
       ];
     }
@@ -458,14 +460,25 @@ export const AdminCampaignsPage: React.FC = () => {
                   <span className="inline-flex items-center gap-1.5"><CalendarDays className="h-3.5 w-3.5" />อัปเดตจากฐานข้อมูล</span>
                 </div>
                 <div className="mt-2 overflow-x-auto">
-                  <table className="w-full min-w-[950px] border-separate border-spacing-0 text-left">
+                  <table className={`w-full ${resource === 'rewards' ? 'min-w-[1180px]' : 'min-w-[950px]'} border-separate border-spacing-0 text-left`}>
                     <thead>
                       <tr className="text-[11px] font-bold uppercase tracking-wide text-ink-muted">
                         <th scope="col" className="w-[28%] px-3 py-3">รายละเอียด</th>
                         <th scope="col" className="px-3 py-3">{resource === 'badges' ? 'ประเภทเงื่อนไข' : resource === 'campaigns' ? 'สัดส่วนร่วมจ่าย' : resource === 'missions' ? 'แคมเปญ / รางวัล' : 'ประเภท / อายุ'}</th>
                         <th scope="col" className="px-3 py-3">{resource === 'badges' ? 'ระดับและเกณฑ์' : resource === 'campaigns' ? 'ระยะเวลา' : resource === 'missions' ? 'เป้าหมาย' : 'มูลค่า'}</th>
-                        <th scope="col" className="px-3 py-3">{resource === 'badges' ? 'สถานะการพัฒนา' : resource === 'campaigns' ? 'วงเงิน' : resource === 'missions' ? 'ช่วงเวลา' : 'มอบแล้ว'}</th>
-                        <th scope="col" className="px-3 py-3">{resource === 'badges' ? 'การเปิดใช้งาน' : 'สถานะ'}</th>
+                        {resource === 'rewards' ? (
+                          <>
+                            <th scope="col" className="px-3 py-3">ยอดซื้อขั้นต่ำ</th>
+                            <th scope="col" className="px-3 py-3">โควตา</th>
+                            <th scope="col" className="px-3 py-3">มอบแล้ว</th>
+                            <th scope="col" className="px-3 py-3">สถานะ</th>
+                          </>
+                        ) : (
+                          <>
+                            <th scope="col" className="px-3 py-3">{resource === 'badges' ? 'สถานะการพัฒนา' : resource === 'campaigns' ? 'วงเงิน' : 'ช่วงเวลา'}</th>
+                            <th scope="col" className="px-3 py-3">{resource === 'badges' ? 'การเปิดใช้งาน' : 'สถานะ'}</th>
+                          </>
+                        )}
                         <th scope="col" className="px-3 py-3 text-right">จัดการ</th>
                       </tr>
                     </thead>
@@ -473,11 +486,7 @@ export const AdminCampaignsPage: React.FC = () => {
                       {filteredRows.map((record) => {
                         const cells = renderMainCell(record);
                         return <tr key={record.id} className="group transition hover:bg-surface-soft/70">
-                          <td className="border-t border-hairline-soft px-3 py-4 align-middle">{cells[0]}</td>
-                          <td className="border-t border-hairline-soft px-3 py-4 align-middle">{cells[1]}</td>
-                          <td className="border-t border-hairline-soft px-3 py-4 align-middle">{cells[2]}</td>
-                          <td className="border-t border-hairline-soft px-3 py-4 align-middle">{cells[3]}</td>
-                          <td className="border-t border-hairline-soft px-3 py-4 align-middle">{cells[4]}</td>
+                          {cells.map((cell, index) => <td key={index} className="border-t border-hairline-soft px-3 py-4 align-middle">{cell}</td>)}
                           <td className="border-t border-hairline-soft px-3 py-4 text-right align-middle">
                             <div className="inline-flex items-center gap-1">
                               {resource === 'badges' ? (() => {
