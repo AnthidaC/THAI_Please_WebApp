@@ -14,7 +14,6 @@ import {
   Calendar,
   CheckCircle2,
   Award,
-  Clock,
   UserCheck,
   Info,
 } from 'lucide-react';
@@ -25,10 +24,13 @@ import {
   getBuyerHistory,
 } from '../../../services/paymentApi';
 import { APP_ROUTES } from '../../../constants/routes';
+import { useAuthStore } from '../../../stores/authStore';
+import { WalletSecuritySettings } from '../../../components/payment/WalletSecuritySettings';
 
 export const CitizenWalletPage: React.FC = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const user = useAuthStore((state) => state.user);
   const [showTopUpModal, setShowTopUpModal] = useState(false);
   const [topUpAmount, setTopUpAmount] = useState<number>(300);
   const [topUpSuccessMsg, setTopUpSuccessMsg] = useState<string | null>(null);
@@ -41,15 +43,17 @@ export const CitizenWalletPage: React.FC = () => {
     isError: isWalletError,
     refetch: refetchWallet,
   } = useQuery({
-    queryKey: ['wallet-balance'],
+    queryKey: ['wallet-balance', user?.id],
     queryFn: getWalletBalance,
+    enabled: Boolean(user?.id),
     refetchInterval: 10000,
   });
 
   // ดึงประวัติธุรกรรมล่าสุด
   const { data: transactions, isLoading: isTxLoading } = useQuery({
-    queryKey: ['buyer-history'],
+    queryKey: ['buyer-history', user?.id],
     queryFn: getBuyerHistory,
+    enabled: Boolean(user?.id),
   });
 
   // Mutation สำหรับเติมเงิน
@@ -91,6 +95,17 @@ export const CitizenWalletPage: React.FC = () => {
     ? Math.min(100, Math.round((wallet.dailyQuotaUsed / dailyLimit) * 100))
     : 0;
 
+  // คำนวณยอดใช้ไปและเปอร์เซ็นต์ของช่วงสิทธิ / ยอดรวม
+  const periodLimit = wallet?.periodQuota.enabled && wallet.periodQuota.currentPeriod
+    ? wallet.periodQuota.currentPeriod.quotaLimit
+    : (wallet?.campaignInfo?.totalLimit || 0);
+  const periodUsed = wallet?.periodQuota.enabled && wallet.periodQuota.currentPeriod
+    ? wallet.periodQuota.currentPeriod.quotaUsed
+    : (wallet?.campaignInfo ? Math.max(0, wallet.campaignInfo.totalLimit - (wallet.totalQuotaRemaining || 0)) : 0);
+  const periodUsedPercent = periodLimit > 0
+    ? Math.min(100, Math.round((periodUsed / periodLimit) * 100))
+    : 0;
+
   // คำนวณวันสิ้นสุดของงวดปัจจุบัน (วันสิ้นเดือนของงวดปัจจุบัน)
   const getFallbackCycleDates = () => {
     const thaiMonths = [
@@ -107,8 +122,22 @@ export const CitizenWalletPage: React.FC = () => {
     };
   };
   const fallbackCycle = getFallbackCycleDates();
-  const currentCycleName = wallet?.monthlyCycle?.currentMonthName ?? fallbackCycle.monthName;
-  const currentValidUntil = wallet?.monthlyCycle?.validUntilDate ?? fallbackCycle.validUntil;
+  const formatThaiPeriodDate = (dateStr: string) => new Intl.DateTimeFormat('th-TH', {
+    timeZone: 'Asia/Bangkok', dateStyle: 'medium', timeStyle: 'short',
+  }).format(new Date(dateStr));
+  const periodStatusLabel: Record<string, string> = {
+    BEFORE_FIRST: 'ยังไม่เริ่มช่วงสิทธิ์',
+    BETWEEN_PERIODS: 'ไม่มีช่วงที่ใช้งานในขณะนี้',
+    AFTER_LAST: 'สิ้นสุดช่วงสิทธิ์แล้ว',
+    ALLOCATION_MISSING: 'กำลังจัดสรรวงเงินช่วงนี้',
+    INVALID_OVERLAP: 'ช่วงเวลาโครงการมีข้อมูลทับซ้อน',
+  };
+  const currentCycleName = wallet?.periodQuota.enabled
+    ? wallet.periodQuota.currentPeriod?.name ?? periodStatusLabel[wallet.periodQuota.status] ?? 'ไม่มีช่วงที่ใช้งาน'
+    : wallet?.monthlyCycle?.currentMonthName ?? fallbackCycle.monthName;
+  const currentValidUntil = wallet?.periodQuota.enabled && wallet.periodQuota.currentPeriod
+    ? formatThaiPeriodDate(wallet.periodQuota.currentPeriod.endDate)
+    : wallet?.monthlyCycle?.validUntilDate ?? fallbackCycle.validUntil;
 
   // แปลงวันที่แบบย่อภาษาไทย
   const formatThaiDate = (dateStr?: string) => {
@@ -123,34 +152,35 @@ export const CitizenWalletPage: React.FC = () => {
   };
 
   const isEligible = wallet?.eligibilityStatus === 'ELIGIBLE';
+  const periodCanBeSpent = !wallet?.periodQuota.enabled || wallet.periodQuota.status === 'ACTIVE';
   const availableReg = wallet?.availableCampaignForRegistration;
   const hasOpenRegistration = !isEligible && !!availableReg?.isRegistrationOpen;
 
   return (
     <div className="min-h-screen bg-surface-soft pb-24 md:pb-12 font-sans text-ink">
-      {/* Page Title & Action Bar */}
-      <div className="bg-white border-b border-hairline px-3.5 sm:px-6 lg:px-8 py-3 sm:py-3.5 mb-4 shadow-2xs">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-2">
+      {/* 1. Page Header (Seamlessly integrated into canvas — No duplicate white bar) */}
+      <div className="mx-auto max-w-6xl px-3.5 sm:px-6 lg:px-8 pt-4 sm:pt-6 pb-2">
+        <div className="flex items-center justify-between gap-3">
           <div className="flex items-center space-x-2.5 min-w-0">
-            <div className="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-blue-light text-brand-blue shadow-xs">
-              <Wallet className="h-4 w-4 sm:h-5 sm:w-5" />
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-blue-light text-brand-blue shadow-xs">
+              <Wallet className="h-5 w-5" />
             </div>
             <div className="min-w-0">
-              <h1 className="text-sm sm:text-base md:text-lg font-bold text-ink truncate">
-                กระเป๋าเงินดิจิทัลประชาชน
+              <h1 className="text-base sm:text-lg md:text-xl font-bold text-ink truncate">
+                กระเป๋าเงินประชาชน
               </h1>
-              <p className="text-[11px] sm:text-xs text-ink-muted truncate">
-                โครงการไทยช่วยไทยพลีส (Co-pay 60/40)
+              <p className="text-xs text-ink-muted truncate">
+                ยอดเงินคงเหลือและสิทธิร่วมจ่าย Co-pay 60/40
               </p>
             </div>
           </div>
           <button
             onClick={() => refetchWallet()}
-            className="flex shrink-0 items-center space-x-1.5 rounded-pill px-2.5 sm:px-3 py-1.5 text-xs font-medium text-ink-muted bg-surface-soft hover:bg-gray-200 hover:text-ink transition border border-hairline"
+            className="flex shrink-0 items-center space-x-1.5 rounded-full px-3 py-1.5 text-xs font-semibold text-slate-600 bg-white hover:bg-slate-50 hover:text-ink transition border border-slate-200/80 shadow-2xs"
             title="รีเฟรชข้อมูล"
           >
-            <RefreshCw className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">อัปเดตล่าสุด</span>
+            <RefreshCw className={`h-3.5 w-3.5 text-brand-blue ${isWalletLoading ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline">อัปเดตข้อมูล</span>
           </button>
         </div>
       </div>
@@ -178,22 +208,22 @@ export const CitizenWalletPage: React.FC = () => {
         {/* Responsive Grid: Single column on Mobile, 12-Col Split on Tablet/Desktop */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 items-start">
           {/* Left Column: Balances & Quota (lg:col-span-7) */}
-          <div className="lg:col-span-7 space-y-4">
+          <div className="lg:col-span-7 space-y-3 sm:space-y-4">
             {/* 1. การ์ดยอดเงินส่วนตัว (Personal Wallet Balance) */}
-            <section className="relative overflow-hidden rounded-card border border-hairline bg-white p-4 sm:p-5 md:p-6 shadow-sm transition hover:shadow-md">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="text-[11px] sm:text-xs font-medium uppercase tracking-wider text-ink-muted">
+            <section className="relative overflow-hidden rounded-2xl border border-hairline bg-white p-3.5 sm:p-5 shadow-xs">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-semibold text-ink-muted">
                   ยอดเงินในกระเป๋าส่วนตัว
                 </span>
-                <span className="inline-flex items-center rounded-pill bg-emerald-50 px-2.5 py-0.5 text-[11px] sm:text-xs font-medium text-status-success border border-emerald-200">
-                  <span className="mr-1.5 h-1.5 w-1.5 rounded-full bg-status-success animate-pulse" />
+                <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-status-success border border-emerald-200">
+                  <span className="mr-1 h-1.5 w-1.5 rounded-full bg-status-success animate-pulse" />
                   พร้อมใช้งาน
                 </span>
               </div>
 
-              <div className="mt-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3.5">
+              <div className="mt-2.5 flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="font-mono text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight text-ink break-all">
+                  <div className="font-mono text-2xl sm:text-3xl font-extrabold tracking-tight text-ink truncate">
                     ฿{' '}
                     {isWalletLoading
                       ? '---.--'
@@ -202,114 +232,121 @@ export const CitizenWalletPage: React.FC = () => {
                         })}
                   </div>
                 </div>
-                <div className="flex items-center gap-2 w-full sm:w-auto">
-                  <button
-                    id="btn-open-topup"
-                    onClick={() => setShowTopUpModal(true)}
-                    className="flex-1 sm:flex-initial inline-flex items-center justify-center space-x-1.5 rounded-pill border border-blue-200 bg-blue-50 px-4 py-2.5 sm:py-2 text-xs font-semibold text-brand-blue transition hover:bg-blue-100 active:scale-95"
-                  >
-                    <PlusCircle className="h-4 w-4 shrink-0" />
-                    <span>เติมเงิน</span>
-                  </button>
-                  <button
-                    onClick={() => navigate(APP_ROUTES.CITIZEN_SCAN_COPAY)}
-                    className="flex-1 sm:flex-initial lg:hidden inline-flex items-center justify-center space-x-1.5 rounded-pill bg-brand-blue px-4 py-2.5 sm:py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-brand-blue-hover active:scale-95"
-                  >
-                    <QrCode className="h-4 w-4 shrink-0" />
-                    <span>สแกนจ่าย</span>
-                  </button>
-                </div>
+                <button
+                  id="btn-open-topup"
+                  onClick={() => setShowTopUpModal(true)}
+                  className="inline-flex items-center justify-center space-x-1 rounded-full border border-blue-200 bg-blue-50 px-3.5 py-1.5 text-xs font-semibold text-brand-blue transition hover:bg-blue-100 active:scale-95 shrink-0"
+                >
+                  <PlusCircle className="h-3.5 w-3.5 shrink-0" />
+                  <span>เติมเงิน</span>
+                </button>
               </div>
             </section>
 
-            {/* 2. สิทธิโครงการ Co-pay: แบ่งเป็น 3 กรณีตามสถานะและ DB */}
-
-            {/* กรณีที่ 1: ผู้ใช้มีสิทธิ์รับเงินสมทบ (ELIGIBLE) */}
+            {/* 2. สิทธิโครงการ Co-pay: กระชับ พอดีหน้าจอ ไม่ใหญ่เทอะทะ */}
             {isEligible && (
-              <section className="rounded-card border border-blue-100 bg-gradient-to-br from-blue-50/80 to-white p-4 sm:p-5 md:p-6 shadow-sm">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex items-center space-x-2">
-                    <Sparkles className="h-4 w-4 text-brand-blue shrink-0" />
-                    <h2 className="text-sm sm:text-base font-semibold text-ink">
-                      {wallet.campaignInfo?.campaignName || 'สิทธิรัฐช่วยจ่าย 60% (Co-pay)'}
-                    </h2>
-                  </div>
-                  <span className="inline-flex items-center rounded-pill bg-blue-100/70 px-2.5 py-0.5 text-[11px] sm:text-xs font-semibold text-brand-blue border border-blue-200">
-                    <Calendar className="mr-1 h-3 w-3 shrink-0" />
-                    <span>งวดปัจจุบัน: {currentCycleName}</span>
-                  </span>
-                </div>
-
-                <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {/* การ์ดโควตารายวัน */}
-                  <div className="rounded-2xl border border-hairline/60 bg-white p-3.5 sm:p-4 shadow-2xs flex flex-col justify-between">
-                    <div>
-                      <span className="text-xs font-medium text-ink-muted block">โควตาวันนี้คงเหลือ</span>
-                      <div className="mt-1 font-mono text-xl sm:text-2xl font-bold text-brand-blue">
-                        ฿ {isWalletLoading ? '---' : wallet.dailyQuotaRemaining.toFixed(2)}
-                      </div>
+              <section className="rounded-2xl border border-blue-100 bg-white p-3.5 sm:p-5 shadow-xs space-y-3">
+                {/* Header: ชื่อโครงการและงวด */}
+                <div className="flex items-center justify-between gap-2 border-b border-hairline/70 pb-2.5">
+                  <div className="flex items-center space-x-2 min-w-0">
+                    <div className="h-7 w-7 rounded-lg bg-blue-50 text-brand-blue flex items-center justify-center shrink-0">
+                      <Sparkles className="h-3.5 w-3.5" />
                     </div>
-                    <div className="mt-2 pt-2 border-t border-hairline/60 flex items-center justify-between text-[11px] text-ink-muted">
-                      <span>เพดานรายวัน (จาก DB)</span>
-                      <span className="font-mono font-semibold text-ink">
-                        ฿{wallet.dailyQuotaLimit.toFixed(2)} / วัน
+                    <div className="min-w-0">
+                      <h2 className="text-xs sm:text-sm font-bold text-ink truncate">
+                        {wallet.campaignInfo?.campaignName || 'สิทธิรัฐช่วยจ่าย 60% (Co-pay)'}
+                      </h2>
+                      <span className="text-[10px] sm:text-xs text-ink-muted block truncate">
+                        งวดประจำเดือน: {currentCycleName}
                       </span>
                     </div>
                   </div>
+                  <span className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-0.5 text-[10px] sm:text-xs font-semibold text-brand-blue border border-blue-200/80 shrink-0">
+                    <Calendar className="mr-1 h-3 w-3 shrink-0" />
+                    <span>ถึง {currentValidUntil}</span>
+                  </span>
+                </div>
 
-                  {/* การ์ดโควตารวมสะสม */}
-                  <div className="rounded-2xl border border-hairline/60 bg-white p-3.5 sm:p-4 shadow-2xs flex flex-col justify-between">
+                {/* 2 คอลัมน์คู่ขนานทั้งบน Mobile และ Desktop กระชับพอดี ไม่กินพื้นที่แนวตั้ง */}
+                <div className="grid grid-cols-2 gap-2 sm:gap-3">
+                  {/* กล่อง 1: สิทธิวันนี้ */}
+                  <div className="rounded-xl border border-hairline bg-surface-soft/60 p-2.5 sm:p-3.5 flex flex-col justify-between">
                     <div>
-                      <div className="flex flex-wrap items-center justify-between gap-1">
-                        <span className="text-xs font-medium text-ink-muted">เงินสะสมคงเหลือปัจจุบัน</span>
-                        <span className="rounded-pill bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-200">
-                          งวดนี้ (เดือนละ ฿1,000)
+                      <div className="flex items-center justify-between text-[10px] sm:text-xs">
+                        <span className="font-semibold text-ink-muted truncate">สิทธิวันนี้</span>
+                        <span className="font-mono text-brand-blue font-medium shrink-0">
+                          ฿{wallet.dailyQuotaLimit.toFixed(0)}/วัน
                         </span>
                       </div>
-                      <div className="mt-1 font-mono text-xl sm:text-2xl font-bold text-emerald-600">
+                      <div className="mt-1 font-mono text-lg sm:text-2xl font-extrabold text-brand-blue truncate">
+                        ฿ {isWalletLoading ? '---' : wallet.dailyQuotaRemaining.toLocaleString('th-TH', { minimumFractionDigits: 2 })}
+                      </div>
+                    </div>
+                    
+                    {/* Mini progress bar */}
+                    <div className="mt-2 pt-1.5 border-t border-hairline/60">
+                      <div className="flex items-center justify-between text-[9px] sm:text-[11px] text-ink-muted mb-1">
+                        <span>ใช้แล้ว</span>
+                        <span className="font-mono font-semibold text-ink">
+                          ฿{wallet.dailyQuotaUsed.toFixed(0)} ({dailyUsedPercent}%)
+                        </span>
+                      </div>
+                      <div className="h-1.5 w-full rounded-full bg-slate-200 overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-brand-blue transition-all duration-500"
+                          style={{ width: `${dailyUsedPercent}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* กล่อง 2: สิทธิคงเหลือรอบนี้ / รวม */}
+                  <div className="rounded-xl border border-hairline bg-surface-soft/60 p-2.5 sm:p-3.5 flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between text-[10px] sm:text-xs">
+                        <span className="font-semibold text-ink-muted truncate">
+                          {wallet.periodQuota.enabled ? 'คงเหลือช่วงนี้' : 'คงเหลือรวม'}
+                        </span>
+                        <span className="rounded-full bg-emerald-50 px-1.5 py-0.5 text-[9px] sm:text-[10px] font-bold text-emerald-700 border border-emerald-200 shrink-0">
+                          {wallet.periodQuota.enabled && wallet.periodQuota.currentPeriod
+                            ? `เต็ม ฿${wallet.periodQuota.currentPeriod.quotaLimit.toLocaleString('th-TH')}`
+                            : 'สะสม'}
+                        </span>
+                      </div>
+                      <div className="mt-1 font-mono text-lg sm:text-2xl font-extrabold text-emerald-600 truncate">
                         ฿{' '}
                         {isWalletLoading
                           ? '---'
-                          : wallet.totalQuotaRemaining.toLocaleString('th-TH', {
-                              minimumFractionDigits: 2,
-                            })}
+                          : (wallet.periodQuota.enabled && wallet.periodQuota.currentPeriod
+                              ? wallet.periodQuota.currentPeriod.quotaRemaining
+                              : wallet.totalQuotaRemaining
+                            ).toLocaleString('th-TH', { minimumFractionDigits: 2 })}
                       </div>
                     </div>
-                    <div className="mt-2 pt-2 border-t border-hairline/60 flex items-center justify-between gap-2 text-[11px]">
-                      <span className="text-ink-muted">ใช้ได้ถึงวันที่:</span>
-                      <span className="font-semibold text-brand-blue">{currentValidUntil}</span>
+
+                    {/* Mini progress bar */}
+                    <div className="mt-2 pt-1.5 border-t border-hairline/60">
+                      <div className="flex items-center justify-between text-[9px] sm:text-[11px] text-ink-muted mb-1">
+                        <span>ใช้แล้ว</span>
+                        <span className="font-mono font-semibold text-ink">
+                          ฿{periodUsed.toFixed(0)} ({periodUsedPercent}%)
+                        </span>
+                      </div>
+                      <div className="h-1.5 w-full rounded-full bg-slate-200 overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-emerald-600 transition-all duration-500"
+                          style={{ width: `${periodUsedPercent}%` }}
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
 
-                {/* แถบการใช้สิทธิรายวัน */}
-                <div className="mt-4 pt-3.5 border-t border-hairline/70">
-                  <div className="flex items-center justify-between gap-2 text-[11px] sm:text-xs text-ink-muted mb-1.5">
-                    <span className="font-medium text-ink truncate">
-                      การใช้สิทธิวันนี้ (รีเซ็ตทุกวัน 06:00 น.)
-                    </span>
-                    <span className="font-mono font-semibold text-brand-blue shrink-0">
-                      {dailyUsedPercent}%
-                    </span>
-                  </div>
-                  <div className="h-2.5 w-full rounded-full bg-gray-200 overflow-hidden">
-                    <div
-                      className="h-full rounded-full bg-brand-blue transition-all duration-500"
-                      style={{ width: `${dailyUsedPercent}%` }}
-                    />
-                  </div>
-                </div>
-
-                {/* ระยะเวลาของโครงการจาก DB */}
-                {wallet.campaignInfo && (
-                  <div className="mt-3 flex items-center justify-between text-[11px] text-ink-muted pt-2 border-t border-hairline/60">
-                    <span className="flex items-center space-x-1">
-                      <Clock className="h-3 w-3 text-brand-blue shrink-0" />
-                      <span>ระยะเวลาโครงการ:</span>
-                    </span>
-                    <span className="font-medium text-ink">
-                      {formatThaiDate(wallet.campaignInfo.startDate)} - {formatThaiDate(wallet.campaignInfo.endDate)}
-                    </span>
+                {/* Status banner when period is not active */}
+                {wallet.periodQuota.enabled && !wallet.periodQuota.currentPeriod && (
+                  <div role="status" className="rounded-lg bg-amber-50 border border-amber-200 p-2 text-[11px] text-amber-900 flex items-center gap-1.5">
+                    <Info className="h-3.5 w-3.5 shrink-0 text-amber-700" />
+                    <span>{periodStatusLabel[wallet.periodQuota.status] ?? 'ไม่มีช่วงโครงการที่เปิดใช้งานในขณะนี้'}</span>
                   </div>
                 )}
               </section>
@@ -338,7 +375,9 @@ export const CitizenWalletPage: React.FC = () => {
                   <p className="text-xs text-ink-muted mt-1 leading-relaxed">
                     รัฐช่วยจ่ายสมทบ {availableReg.governmentCopayRatePercent}% ประชาชนร่วมจ่าย {availableReg.citizenPaymentRatePercent}%
                     เพดานสูงสุด ฿{availableReg.dailyQuotaLimit.toFixed(0)} ต่อวัน ยอดรวมตลอดโครงการ ฿
-                    {availableReg.totalQuotaLimit.toLocaleString()} (เฉลี่ยเดือนละ ฿1,000)
+                    {availableReg.totalQuotaLimit.toLocaleString()} {availableReg.periodCount > 0
+                      ? `แบ่งเป็น ${availableReg.periodCount} ช่วง รวมวงเงินช่วงละ ฿${availableReg.configuredPeriodQuota.toLocaleString('th-TH')} โดยไม่ยกยอดวงเงินที่เหลือ`
+                      : 'โควตาตามการตั้งค่าของโครงการ'}
                   </p>
                 </div>
 
@@ -427,23 +466,26 @@ export const CitizenWalletPage: React.FC = () => {
           </div>
 
           {/* Right Column: CTA & Transactions (lg:col-span-5) */}
-          <div className="lg:col-span-5 space-y-4">
-            {/* 3. Primary CTA: สแกน QR ชำระเงิน */}
+          <div className="lg:col-span-5 space-y-3 sm:space-y-4">
+            {/* 3. Primary CTA: สแกน QR ชำระเงิน (แถบสีน้ำเงินหลัก) */}
             <section>
               <button
                 id="btn-scan-copay"
+                type="button"
+                disabled={!periodCanBeSpent}
                 onClick={() => navigate(APP_ROUTES.CITIZEN_SCAN_COPAY)}
-                className="group flex w-full items-center justify-between rounded-card bg-brand-blue p-4 sm:p-5 text-white shadow-lg shadow-blue-500/20 transition-all hover:bg-brand-blue-hover active:scale-98"
+                title={!periodCanBeSpent ? 'ยังไม่มีช่วงโครงการที่เปิดใช้งาน' : undefined}
+                className="group flex w-full items-center justify-between rounded-2xl bg-brand-blue p-3.5 sm:p-4 text-white shadow-md shadow-blue-500/20 transition-all hover:bg-brand-blue-hover active:scale-98 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-200 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <div className="flex items-center space-x-3.5 min-w-0">
-                  <div className="flex h-11 w-11 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-2xl bg-white/20 text-white backdrop-blur-sm group-hover:scale-105 transition shadow-xs">
-                    <QrCode className="h-6 w-6 sm:h-7 sm:w-7" />
+                <div className="flex items-center space-x-3 min-w-0">
+                  <div className="flex h-10 w-10 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-xl bg-white/20 text-white backdrop-blur-sm group-hover:scale-105 transition shadow-xs">
+                    <QrCode className="h-5 w-5 sm:h-6 sm:w-6" />
                   </div>
                   <div className="text-left min-w-0">
-                    <div className="text-sm sm:text-base font-bold leading-tight truncate">
+                    <div className="text-xs sm:text-sm font-bold leading-tight truncate">
                       {isEligible ? 'สแกนชำระ Co-pay 60/40' : 'สแกนชำระเงินดิจิทัล'}
                     </div>
-                    <div className="text-[11px] sm:text-xs text-blue-100 mt-1 truncate">
+                    <div className="text-[10px] sm:text-xs text-blue-100 mt-0.5 truncate">
                       {isEligible
                         ? 'สแกน QR ร้านค้าเพื่อรับเงินสมทบ 60%'
                         : 'สแกน QR ชำระด้วยยอดเงินส่วนตัว'}
@@ -451,7 +493,7 @@ export const CitizenWalletPage: React.FC = () => {
                   </div>
                 </div>
                 <div className="pl-2 shrink-0">
-                  <ArrowUpRight className="h-5 w-5 sm:h-6 sm:w-6 text-white/90 group-hover:translate-x-1 group-hover:-translate-y-1 transition" />
+                  <ArrowUpRight className="h-4 w-4 sm:h-5 sm:w-5 text-white/90 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition" />
                 </div>
               </button>
             </section>
@@ -545,6 +587,9 @@ export const CitizenWalletPage: React.FC = () => {
                 </div>
               )}
             </section>
+
+            {/* ตั้งค่าความปลอดภัย (เปลี่ยน PIN) — วางท้ายหน้าเพื่อไม่ให้เด่นเหนือยอดเงิน */}
+            <WalletSecuritySettings />
 
             {/* Institutional Calm Badge */}
             <section className="flex items-center justify-center space-x-2 py-2 text-[11px] sm:text-xs text-ink-muted text-center">

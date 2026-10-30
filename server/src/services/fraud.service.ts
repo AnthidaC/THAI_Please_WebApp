@@ -1,4 +1,23 @@
 import prisma from '../utils/prisma';
+import { thaiDayRange } from '../utils/thai-date';
+
+export interface MerchantBehaviorBaseline {
+  totalTxCount: number;
+  avgAmount: number;
+  amountStdDev: number;
+  inStoreTxCount: number;
+  remoteTxCount: number;
+  inStoreRatio: number; // สัดส่วนธุรกรรมหน้าร้าน เช่น 0.85 = 85%
+  uniqueCustomerCount: number;
+}
+
+export interface CitizenBehaviorBaseline {
+  lifetimeTxCount: number;
+  avgAmount: number;
+  amountStdDev: number;
+  accountAgeDays: number;
+  cleanTxRatio: number; // สัดส่วนประวัติขาวสะอาด 1.0 = 100%
+}
 
 export interface FraudFeatureVector {
   userId: string;
@@ -14,6 +33,9 @@ export interface FraudFeatureVector {
   timeHour: number;
   repeatedSuspiciousCount?: number;
   samePairRepeatCountToday?: number;
+  merchantBaseline?: MerchantBehaviorBaseline;
+  citizenBaseline?: CitizenBehaviorBaseline;
+  amountZScoreVsMerchant?: number;
 }
 
 export interface AiFraudAssessment {
@@ -386,8 +408,7 @@ export class FraudService {
 
     const now = Date.now();
     const tenMinutesAgo = new Date(now - 10 * 60 * 1000);
-    const startOfToday = new Date();
-    startOfToday.setHours(0, 0, 0, 0);
+    const startOfToday = thaiDayRange().start;
 
     // 1. ดึงประวัติธุรกรรมล่าสุดของผู้ใช้ใน 10 นาที เพื่อดูความถี่และความเร็วการเปลี่ยนพิกัด
     const recentTx = await prisma.transactions.findMany({
@@ -444,6 +465,127 @@ export class FraudService {
       }
     }
 
+    // 4. ดึงสถิติภาพรวมย้อนหลังของร้านค้าและประชาชน (Merchant & Citizen Baseline Profiling)
+    const [merchantPastTxs, userPastTxs] = await Promise.all([
+      prisma.transactions.findMany({
+        where: {
+          merchant_id: params.merchantId,
+          status: { in: ['SUCCESS', 'FLAGGED'] },
+        },
+        select: {
+          total_amount: true,
+          user_id: true,
+          fraud_checks: {
+            select: { distance_meters: true },
+          },
+        },
+        take: 50,
+        orderBy: { created_at: 'desc' },
+      }),
+      prisma.transactions.findMany({
+        where: {
+          user_id: params.userId,
+          status: { in: ['SUCCESS', 'FLAGGED'] },
+        },
+        select: {
+          total_amount: true,
+          created_at: true,
+          fraud_checks: {
+            select: { decision: true },
+          },
+        },
+        take: 30,
+        orderBy: { created_at: 'desc' },
+      }),
+    ]);
+
+    // คำนวณ Merchant Baseline (ยอดเฉลี่ย, ความผันผวน, สัดส่วนหน้าร้าน vs ส่งรอบร้าน)
+    let merchantBaseline: MerchantBehaviorBaseline = {
+      totalTxCount: 0,
+      avgAmount: 150,
+      amountStdDev: 30,
+      inStoreTxCount: 0,
+      remoteTxCount: 0,
+      inStoreRatio: 1.0,
+      uniqueCustomerCount: 0,
+    };
+
+    if (merchantPastTxs.length > 0) {
+      const amounts = merchantPastTxs.map((t) => Number(t.total_amount));
+      const sumAmount = amounts.reduce((a, b) => a + b, 0);
+      const avgAmount = Math.round((sumAmount / amounts.length) * 100) / 100;
+
+      const variance = amounts.reduce((sum, amt) => sum + Math.pow(amt - avgAmount, 2), 0) / amounts.length;
+      const amountStdDev = Math.round(Math.sqrt(variance) * 100) / 100;
+
+      let inStoreCount = 0;
+      let remoteCount = 0;
+      const uniqueUsers = new Set<string>();
+
+      for (const tx of merchantPastTxs) {
+        if (tx.user_id) uniqueUsers.add(tx.user_id);
+        const dist = tx.fraud_checks ? Number(tx.fraud_checks.distance_meters) : 0;
+        if (dist <= 200) {
+          inStoreCount++;
+        } else {
+          remoteCount++;
+        }
+      }
+
+      const inStoreRatio = Math.round((inStoreCount / merchantPastTxs.length) * 100) / 100;
+
+      merchantBaseline = {
+        totalTxCount: merchantPastTxs.length,
+        avgAmount,
+        amountStdDev: amountStdDev || 20,
+        inStoreTxCount: inStoreCount,
+        remoteTxCount: remoteCount,
+        inStoreRatio,
+        uniqueCustomerCount: uniqueUsers.size,
+      };
+    }
+
+    // คำนวณ Citizen Baseline
+    let citizenBaseline: CitizenBehaviorBaseline = {
+      lifetimeTxCount: 0,
+      avgAmount: 150,
+      amountStdDev: 30,
+      accountAgeDays: 30,
+      cleanTxRatio: 1.0,
+    };
+
+    if (userPastTxs.length > 0) {
+      const userAmounts = userPastTxs.map((t) => Number(t.total_amount));
+      const userSum = userAmounts.reduce((a, b) => a + b, 0);
+      const userAvg = Math.round((userSum / userAmounts.length) * 100) / 100;
+      const userVar = userAmounts.reduce((sum, amt) => sum + Math.pow(amt - userAvg, 2), 0) / userAmounts.length;
+      const userStd = Math.round(Math.sqrt(userVar) * 100) / 100;
+
+      let cleanCount = 0;
+      for (const tx of userPastTxs) {
+        const dec = tx.fraud_checks?.decision;
+        if (!dec || dec === 'AUTO_APPROVED') {
+          cleanCount++;
+        }
+      }
+
+      const oldestTxDate = new Date(userPastTxs[userPastTxs.length - 1].created_at).getTime();
+      const accountAgeDays = Math.max(1, Math.round((Date.now() - oldestTxDate) / (1000 * 3600 * 24)));
+
+      citizenBaseline = {
+        lifetimeTxCount: userPastTxs.length,
+        avgAmount: userAvg,
+        amountStdDev: userStd || 20,
+        accountAgeDays,
+        cleanTxRatio: Math.round((cleanCount / userPastTxs.length) * 100) / 100,
+      };
+    }
+
+    // Z-Score ของยอดเงินบิลนี้เทียบกับความผันผวนของร้านค้า
+    const amountZScoreVsMerchant = merchantBaseline.amountStdDev > 0
+      ? Math.round(((params.amount - merchantBaseline.avgAmount) / merchantBaseline.amountStdDev) * 100) / 100
+      : 0;
+
     const featureVector: FraudFeatureVector = {
       userId: params.userId,
       merchantId: params.merchantId,
@@ -458,6 +600,9 @@ export class FraudService {
       timeHour: new Date().getHours(),
       repeatedSuspiciousCount: Math.max(userPrevFlags, merchantPrevFlags),
       samePairRepeatCountToday: samePairTodayCount + 1,
+      merchantBaseline,
+      citizenBaseline,
+      amountZScoreVsMerchant,
     };
 
     const assessment = await this.aiEngine.evaluate(featureVector);
@@ -558,11 +703,14 @@ export class FraudService {
         riskScore: Number(a.risk_score),
         fraudReason: a.fraud_reason,
         decision: a.decision,
+        transactionStatus: a.transactions?.status || (a.decision === 'REJECTED' ? 'REJECTED' : 'FLAGGED'),
+        transactionCreatedAt: a.transactions?.created_at ? a.transactions.created_at.toISOString() : (a.created_at?.toISOString ? a.created_at.toISOString() : a.created_at),
+        transactionCompletedAt: a.transactions?.completed_at ? a.transactions.completed_at.toISOString() : null,
         userLat: Number(a.user_latitude),
         userLon: Number(a.user_longitude),
         merchantLat: Number(a.merchant_latitude),
         merchantLon: Number(a.merchant_longitude),
-        createdAt: a.created_at,
+        createdAt: a.transactions?.created_at ? a.transactions.created_at.toISOString() : (a.created_at?.toISOString ? a.created_at.toISOString() : a.created_at),
         repeatCount,
         systemStats: {
           totalChecksCount,
@@ -855,7 +1003,7 @@ export class FraudService {
       // 2. อัปเดต transactions สถานะ (หาก Approve ให้ยืนยันสำเร็จ)
       if (action === 'APPROVE_ALL') {
         await tx.transactions.updateMany({
-          where: { transaction_id: { in: txIds } },
+          where: { transaction_id: { in: txIds }, status: 'FLAGGED' },
           data: { status: 'SUCCESS' },
         });
       }
@@ -929,12 +1077,9 @@ export class FraudService {
     const newDecision = decisionMap[action] || 'REJECTED_BY_ADMIN';
 
     // ไม่ดึงเงินคืนอัตโนมัติ: คงสถานะธุรกรรมเดิมไว้เป็น SUCCESS (เมื่อชำระเงินแล้ว) หรือ REJECTED (เฉพาะรายการสแกนไม่ผ่าน 0 บาท)
-    const newTxStatus =
-      action === 'APPROVE'
-        ? 'SUCCESS'
-        : Number(txRecord?.total_amount || 0) > 0 && Number(txRecord?.citizen_paid_amount || 0) > 0
-        ? 'SUCCESS'
-        : 'REJECTED';
+    // Reviewing a declined GPS attempt cannot create a paid transaction without a debit.
+    const newTxStatus = txRecord && ['SUCCESS', 'FLAGGED'].includes(txRecord.status)
+      ? 'SUCCESS' : txRecord?.status || 'REJECTED';
 
     await prisma.$transaction(async (tx: any) => {
       await tx.fraud_checks.update({
@@ -953,7 +1098,7 @@ export class FraudService {
           where: { transaction_id: fraudCheck.transaction_id },
           data: {
             status: newTxStatus,
-            ...(action === 'APPROVE' && !txRecord.completed_at ? { completed_at: new Date() } : {}),
+            ...(newTxStatus === 'SUCCESS' && !txRecord.completed_at ? { completed_at: new Date() } : {}),
           },
         });
 

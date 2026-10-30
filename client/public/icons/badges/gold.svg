@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-labelledby="badge-title badge-desc">
+  <title id="badge-title">Gold badge</title>
+  <desc id="badge-desc">A gold medal with a polished crown emblem.</desc>
+  <defs>
+    <linearGradient id="ribbon-metal" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F3D16A" />
+      <stop offset="55%" stop-color="#C38B13" />
+      <stop offset="100%" stop-color="#815708" />
+    </linearGradient>
+    <linearGradient id="rim-metal" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFF0A5" />
+      <stop offset="28%" stop-color="#E3B339" />
+      <stop offset="66%" stop-color="#9A670C" />
+      <stop offset="100%" stop-color="#F8DB68" />
+    </linearGradient>
+    <linearGradient id="face-metal" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFF5C9" />
+      <stop offset="48%" stop-color="#E7BD55" />
+      <stop offset="100%" stop-color="#C98F1E" />
+    </linearGradient>
+    <linearGradient id="engraving-metal" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFF8D6" />
+      <stop offset="100%" stop-color="#BD8112" />
+    </linearGradient>
+    <radialGradient id="gloss" cx="28%" cy="18%" r="85%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.68" />
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0" />
+    </radialGradient>
+    <clipPath id="face-clip"><circle cx="64" cy="52" r="29" /></clipPath>
+  </defs>
+
+  <g stroke-linejoin="round" stroke-linecap="round">
+    <path d="M42 75 60 79 57 111 50 105 43 114 38 85Z" fill="url(#ribbon-metal)" stroke="#815708" stroke-width="1.5" />
+    <path d="M68 79 86 75 90 85 85 114 78 105 71 111Z" fill="url(#ribbon-metal)" stroke="#815708" stroke-width="1.5" />
+    <path d="m44 83 6 1-1 19-4 4-3-21Z" fill="#FFF7DA" opacity="0.3" />
+    <path d="m78 84 6-1 2 3-3 21-4-4Z" fill="#FFF7DA" opacity="0.26" />
+
+    <circle cx="64" cy="52" r="38" fill="url(#rim-metal)" stroke="#785209" stroke-width="2" />
+    <circle cx="64" cy="52" r="32.5" fill="url(#face-metal)" stroke="#FFF3BF" stroke-width="1.5" />
+    <circle cx="64" cy="52" r="27.5" fill="none" stroke="#80580C" stroke-opacity="0.38" stroke-width="1" />
+    <ellipse cx="52" cy="35" rx="24" ry="13" fill="url(#gloss)" clip-path="url(#face-clip)" />
+    <path d="M39 50a25 25 0 0 1 50 0" fill="none" stroke="#FFF8D9" stroke-opacity="0.72" stroke-width="1.4" />
+
+    <path d="m48 47 10 7 6-14 6 14 10-7-3 18H51Z" fill="url(#engraving-metal)" stroke="#815708" stroke-width="1.5" />
+    <path d="M52 68h24" fill="none" stroke="#815708" stroke-width="2" />
+    <circle cx="49" cy="45" r="2" fill="#FFF8D6" stroke="#A36D0B" stroke-width="0.8" />
+    <circle cx="64" cy="39" r="2" fill="#FFF8D6" stroke="#A36D0B" stroke-width="0.8" />
+    <circle cx="79" cy="45" r="2" fill="#FFF8D6" stroke="#A36D0B" stroke-width="0.8" />
+  </g>
+</svg>

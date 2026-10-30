@@ -1,18 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import {
   ShieldCheck,
   AlertTriangle,
   ArrowLeft,
-  Lock,
   Sparkles,
   Store,
   RefreshCw,
   CheckCircle2,
   Gift,
   Tag,
-  Users,
   Check,
   X,
   Clock,
@@ -25,12 +23,21 @@ import {
   validateDiscountCode,
   CopayPreviewData,
   DiscountValidationResult,
+  DiscountCodeType,
 } from '../../../services/paymentApi';
 import { APP_ROUTES } from '../../../constants/routes';
+import { useAuthStore } from '../../../stores/authStore';
 import { QrCameraScanner } from '../../../components/payment/QrCameraScanner';
+import { usePaymentPinStatus } from '../../../hooks/usePaymentPinStatus';
+import { PaymentPinConfirmation } from '../../../components/payment/PaymentPinConfirmation';
+import { getMyRewards } from '../../../services/rewardApi';
+import type { CitizenReward } from '../../../services/rewardApi';
 
 export const CitizenScanCopayPage: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const refFromUrl = searchParams.get('ref') || searchParams.get('code') || searchParams.get('referralCode');
+  const { user, clearAuth } = useAuthStore();
 
   // พิกัด GPS ผู้ใช้ — ดึงเงียบ ๆ เบื้องหลังเพื่อส่งให้ระบบตรวจสอบ (ไม่แสดงให้ผู้ใช้เห็น)
   const [userLocation, setUserLocation] = useState<{ lat: number; lon: number }>({
@@ -41,7 +48,8 @@ export const CitizenScanCopayPage: React.FC = () => {
   // ข้อมูล QR และการเลือกสแกน
   const [qrReference, setQrReference] = useState<string>('');
   const [scannedData, setScannedData] = useState<CopayPreviewData | null>(null);
-  const [pin, setPin] = useState<string>('');
+  const [showPinConfirmation, setShowPinConfirmation] = useState(false);
+  const [pinError, setPinError] = useState<string | null>(null);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [showManualInput, setShowManualInput] = useState<boolean>(false);
   const [showCoupon, setShowCoupon] = useState<boolean>(false);
@@ -50,12 +58,49 @@ export const CitizenScanCopayPage: React.FC = () => {
   const [discountCodeInput, setDiscountCodeInput] = useState<string>('');
   const [appliedDiscount, setAppliedDiscount] = useState<DiscountValidationResult | null>(null);
   const [discountError, setDiscountError] = useState<string | null>(null);
+  const appliedDiscountCodeType: DiscountCodeType | undefined = appliedDiscount
+    ? appliedDiscount.discountSource === 'FRIEND_REFERRAL' ? 'referral' : 'coupon'
+    : undefined;
+
+  // รับโค้ดคำชวนเพื่อนจาก URL parameter (Deep Link จากระบบชวนเพื่อน)
+  useEffect(() => {
+    if (refFromUrl) {
+      const clean = refFromUrl.trim().toUpperCase();
+      setDiscountCodeInput(clean);
+      setShowCoupon(true);
+    }
+  }, [refFromUrl]);
 
   // ดึงข้อมูลกระเป๋าเงินเพื่อตรวจสอบยอดเงินและโควตา
   const { data: wallet } = useQuery({
-    queryKey: ['wallet-balance'],
+    queryKey: ['wallet-balance', user?.id],
     queryFn: getWalletBalance,
+    enabled: Boolean(user?.id),
   });
+  const {
+    data: ownedRewards = [],
+    isLoading: isRewardsLoading,
+    isError: isRewardsError,
+  } = useQuery({
+    queryKey: ['my-rewards'],
+    queryFn: getMyRewards,
+    staleTime: 0,
+  });
+  const discountRewards = ownedRewards.filter(
+    (reward): reward is CitizenReward & { discountType: string; discountValue: number } =>
+      reward.discountType !== null && reward.discountValue !== null
+  );
+  const availableOwnedRewards = discountRewards.filter((reward) =>
+    reward.status === 'available' &&
+    (!reward.expiresAt || new Date(reward.expiresAt).getTime() > Date.now())
+  );
+  const { data: pinStatus, refetch: refetchPinStatus } = usePaymentPinStatus();
+
+  useEffect(() => {
+    if (scannedData && availableOwnedRewards.length > 0 && !appliedDiscount) {
+      setShowCoupon(true);
+    }
+  }, [scannedData, availableOwnedRewards.length, appliedDiscount]);
 
   // ติดตามพิกัด GPS จริงจากเบราว์เซอร์แบบเบื้องหลัง
   useEffect(() => {
@@ -68,8 +113,8 @@ export const CitizenScanCopayPage: React.FC = () => {
     return () => navigator.geolocation.clearWatch(watchId);
   }, []);
 
-  // ตรวจสอบเวลานับถอยหลังของ QR ขณะอยู่ที่หน้าพรีวิว Co-pay (อายุ 3 นาที)
-  const [previewSecondsRemaining, setPreviewSecondsRemaining] = useState<number>(180);
+  // ตรวจสอบเวลานับถอยหลังของเซสชันชำระเงินหลังสแกนสำเร็จ (ขยายเป็น 15 นาทีตามมาตรฐานเป๋าตัง/ไทยช่วยไทย)
+  const [previewSecondsRemaining, setPreviewSecondsRemaining] = useState<number>(900);
 
   useEffect(() => {
     if (!scannedData?.qrData?.expiresAt) return;
@@ -82,8 +127,9 @@ export const CitizenScanCopayPage: React.FC = () => {
       if (diffSec <= 0) {
         // หากหมดอายุ ให้เด้งกลับหน้าสแกนใหม่ทันที พร้อมแจ้งเตือนตามที่กำหนด
         setScannedData(null);
+        setShowPinConfirmation(false);
         setQrReference('');
-        setCheckoutError('QR หมดอายุ กรุณาทำรายการใหม่');
+        setCheckoutError('เซสชันชำระเงินหมดอายุ (เกิน 15 นาที) กรุณาสแกน QR ใหม่อีกครั้ง');
       }
     };
 
@@ -98,8 +144,8 @@ export const CitizenScanCopayPage: React.FC = () => {
 
   // Mutation ตรวจสอบรหัส QR เพื่อพรีวิวยอดเงิน Co-pay (ส่งพิกัด GPS ตรวจสอบทันทีตั้งแต่ตอนสแกน)
   const previewMutation = useMutation({
-    mutationFn: ({ ref, code }: { ref: string; code?: string }) =>
-      getQrDetails(ref, code, userLocation),
+    mutationFn: ({ ref, code, codeType }: { ref: string; code?: string; codeType?: DiscountCodeType }) =>
+      getQrDetails(ref, code, userLocation, codeType),
     onSuccess: (data) => {
       setScannedData(data);
       if (data.discountInfo) {
@@ -119,11 +165,31 @@ export const CitizenScanCopayPage: React.FC = () => {
     },
   });
 
+  // กู้คืนเซสชัน QR ที่สแกนค้างไว้อัตโนมัติ (เช่น หลังผู้ใช้ปลดล็อก/รีเซ็ต PIN สำเร็จแล้วกลับมาหน้าจ่ายเงิน)
+  useEffect(() => {
+    const savedPending = sessionStorage.getItem('thai-please:pending-checkout-qr');
+    if (!savedPending) return;
+    sessionStorage.removeItem('thai-please:pending-checkout-qr');
+    try {
+      const parsed = JSON.parse(savedPending);
+      if (parsed?.ref) {
+        setQrReference(parsed.ref);
+        const codeType: DiscountCodeType | undefined = parsed.codeType === 'referral' || parsed.codeType === 'coupon'
+          ? parsed.codeType
+          : parsed.code ? 'referral' : undefined;
+        previewMutation.mutate({ ref: parsed.ref, code: parsed.code, codeType });
+      }
+    } catch {
+      // ignore invalid storage
+    }
+  }, []);
+
   // Mutation ตรวจสอบความถูกต้องของคูปองหรือโค้ดคำชวนของเพื่อน
   const discountMutation = useMutation({
-    mutationFn: (code: string) =>
+    mutationFn: ({ code, codeType }: { code: string; codeType: DiscountCodeType }) =>
       validateDiscountCode({
         code,
+        codeType,
         totalAmount: scannedData?.qrData.totalAmount || 0,
         merchantId: scannedData?.qrData.merchantId,
       }),
@@ -132,19 +198,20 @@ export const CitizenScanCopayPage: React.FC = () => {
       setDiscountError(null);
       // โหลดการแบ่งจ่าย Co-pay ใหม่โดยส่ง discountCode เข้าไปด้วย
       if (qrReference) {
-        previewMutation.mutate({ ref: qrReference, code: discountRes.code });
+        const codeType: DiscountCodeType = discountRes.discountSource === 'FRIEND_REFERRAL' ? 'referral' : 'coupon';
+        previewMutation.mutate({ ref: qrReference, code: discountRes.code, codeType });
       }
     },
     onError: (err: any) => {
-      setDiscountError(err.response?.data?.message || err.message || 'รหัสคูปองไม่ถูกต้อง');
+      setDiscountError(err.response?.data?.message || err.message || 'ตรวจสอบโค้ดไม่สำเร็จ');
     },
   });
 
-  const handleApplyDiscount = (code: string) => {
+  const handleApplyDiscount = (code: string, codeType: DiscountCodeType = 'referral') => {
     const clean = code.trim().toUpperCase();
     if (!clean) return;
     setDiscountError(null);
-    discountMutation.mutate(clean);
+    discountMutation.mutate({ code: clean, codeType });
   };
 
   const handleRemoveDiscount = () => {
@@ -158,7 +225,7 @@ export const CitizenScanCopayPage: React.FC = () => {
 
   // Mutation ชำระเงินร่วม (Co-pay 60/40)
   const checkoutMutation = useMutation({
-    mutationFn: () =>
+    mutationFn: (pin: string) =>
       checkoutCopay({
         qrReference,
         userLatitude: userLocation.lat,
@@ -166,14 +233,22 @@ export const CitizenScanCopayPage: React.FC = () => {
         merchantId: scannedData?.qrData.merchantId,
         pin,
         discountCode: appliedDiscount?.code,
+        discountCodeType: appliedDiscountCodeType,
       }),
     onSuccess: (data) => {
+      setShowPinConfirmation(false);
       // ชำระเงินสำเร็จ นำทางไปยังหน้า e-Slip พร้อมสั่งบันทึกสลิปอัตโนมัติ (Auto-Save)
       navigate(`/citizen/slip/${data.transactionId}?autosave=1`, {
         state: { autoSave: true },
       });
     },
     onError: (err: any) => {
+      if (err.response?.data?.code?.startsWith('PIN_')) {
+        setPinError(err.response.data.message);
+        if (err.response.data.code === 'PIN_LOCKED') void refetchPinStatus();
+        return;
+      }
+      setShowPinConfirmation(false);
       // หากไม่ผ่านหรือตำแหน่งอยู่นอกระยะ หรือหมดอายุ ให้เด้งกลับหน้าสแกนใหม่
       setScannedData(null);
       setQrReference('');
@@ -187,6 +262,8 @@ export const CitizenScanCopayPage: React.FC = () => {
 
   // เมื่อกล้องอ่าน QR ได้ → ตรวจสอบรายการทันที (ไม่ต้องกดปุ่มเพิ่ม)
   const handleDetected = (text: string) => {
+    setShowPinConfirmation(false);
+    setPinError(null);
     setCheckoutError(null);
     setAppliedDiscount(null);
     setDiscountCodeInput('');
@@ -325,9 +402,14 @@ export const CitizenScanCopayPage: React.FC = () => {
                         <span className="font-mono text-[11px] sm:text-xs text-ink-muted truncate max-w-[180px] sm:max-w-xs">
                           Ref: {scannedData.qrData.qrReference}
                         </span>
-                        <span className="inline-flex items-center space-x-1 rounded-pill bg-blue-50 px-2 py-0.5 text-[10px] font-mono font-bold text-brand-blue border border-blue-200 shrink-0">
-                          <Clock className="h-3 w-3" />
-                          <span>อายุ QR: {formattedPreviewTimer} น.</span>
+                        <span className="inline-flex items-center space-x-1.5 rounded-pill bg-emerald-50 px-2.5 py-0.5 text-[10px] sm:text-[11px] font-semibold text-emerald-800 border border-emerald-200 shrink-0">
+                          <CheckCircle2 className="h-3 w-3 text-emerald-600 shrink-0" />
+                          <span className="inline-flex items-center gap-1">
+                            <span>สแกนสำเร็จ</span>
+                            <span className="text-emerald-400">•</span>
+                            <Clock className="h-2.5 w-2.5 text-emerald-700 shrink-0" />
+                            <span className="font-mono">{formattedPreviewTimer} น.</span>
+                          </span>
                         </span>
                       </div>
                     </div>
@@ -350,103 +432,149 @@ export const CitizenScanCopayPage: React.FC = () => {
                     type="button"
                     onClick={() => setShowCoupon((v) => !v)}
                     disabled={!!appliedDiscount}
-                    className="w-full flex items-center justify-between gap-2"
+                    aria-expanded={showCoupon || Boolean(appliedDiscount)}
+                    className="w-full flex items-center justify-between gap-2 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue focus-visible:ring-offset-2"
                   >
                     <span className="text-xs font-semibold text-ink flex items-center space-x-1.5">
-                      <Gift className="h-3.5 w-3.5 text-brand-blue shrink-0" />
-                      <span>มีคูปองส่วนลด / โค้ดเพื่อน?</span>
+                      <Gift className="h-3.5 w-3.5 text-brand-blue shrink-0" aria-hidden="true" />
+                      <span>มีคูปองส่วนลด หรือโค้ดชวนเพื่อน?</span>
                     </span>
                     {appliedDiscount ? (
                       <span className="rounded-pill bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-status-success border border-emerald-200 flex items-center space-x-1 shrink-0">
-                        <Check className="h-3 w-3" />
+                        <Check className="h-3 w-3" aria-hidden="true" />
                         <span>ใช้โค้ดแล้ว</span>
                       </span>
                     ) : (
-                      <ChevronDown className={`h-4 w-4 text-ink-muted transition shrink-0 ${showCoupon ? 'rotate-180' : ''}`} />
+                      <div className="flex items-center gap-1 text-[11px] text-brand-blue font-medium">
+                        <span>{showCoupon ? 'ซ่อน' : 'ใส่โค้ดที่นี่'}</span>
+                        <ChevronDown className={`h-4 w-4 text-brand-blue transition shrink-0 ${showCoupon ? 'rotate-180' : ''}`} aria-hidden="true" />
+                      </div>
                     )}
                   </button>
 
                   {(showCoupon || appliedDiscount) && (
-                    <div className="mt-2.5">
+                    <div className="mt-2.5" aria-live="polite">
                       {!appliedDiscount ? (
                         <div className="space-y-2">
-                          <div className="flex space-x-2">
-                            <div className="relative flex-1 min-w-0">
-                              <Tag className="absolute left-3 top-2.5 h-3.5 w-3.5 text-ink-muted" />
-                              <input
-                                id="input-discount-code"
-                                type="text"
-                                placeholder="กรอกโค้ด เช่น FRIEND30, DUO50"
-                                value={discountCodeInput}
-                                onChange={(e) => setDiscountCodeInput(e.target.value.toUpperCase())}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') {
-                                    e.preventDefault();
-                                    handleApplyDiscount(discountCodeInput);
-                                  }
-                                }}
-                                className="w-full rounded-pill border border-hairline pl-8 pr-3 py-2 text-xs font-mono text-ink placeholder:font-sans focus:border-brand-blue focus:outline-none uppercase"
-                              />
+                          <section className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-3 space-y-2">
+                            <div className="flex items-center justify-between gap-2">
+                              <h4 className="text-xs font-bold text-ink">คูปองส่วนลดของคุณ</h4>
+                              {availableOwnedRewards.length > 0 && (
+                                <span className="shrink-0 rounded-pill bg-white px-2 py-0.5 text-[10px] font-semibold text-emerald-800 border border-emerald-200">
+                                  พร้อมใช้ {availableOwnedRewards.length} ใบ
+                                </span>
+                              )}
                             </div>
-                            <button
-                              id="btn-apply-discount"
-                              type="button"
-                              disabled={!discountCodeInput.trim() || discountMutation.isPending}
-                              onClick={() => handleApplyDiscount(discountCodeInput)}
-                              className="rounded-pill bg-brand-blue px-4 py-2 text-xs font-semibold text-white transition hover:bg-brand-blue-hover disabled:opacity-40 shrink-0"
-                            >
-                              {discountMutation.isPending ? 'ตรวจ...' : 'ใช้โค้ด'}
-                            </button>
+
+                            {availableOwnedRewards.length > 0 ? (
+                              <div className="grid gap-2 sm:grid-cols-2">
+                                {availableOwnedRewards.map((reward) => {
+                                  const discountLabel = reward.discountType === 'percent'
+                                    ? `${reward.discountValue.toLocaleString('th-TH', { maximumFractionDigits: 2 })}%`
+                                    : `฿${reward.discountValue.toLocaleString('th-TH', { maximumFractionDigits: 2 })}`;
+
+                                  return (
+                                    <button
+                                      key={reward.userRewardId}
+                                      type="button"
+                                      disabled={discountMutation.isPending}
+                                      onClick={() => {
+                                        setDiscountCodeInput(reward.rewardCode);
+                                        handleApplyDiscount(reward.rewardCode, 'coupon');
+                                      }}
+                                      className="flex w-full min-w-0 items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-white px-3 py-2.5 text-left transition hover:border-emerald-400 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-60"
+                                      aria-label={`ใช้คูปอง ${reward.rewardName} ลด ${discountLabel}; ยอดซื้อขั้นต่ำ ${reward.minimumSpend.toLocaleString('th-TH')} บาท`}
+                                    >
+                                      <span className="min-w-0 space-y-0.5">
+                                        <span className="block truncate text-xs font-semibold text-ink">{reward.rewardName}</span>
+                                        <span className="block truncate font-mono text-[10px] text-ink-muted" translate="no">{reward.rewardCode}</span>
+                                        <span className="block text-[10px] text-ink-muted">
+                                          ยอดซื้อขั้นต่ำ {reward.minimumSpend > 0 ? `฿${reward.minimumSpend.toLocaleString('th-TH', { maximumFractionDigits: 2 })}` : 'ไม่มีขั้นต่ำ'}
+                                        </span>
+                                        {reward.expiresAt && (
+                                          <span className="block text-[10px] text-ink-muted">
+                                            ใช้ได้ถึง {new Intl.DateTimeFormat('th-TH', {
+                                              year: 'numeric',
+                                              month: 'short',
+                                              day: 'numeric',
+                                            }).format(new Date(reward.expiresAt))}
+                                          </span>
+                                        )}
+                                      </span>
+                                      <span className="shrink-0 text-right">
+                                        <span className="block font-mono text-sm font-bold text-emerald-800">
+                                          {discountLabel}
+                                        </span>
+                                        <span className="block text-[10px] font-semibold text-emerald-700">
+                                          {discountMutation.isPending ? 'กำลังตรวจสอบ…' : 'ใช้คูปอง'}
+                                        </span>
+                                      </span>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            ) : (
+                              <p className="text-[11px] text-ink-muted">
+                                {isRewardsLoading
+                                  ? 'กำลังโหลดคูปองของคุณ…'
+                                  : isRewardsError
+                                  ? 'โหลดคูปองไม่สำเร็จ คุณยังกรอกรหัสคูปองด้านล่างได้'
+                                  : discountRewards.length > 0
+                                  ? 'ไม่มีคูปองที่ยังพร้อมใช้งาน'
+                                  : 'ยังไม่มีคูปองส่วนลดที่ใช้กับรายการนี้ได้'}
+                              </p>
+                            )}
+                          </section>
+
+                          <div className="space-y-1.5 pt-1">
+                            <label htmlFor="input-discount-code" className="text-xs font-semibold text-ink flex items-center space-x-1.5">
+                              <Tag className="h-3.5 w-3.5 text-brand-blue" aria-hidden="true" />
+                              <span>กรอกโค้ดแนะนำเพื่อน:</span>
+                            </label>
+                            <div className="flex space-x-2">
+                              <div className="relative flex-1 min-w-0">
+                                <Tag className="absolute left-3 top-2.5 h-3.5 w-3.5 text-ink-muted" aria-hidden="true" />
+                                <input
+                                  id="input-discount-code"
+                                  name="discountCode"
+                                  type="text"
+                                  autoComplete="off"
+                                  spellCheck={false}
+                                  placeholder="กรอกโค้ดแนะนำเพื่อน เช่น TP-XXXX…"
+                                  value={discountCodeInput}
+                                  onChange={(e) => setDiscountCodeInput(e.target.value.toUpperCase())}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      e.preventDefault();
+                                      handleApplyDiscount(discountCodeInput);
+                                    }
+                                  }}
+                                  className="w-full rounded-pill border border-hairline pl-8 pr-3 py-2 text-xs font-mono text-ink placeholder:font-sans focus:border-brand-blue focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue focus-visible:ring-offset-1 uppercase"
+                                />
+                              </div>
+                              <button
+                                id="btn-apply-discount"
+                                type="button"
+                                disabled={!discountCodeInput.trim() || discountMutation.isPending}
+                                onClick={() => handleApplyDiscount(discountCodeInput)}
+                                className="rounded-pill bg-brand-blue px-4 py-2 text-xs font-semibold text-white transition hover:bg-brand-blue-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue focus-visible:ring-offset-2 disabled:opacity-40 shrink-0"
+                              >
+                                {discountMutation.isPending ? 'ตรวจ...' : 'ใช้โค้ด'}
+                              </button>
+                            </div>
+                            <p className="text-[10px] text-ink-muted flex items-center gap-1">
+                              <span>💡</span>
+                              <span>หากมีโค้ดชวนเพื่อนจากเพื่อน (เช่น TP-XXXX) สามารถพิมพ์หรือวางในช่องนี้แล้วกด &quot;ใช้โค้ด&quot; ได้ทันที</span>
+                            </p>
                           </div>
 
                           {discountError && (
-                            <p className="text-[11px] text-status-error flex items-center space-x-1">
-                              <AlertTriangle className="h-3 w-3 flex-shrink-0" />
+                            <p role="alert" className="text-[11px] text-status-error flex items-center space-x-1">
+                              <AlertTriangle className="h-3 w-3 flex-shrink-0" aria-hidden="true" />
                               <span>{discountError}</span>
                             </p>
                           )}
 
-                          {/* แนะนำโค้ดสิทธิพิเศษและเพื่อนชวนเพื่อน */}
-                          <div className="pt-1">
-                            <span className="text-[10px] text-ink-muted block mb-1">
-                              สิทธิพิเศษและโค้ดแนะนำ:
-                            </span>
-                            <div className="flex flex-wrap gap-1.5">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setDiscountCodeInput('FRIEND30');
-                                  handleApplyDiscount('FRIEND30');
-                                }}
-                                className="rounded-pill border border-emerald-200 bg-emerald-50/80 px-2.5 py-1 text-[10px] font-medium text-emerald-800 transition hover:bg-emerald-100 flex items-center space-x-1"
-                              >
-                                <Users className="h-3 w-3 text-emerald-600 shrink-0" />
-                                <span>FRIEND30 (ลด ฿30 เพื่อนชวนเพื่อน)</span>
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setDiscountCodeInput('DUO50');
-                                  handleApplyDiscount('DUO50');
-                                }}
-                                className="rounded-pill border border-blue-200 bg-blue-50/80 px-2.5 py-1 text-[10px] font-medium text-brand-blue transition hover:bg-blue-100 flex items-center space-x-1"
-                              >
-                                <Tag className="h-3 w-3 text-brand-blue shrink-0" />
-                                <span>DUO50 (ลด ฿50 สิทธิพิเศษคู่หู)</span>
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setDiscountCodeInput('WELCOME20');
-                                  handleApplyDiscount('WELCOME20');
-                                }}
-                                className="rounded-pill border border-hairline bg-surface-soft px-2.5 py-1 text-[10px] font-medium text-ink transition hover:bg-gray-100 flex items-center space-x-1"
-                              >
-                                <Gift className="h-3 w-3 text-ink-muted shrink-0" />
-                                <span>WELCOME20 (ลด ฿20 สิทธิพิเศษต้อนรับ)</span>
-                              </button>
-                            </div>
-                          </div>
                         </div>
                       ) : (
                         <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-3 flex items-start justify-between gap-2">
@@ -472,10 +600,10 @@ export const CitizenScanCopayPage: React.FC = () => {
                           <button
                             type="button"
                             onClick={handleRemoveDiscount}
-                            className="rounded-full p-1 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-900 transition shrink-0"
-                            title="ยกเลิกการใช้โค้ดนี้"
+                            aria-label="ยกเลิกคูปองที่ใช้"
+                            className="rounded-full p-1 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700 focus-visible:ring-offset-2 transition shrink-0"
                           >
-                            <X className="h-4 w-4" />
+                            <X className="h-4 w-4" aria-hidden="true" />
                           </button>
                         </div>
                       )}
@@ -554,9 +682,9 @@ export const CitizenScanCopayPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Right Column: PIN & Confirm Checkout (lg:col-span-5) */}
+            {/* Review the amount first; PIN authorization opens as a separate full-screen step. */}
             <div className="lg:col-span-5 space-y-4">
-              {/* ยอดเงินคงเหลือ + PIN + ปุ่มยืนยัน รวมไว้การ์ดเดียว */}
+              {/* ยอดเงินคงเหลือและปุ่มไปขั้นตอนยืนยัน PIN */}
               <div className="rounded-card border border-hairline bg-white p-4 sm:p-5 shadow-sm space-y-3.5">
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-ink-muted font-medium">ยอดเงินในกระเป๋าส่วนตัว</span>
@@ -570,41 +698,21 @@ export const CitizenScanCopayPage: React.FC = () => {
                   </p>
                 )}
 
-                <div className="pt-2 border-t border-hairline">
-                  <label htmlFor="input-copay-pin" className="text-xs font-semibold text-ink flex items-center space-x-1.5 mb-2">
-                    <Lock className="h-4 w-4 text-brand-blue shrink-0" />
-                    <span>รหัส PIN ยืนยันการชำระเงิน (6 หลัก)</span>
-                  </label>
-                  <input
-                    id="input-copay-pin"
-                    type="password"
-                    inputMode="numeric"
-                    maxLength={6}
-                    value={pin}
-                    onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                    placeholder="******"
-                    className="w-full text-center tracking-[0.45em] font-mono text-xl sm:text-2xl rounded-pill border border-hairline py-2.5 focus:border-brand-blue focus:outline-none focus:ring-2 focus:ring-blue-100"
-                  />
-                  {pin.length !== 6 && (
-                    <p className="text-[11px] text-amber-600 mt-1 text-center">
-                      กรุณาระบุรหัส PIN ตัวเลข 6 หลักเพื่อยืนยันการชำระเงิน
-                    </p>
-                  )}
-                </div>
+                <p className="border-t border-hairline pt-3 text-xs leading-relaxed text-ink-muted">ตรวจสอบยอดชำระ จากนั้นกดยืนยันเพื่อกรอกรหัส PIN ในขั้นตอนถัดไป</p>
 
                 {/* ปุ่มยืนยันชำระเงิน */}
                 <button
                   id="btn-confirm-checkout"
                   disabled={
                     checkoutMutation.isPending ||
-                    pin.length !== 6 ||
+                    !pinStatus?.isSet ||
                     (wallet
                       ? wallet.balance <
                         (scannedData.copaySplit?.citizenPaidAmount ??
                           scannedData.qrData.estimatedCitizenPay)
                       : false)
                   }
-                  onClick={() => checkoutMutation.mutate()}
+                  onClick={() => { setPinError(null); setCheckoutError(null); setShowPinConfirmation(true); }}
                   className="w-full flex items-center justify-center space-x-2 rounded-card bg-brand-blue py-3.5 text-white text-sm sm:text-base font-semibold shadow-lg shadow-blue-500/20 transition hover:bg-brand-blue-hover active:scale-98 disabled:opacity-50"
                 >
                   {checkoutMutation.isPending ? (
@@ -633,6 +741,36 @@ export const CitizenScanCopayPage: React.FC = () => {
           <span>ทำรายการอย่างปลอดภัยตามมาตรฐานโครงการ</span>
         </div>
       </main>
+      <PaymentPinConfirmation
+        open={showPinConfirmation && Boolean(scannedData)}
+        amount={scannedData?.copaySplit?.citizenPaidAmount ?? scannedData?.qrData.estimatedCitizenPay ?? 0}
+        shopName={scannedData?.qrData.shopName ?? ''}
+        isPending={checkoutMutation.isPending}
+        error={pinError}
+        lockedUntil={pinStatus?.lockedUntil}
+        onConfirm={pin => checkoutMutation.mutate(pin)}
+        onClose={() => { setShowPinConfirmation(false); setPinError(null); }}
+        onEdit={() => setPinError(null)}
+        onForgot={() => {
+          if (scannedData?.qrData?.qrReference) {
+            sessionStorage.setItem(
+              'thai-please:pending-checkout-qr',
+              JSON.stringify({
+                ref: scannedData.qrData.qrReference,
+                code: appliedDiscount?.code || undefined,
+                codeType: appliedDiscountCodeType,
+              })
+            );
+          }
+          sessionStorage.setItem('thai-please:pin-reset-intent', '1');
+          if (user?.id) {
+            sessionStorage.setItem('thai-please:pin-reset-user-id', user.id);
+          }
+          sessionStorage.setItem('thai-please:pin-reset-return', APP_ROUTES.CITIZEN_SCAN_COPAY);
+          clearAuth();
+          navigate(APP_ROUTES.LOGIN, { replace: true, state: { from: { pathname: APP_ROUTES.CITIZEN_SCAN_COPAY } } });
+        }}
+      />
     </div>
   );
 };

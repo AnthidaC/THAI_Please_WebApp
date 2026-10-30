@@ -45,3 +45,28 @@
 1. เพิ่ม Path Constant ใน `src/constants/routes.ts`
 2. สร้าง Component หน้าใหม่ใน `src/pages/<module>/<NewPage>.tsx`
 3. นำไปผูกใน `src/routes/index.tsx` (เลือกว่าอยู่ใน `RootLayout`, `ProtectedRoute` หรือ `PublicRoute`)
+
+## 4. Admin Badge workflow
+
+The Badges tab on `/admin/campaigns` uses the shared Admin design system and TanStack Query. The Thai UI calls these achievements “เหรียญตรา”. Admins select a stored condition definition and configure exactly four fixed tiers: Bronze, Silver, Gold, and Platinum at levels 1–4. The condition catalog supplies the measurement unit; count thresholds use integers, and spending thresholds use whole baht because `badge_tiers.required_count` is an integer. To propose a new condition, open the condition management panel; the Badge form does not accept unregistered free-text identifiers.
+
+The threshold editor has four thumbs on one dynamic-range slider and four synchronized numeric inputs. The optional “ปรับทุกระดับตามสัดส่วน” mode scales the lower thresholds when Platinum changes; editing Bronze, Silver, or Gold changes only that tier. A local preview calculates the current and next tier without querying or saving Citizen progress. Admins cannot add, remove, reorder, or rename tier identities. New Badges display Pending and Inactive. Admins can filter by activation and implementation status and edit metadata, thresholds, and optional icon URLs. Earned tiers stay locked, active Badges must be deactivated before tier changes, and updates keep the same tier IDs. Activation stays disabled until the condition catalog reports Ready and the backend registry contains the handler. Legacy Badge Series with a noncanonical tier structure remain read-only until a reviewed conversion plan can preserve their tier IDs and award history. Search, tab, and filter state is represented in the page query string for direct links.
+
+## 5. Citizen achievements
+
+`/citizen/achievements` (`APP_ROUTES.CITIZEN_ACHIEVEMENTS`) is reachable from the citizen navigation as "เหรียญตราของฉัน". It reads `GET /api/me/badges` through `services/badgeApi.ts` with TanStack Query; progress is never hardcoded.
+
+- `components/badges/BadgeProgressCard.tsx` renders one Badge: icon, name, current tier, remaining amount to the next tier, an accessible `role="progressbar"` (`aria-valuetext` in the condition's unit), tier chips, and the unlock date.
+- `pages/citizen/achievements/CitizenAchievementsPage.tsx` owns loading skeletons (`aria-live`), an `role="alert"` error state with retry, an empty state, and the unlocked/max-tier counters.
+- Money conditions are formatted with `toLocaleString('th-TH')`; counts are formatted separately. `progress: null` (unregistered or failing handler) shows an "unavailable" note rather than a misleading bar.
+- The payment slip review modal now posts to `POST /api/reviews`; it shows a pending label while saving and an `role="alert"` message on failure. It no longer marks a review as submitted without a server write.
+
+Do not add a separate progress store or cache on the client: the query cache already holds the latest server state, and Badge writes happen server-side.
+
+## 6. Campaign period configuration and wallet display
+
+The existing Admin campaign editor owns period configuration. It keeps periods in local form state, submits them with the existing campaign create/update request, shows the period quota sum, campaign total, and their difference, and disables submit unless a non-empty period configuration sums exactly to the campaign total. This applies to manually added and generated monthly periods. Only upcoming unused periods are editable. Administrators set the number of months and quota and can edit generated rows.
+
+`datetime-local` period values are interpreted in `Asia/Bangkok`; conversion to API timestamps always includes the `+07:00` offset. Do not use the browser machine's local zone for period eligibility. The end time is exclusive, so labels must say so.
+
+Citizen Wallet reads `periodQuota` from the existing wallet API. Show the current period's limit, used amount, and remaining amount only when an allocation is active. In gaps and after expiry, show a clear status and never display an expired period remainder as spendable. Keep daily remaining, current-period remaining, and campaign-wide remaining visibly distinct. Legacy campaigns without periods keep the prior wallet presentation.

@@ -17,6 +17,9 @@ import {
   ChevronUp,
   Filter,
   CheckCheck,
+  Calendar,
+  Clock,
+  XCircle,
 } from 'lucide-react';
 import {
   getFraudAlerts,
@@ -31,11 +34,207 @@ import {
 } from '../../../services/paymentApi';
 import { FraudLocationMap } from '../../../components/admin/FraudLocationMap';
 
+const formatDistance = (meters: number) =>
+  meters > 1000 ? `${(meters / 1000).toFixed(1)} กม.` : `${meters.toFixed(0)} ม.`;
+
+const formatThaiDate = (dateStr?: string) => {
+  if (!dateStr) return '-';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return '-';
+  return d.toLocaleDateString('th-TH', {
+    day: 'numeric',
+    month: 'short',
+    year: '2-digit',
+  });
+};
+
+const formatThaiTime = (dateStr?: string) => {
+  if (!dateStr) return '-';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return '-';
+  return `${d.toLocaleTimeString('th-TH', {
+    hour: '2-digit',
+    minute: '2-digit',
+  })} น.`;
+};
+
+const formatThaiDateTime = (dateStr?: string) => {
+  if (!dateStr) return '-';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return '-';
+  const dateFormatted = d.toLocaleDateString('th-TH', {
+    day: 'numeric',
+    month: 'short',
+    year: '2-digit',
+  });
+  const timeFormatted = d.toLocaleTimeString('th-TH', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+  return `${dateFormatted} • ${timeFormatted} น.`;
+};
+
+const renderTransactionStatusBadge = (txStatus?: string, decision?: string) => {
+  const isRejected = txStatus === 'REJECTED' || decision === 'REJECTED';
+  if (isRejected) {
+    return (
+      <span className="inline-flex items-center space-x-1 rounded-pill bg-red-50 text-status-error border border-red-200 px-2 py-0.5 text-[10px] sm:text-[11px] font-semibold">
+        <XCircle className="h-3 w-3 shrink-0 text-status-error" />
+        <span>ถูกบล็อก (ไม่สำเร็จ)</span>
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center space-x-1 rounded-pill bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 text-[10px] sm:text-[11px] font-semibold">
+      <CheckCircle2 className="h-3 w-3 shrink-0 text-status-success" />
+      <span>ชำระสำเร็จ (ตัดเงินแล้ว)</span>
+    </span>
+  );
+};
+
+interface SubBillsViewerProps {
+  transactions: FraudAlertItem[];
+  type: 'USER' | 'MERCHANT';
+  onSelectAlert: (alert: FraudAlertItem) => void;
+}
+
+const SubBillsViewer: React.FC<SubBillsViewerProps> = ({
+  transactions,
+  type,
+  onSelectAlert,
+}) => {
+  const completedCount = transactions.filter(
+    (tx) => tx.transactionStatus !== 'REJECTED' && tx.decision !== 'REJECTED'
+  ).length;
+  const rejectedCount = transactions.length - completedCount;
+
+  return (
+    <div className="border-t border-hairline bg-surface-soft/60 p-3 sm:p-4 md:p-5 space-y-3 animate-in fade-in duration-200">
+      {/* สรุปภาพรวมและตัวนับบิลย่อย */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-white border border-hairline rounded-2xl p-3 sm:px-4 shadow-2xs">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center space-x-1.5 text-xs font-bold text-ink">
+            <FileSearch className="h-4 w-4 text-brand-blue shrink-0" />
+            <span>
+              {type === 'USER' ? 'รายการบิลย่อยในแฟ้มคดีนี้' : 'รายการบิลลูกค้าที่สแกนกับร้านนี้'}
+            </span>
+          </div>
+          <span className="bg-brand-blue/10 text-brand-blue font-mono font-bold px-2 py-0.5 rounded-pill text-[11px]">
+            {transactions.length} รายการ
+          </span>
+        </div>
+
+        {/* Breakdown สรุปสถานะความสำเร็จของบิล */}
+        <div className="flex flex-wrap items-center gap-2 text-[11px]">
+          <span className="inline-flex items-center space-x-1 rounded-pill bg-emerald-50 text-emerald-800 border border-emerald-200 px-2.5 py-0.5 font-medium">
+            <CheckCircle2 className="h-3.5 w-3.5 text-status-success shrink-0" />
+            <span>
+              ชำระสำเร็จ: <strong className="font-mono">{completedCount}</strong> บิล
+            </span>
+          </span>
+          {rejectedCount > 0 && (
+            <span className="inline-flex items-center space-x-1 rounded-pill bg-red-50 text-status-error border border-red-200 px-2.5 py-0.5 font-medium">
+              <XCircle className="h-3.5 w-3.5 text-status-error shrink-0" />
+              <span>
+                ถูกบล็อก: <strong className="font-mono">{rejectedCount}</strong> บิล
+              </span>
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* รายการบิลย่อยแบบ Scrollable สะอาดตา อ่านง่าย ไม่ทำให้หน้ารวมยืดยาว */}
+      <div className="max-h-[520px] overflow-y-auto pr-1 space-y-2.5">
+        {transactions.map((tx) => {
+          const txDate = tx.transactionCreatedAt || tx.createdAt;
+          const isRejected = tx.transactionStatus === 'REJECTED' || tx.decision === 'REJECTED';
+
+          return (
+            <div
+              key={tx.fraudCheckId}
+              className={`rounded-2xl border bg-white p-3.5 sm:p-4 shadow-2xs hover:shadow-xs transition duration-150 ${
+                isRejected ? 'border-red-200 bg-red-50/20' : 'border-hairline hover:border-brand-blue/30'
+              }`}
+            >
+              {/* แถวด้านบน: วันที่ & เวลา + สถานะสำเร็จไหม + ยอดเงิน Co-pay */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2.5 border-b border-hairline/60">
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* วันที่ และ เวลา ที่ทำรายการบิลนี้ */}
+                  <span className="inline-flex items-center space-x-1.5 font-mono text-[11px] font-semibold text-ink bg-surface-soft px-2.5 py-1 rounded-lg border border-hairline">
+                    <Calendar className="h-3.5 w-3.5 text-brand-blue shrink-0" />
+                    <span>{formatThaiDate(txDate)}</span>
+                    <span className="text-ink-muted font-normal">•</span>
+                    <Clock className="h-3.5 w-3.5 text-ink-muted shrink-0" />
+                    <span>{formatThaiTime(txDate)}</span>
+                  </span>
+
+                  {/* ป้ายสถานะว่าบิลนั้นสำเร็จไหม */}
+                  {renderTransactionStatusBadge(tx.transactionStatus, tx.decision)}
+                </div>
+
+                {/* ยอดเงิน Co-pay */}
+                <div className="flex items-baseline space-x-2 sm:text-right shrink-0">
+                  <span className="text-[11px] text-ink-muted sm:hidden">ยอดบิล:</span>
+                  <span className="font-mono text-sm sm:text-base font-bold text-ink">
+                    ฿{tx.totalAmount.toFixed(2)}
+                  </span>
+                  <span className="font-mono text-[11px] font-semibold text-status-error bg-red-50 border border-red-100 px-2 py-0.5 rounded-md">
+                    (รัฐ 60%: ฿{tx.copayAmount.toFixed(2)})
+                  </span>
+                </div>
+              </div>
+
+              {/* แถวด้านล่าง: คู่ค้า + ระยะทาง + ข้อสงสัย AI + ปุ่มดูแผนที่ */}
+              <div className="pt-2.5 flex flex-col md:flex-row md:items-center justify-between gap-2.5 text-xs">
+                <div className="space-y-1.5 min-w-0">
+                  <div className="font-semibold text-ink flex flex-wrap items-center gap-2">
+                    {type === 'USER' ? (
+                      <span className="flex items-center space-x-1.5 text-ink">
+                        <Store className="h-3.5 w-3.5 text-brand-blue shrink-0" />
+                        <span className="truncate">ร้าน: {tx.shopName}</span>
+                      </span>
+                    ) : (
+                      <span className="flex items-center space-x-1.5 text-ink">
+                        <Users className="h-3.5 w-3.5 text-brand-blue shrink-0" />
+                        <span className="truncate">ลูกค้า: {tx.customerName}</span>
+                      </span>
+                    )}
+
+                    <span className="text-[10px] text-ink-muted bg-surface-soft border border-hairline px-2 py-0.5 rounded-pill font-mono">
+                      ห่าง {formatDistance(tx.distanceMeters)}
+                    </span>
+                  </div>
+
+                  {/* ข้อสังเกตจาก AI */}
+                  <div className="text-[11px] text-ink-muted flex items-start space-x-1.5 leading-relaxed bg-surface-soft/60 rounded-xl px-2.5 py-1 border border-hairline/40">
+                    <span className="text-brand-blue font-bold shrink-0">ข้อสังเกต:</span>
+                    <span>{tx.fraudReason}</span>
+                  </div>
+                </div>
+
+                {/* Action: แผนที่พิกัด */}
+                <button
+                  onClick={() => onSelectAlert(tx)}
+                  className="inline-flex items-center justify-center space-x-1.5 rounded-pill border border-hairline bg-surface-soft hover:bg-brand-blue hover:text-white hover:border-brand-blue px-3.5 py-1.5 text-xs font-semibold text-ink transition shadow-2xs shrink-0 self-start md:self-center"
+                >
+                  <Eye className="h-3.5 w-3.5 text-brand-blue hover:text-inherit" />
+                  <span>ดูพิกัดแผนที่</span>
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
 export const AdminFraudAlertsPage: React.FC = () => {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<'USER_DOSSIERS' | 'MERCHANT_DOSSIERS' | 'RAW_ALERTS'>('USER_DOSSIERS');
   const [includeNoise, setIncludeNoise] = useState<boolean>(false);
   const [expandedDossierId, setExpandedDossierId] = useState<string | null>(null);
+  const [expandedMerchantsUserId, setExpandedMerchantsUserId] = useState<string | null>(null);
 
   const [selectedAlert, setSelectedAlert] = useState<FraudAlertItem | null>(null);
   const [resolveNote, setResolveNote] = useState<string>('');
@@ -130,9 +329,6 @@ export const AdminFraudAlertsPage: React.FC = () => {
     },
   });
 
-  const formatDistance = (meters: number) =>
-    meters > 1000 ? `${(meters / 1000).toFixed(1)} กม.` : `${meters.toFixed(0)} ม.`;
-
   const summary = dossiersData?.summary;
   const userDossiers = dossiersData?.userDossiers || [];
   const merchantDossiers = dossiersData?.merchantDossiers || [];
@@ -140,7 +336,7 @@ export const AdminFraudAlertsPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-surface-soft pb-24 md:pb-12 font-sans text-ink">
       {/* Header & Refresh */}
-      <div className="bg-white border-b border-hairline px-3.5 sm:px-6 lg:px-8 py-3 sm:py-3.5 mb-4 shadow-2xs">
+      <div className="mx-auto max-w-7xl px-3.5 sm:px-6 lg:px-8 pt-4 sm:pt-6 pb-2">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 sm:gap-3">
           <div className="flex items-center space-x-2.5 min-w-0">
             <div className="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-2xl bg-red-50 text-status-error border border-red-100 shadow-xs">
@@ -320,6 +516,13 @@ export const AdminFraudAlertsPage: React.FC = () => {
             ) : (
               userDossiers.map((userDossier: UserFraudDossier) => {
                 const isExpanded = expandedDossierId === userDossier.userId;
+                const isAllMerchantsShown = expandedMerchantsUserId === userDossier.userId;
+                const sortedMerchants = [...(userDossier.merchantsInvolved || [])].sort(
+                  (a: any, b: any) => b.transactionCount - a.transactionCount
+                );
+                const visibleMerchants = isAllMerchantsShown ? sortedMerchants : sortedMerchants.slice(0, 2);
+                const extraMerchantsCount = Math.max(0, sortedMerchants.length - 2);
+
                 return (
                   <div
                     key={userDossier.userId}
@@ -395,28 +598,53 @@ export const AdminFraudAlertsPage: React.FC = () => {
                     </div>
 
                     {/* รายชื่อร้านค้าที่เกี่ยวข้อง & ปุ่ม Action Bar */}
-                    <div className="p-3.5 sm:p-4 bg-white flex flex-col md:flex-row md:items-center justify-between gap-3">
-                      <div className="flex flex-wrap items-center gap-2 text-xs text-ink-muted">
-                        <span>ร้านค้าที่สแกน:</span>
-                        {userDossier.merchantsInvolved.map((m: any) => (
+                    <div className="p-3.5 sm:p-4 bg-white flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-t border-hairline/60">
+                      <div className="flex flex-wrap items-center gap-1.5 text-xs text-ink min-w-0">
+                        <span className="shrink-0 font-medium text-ink-muted flex items-center space-x-1 mr-1">
+                          <Store className="h-3.5 w-3.5 text-brand-blue" />
+                          <span>ร้านค้า ({sortedMerchants.length}):</span>
+                        </span>
+                        {visibleMerchants.map((m: any) => (
                           <span
                             key={m.merchantId}
-                            className="bg-surface-soft border border-hairline rounded-lg px-2 py-0.5 font-medium text-ink flex items-center space-x-1"
+                            title={`${m.shopName} (${m.transactionCount} บิล)`}
+                            className="bg-surface-soft border border-hairline rounded-lg px-2 py-0.5 font-medium text-ink flex items-center space-x-1 shrink-0"
                           >
-                            <Store className="h-3 w-3 text-brand-blue" />
-                            <span>{m.shopName}</span>
-                            <span className="font-mono text-[10px] text-brand-blue">({m.transactionCount} บิล)</span>
+                            <span className="max-w-[140px] sm:max-w-[180px] truncate">{m.shopName}</span>
+                            <span className="font-mono text-[10px] text-brand-blue font-bold">({m.transactionCount} บิล)</span>
                           </span>
                         ))}
+                        {extraMerchantsCount > 0 && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setExpandedMerchantsUserId(
+                                isAllMerchantsShown ? null : userDossier.userId
+                              )
+                            }
+                            className="bg-brand-blue/10 hover:bg-brand-blue/20 text-brand-blue border border-brand-blue/20 rounded-lg px-2 py-0.5 text-[11px] font-semibold transition shrink-0"
+                            title={
+                              isAllMerchantsShown
+                                ? 'คลิกเพื่อย่อแสดงเฉพาะร้านหลัก'
+                                : sortedMerchants.slice(2).map((m: any) => `${m.shopName} (${m.transactionCount} บิล)`).join(', ')
+                            }
+                          >
+                            {isAllMerchantsShown ? 'ย่อร้านค้า' : `+ อีก ${extraMerchantsCount} ร้าน`}
+                          </button>
+                        )}
                       </div>
 
                       {/* ปุ่ม Batch Actions ระดับบุคคลใน 1 คลิก */}
-                      <div className="flex flex-wrap items-center gap-2 shrink-0">
+                      <div className="flex flex-wrap items-center gap-2 shrink-0 self-start lg:self-center">
                         <button
                           onClick={() => setExpandedDossierId(isExpanded ? null : userDossier.userId)}
-                          className="inline-flex items-center space-x-1 rounded-pill border border-hairline bg-surface-soft px-3 py-1.5 text-xs font-medium text-ink hover:bg-gray-200 transition"
+                          className={`inline-flex items-center space-x-1.5 rounded-pill border px-3 py-1.5 text-xs font-semibold transition ${
+                            isExpanded
+                              ? 'bg-brand-blue/10 text-brand-blue border-brand-blue/30 shadow-2xs'
+                              : 'bg-surface-soft border-hairline text-ink hover:bg-gray-200'
+                          }`}
                         >
-                          <span>ดู {userDossier.flaggedCount} บิลย่อย</span>
+                          <span>{isExpanded ? 'ซ่อนบิลย่อย' : `ดู ${userDossier.flaggedCount} บิลย่อย`}</span>
                           {isExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
                         </button>
 
@@ -456,46 +684,11 @@ export const AdminFraudAlertsPage: React.FC = () => {
 
                     {/* รายการบิลย่อยที่ซ่อนอยู่ (Expandable Sub-transactions) */}
                     {isExpanded && (
-                      <div className="border-t border-hairline bg-surface-soft/40 p-3 sm:p-4 space-y-2">
-                        <span className="text-[11px] font-bold text-ink-muted block mb-2">
-                          รายการธุรกรรมย่อยในแฟ้มคดีนี้:
-                        </span>
-                        <div className="space-y-2">
-                          {userDossier.transactions.map((tx: any) => (
-                            <div
-                              key={tx.fraudCheckId}
-                              className="rounded-xl border border-hairline bg-white p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs"
-                            >
-                              <div className="space-y-0.5">
-                                <div className="font-semibold text-ink flex items-center space-x-2">
-                                  <span>ร้าน {tx.shopName}</span>
-                                  <span className="text-[10px] text-ink-muted">
-                                    ห่าง {formatDistance(tx.distanceMeters)}
-                                  </span>
-                                </div>
-                                <div className="text-[11px] text-ink-muted">
-                                  {tx.fraudReason}
-                                </div>
-                              </div>
-                              <div className="flex items-center space-x-3 shrink-0">
-                                <div className="text-right">
-                                  <div className="font-mono font-bold text-ink">฿{tx.totalAmount.toFixed(2)}</div>
-                                  <div className="font-mono text-[10px] text-status-error">
-                                    (รัฐ ฿{tx.copayAmount.toFixed(2)})
-                                  </div>
-                                </div>
-                                <button
-                                  onClick={() => setSelectedAlert(tx)}
-                                  className="inline-flex items-center space-x-1 rounded-pill border border-hairline bg-surface-soft hover:bg-gray-200 px-2.5 py-1 text-[11px] font-medium text-ink transition"
-                                >
-                                  <Eye className="h-3 w-3 text-brand-blue" />
-                                  <span>แผนที่พิกัด</span>
-                                </button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
+                      <SubBillsViewer
+                        transactions={userDossier.transactions}
+                        type="USER"
+                        onSelectAlert={setSelectedAlert}
+                      />
                     )}
                   </div>
                 );
@@ -597,9 +790,13 @@ export const AdminFraudAlertsPage: React.FC = () => {
                       <div className="flex flex-wrap items-center gap-2 shrink-0">
                         <button
                           onClick={() => setExpandedDossierId(isExpanded ? null : merchantDossier.merchantId)}
-                          className="inline-flex items-center space-x-1 rounded-pill border border-hairline bg-surface-soft px-3 py-1.5 text-xs font-medium text-ink hover:bg-gray-200 transition"
+                          className={`inline-flex items-center space-x-1.5 rounded-pill border px-3 py-1.5 text-xs font-semibold transition ${
+                            isExpanded
+                              ? 'bg-brand-blue/10 text-brand-blue border-brand-blue/30 shadow-2xs'
+                              : 'bg-surface-soft border-hairline text-ink hover:bg-gray-200'
+                          }`}
                         >
-                          <span>ดู {merchantDossier.flaggedCount} บิลย่อย</span>
+                          <span>{isExpanded ? 'ซ่อนบิลย่อย' : `ดู ${merchantDossier.flaggedCount} บิลย่อย`}</span>
                           {isExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
                         </button>
 
@@ -638,46 +835,11 @@ export const AdminFraudAlertsPage: React.FC = () => {
                     </div>
 
                     {isExpanded && (
-                      <div className="border-t border-hairline bg-surface-soft/40 p-3 sm:p-4 space-y-2">
-                        <span className="text-[11px] font-bold text-ink-muted block mb-2">
-                          รายการบิลลูกค้าที่สแกนกับร้านนี้:
-                        </span>
-                        <div className="space-y-2">
-                          {merchantDossier.transactions.map((tx: any) => (
-                            <div
-                              key={tx.fraudCheckId}
-                              className="rounded-xl border border-hairline bg-white p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs"
-                            >
-                              <div className="space-y-0.5">
-                                <div className="font-semibold text-ink flex items-center space-x-2">
-                                  <span>ลูกค้า: {tx.customerName}</span>
-                                  <span className="text-[10px] text-ink-muted">
-                                    ห่าง {formatDistance(tx.distanceMeters)}
-                                  </span>
-                                </div>
-                                <div className="text-[11px] text-ink-muted">
-                                  {tx.fraudReason}
-                                </div>
-                              </div>
-                              <div className="flex items-center space-x-3 shrink-0">
-                                <div className="text-right">
-                                  <div className="font-mono font-bold text-ink">฿{tx.totalAmount.toFixed(2)}</div>
-                                  <div className="font-mono text-[10px] text-status-error">
-                                    (รัฐ ฿{tx.copayAmount.toFixed(2)})
-                                  </div>
-                                </div>
-                                <button
-                                  onClick={() => setSelectedAlert(tx)}
-                                  className="inline-flex items-center space-x-1 rounded-pill border border-hairline bg-surface-soft hover:bg-gray-200 px-2.5 py-1 text-[11px] font-medium text-ink transition"
-                                >
-                                  <Eye className="h-3 w-3 text-brand-blue" />
-                                  <span>แผนที่พิกัด</span>
-                                </button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
+                      <SubBillsViewer
+                        transactions={merchantDossier.transactions}
+                        type="MERCHANT"
+                        onSelectAlert={setSelectedAlert}
+                      />
                     )}
                   </div>
                 );
@@ -707,44 +869,45 @@ export const AdminFraudAlertsPage: React.FC = () => {
               </div>
             ) : (
               <div className="divide-y divide-hairline">
-                {rawAlerts.map((alertItem: FraudAlertItem) => (
-                  <div
-                    key={alertItem.fraudCheckId}
-                    className="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5"
-                  >
-                    <div className="space-y-1">
-                      <div className="font-bold text-xs sm:text-sm text-ink flex items-center space-x-2">
-                        <span>{alertItem.customerName}</span>
-                        <span className="text-ink-muted font-normal text-[11px]">→ ร้าน {alertItem.shopName}</span>
-                      </div>
-                      <div className="flex flex-wrap items-center gap-2 text-[11px]">
-                        <span className="rounded-pill bg-amber-50 text-status-warning border border-amber-200 px-2 py-0.5 font-mono">
-                          ห่าง {formatDistance(alertItem.distanceMeters)}
-                        </span>
-                        <span className="text-ink-muted">{alertItem.fraudReason}</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-3 shrink-0">
-                      <div className="text-right">
-                        <div className="font-mono font-bold text-ink">฿{alertItem.totalAmount.toFixed(2)}</div>
-                        <div className="font-mono text-[10px] text-ink-muted">
-                          {new Date(alertItem.createdAt).toLocaleTimeString('th-TH', {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}{' '}
-                          น.
+                {rawAlerts.map((alertItem: FraudAlertItem) => {
+                  const txDate = alertItem.transactionCreatedAt || alertItem.createdAt;
+                  return (
+                    <div
+                      key={alertItem.fraudCheckId}
+                      className="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5"
+                    >
+                      <div className="space-y-1 min-w-0">
+                        <div className="font-bold text-xs sm:text-sm text-ink flex flex-wrap items-center gap-2">
+                          <span>{alertItem.customerName}</span>
+                          <span className="text-ink-muted font-normal text-[11px]">→ ร้าน {alertItem.shopName}</span>
+                          {renderTransactionStatusBadge(alertItem.transactionStatus, alertItem.decision)}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2 text-[11px]">
+                          <span className="rounded-pill bg-amber-50 text-status-warning border border-amber-200 px-2 py-0.5 font-mono">
+                            ห่าง {formatDistance(alertItem.distanceMeters)}
+                          </span>
+                          <span className="text-ink-muted">{alertItem.fraudReason}</span>
                         </div>
                       </div>
-                      <button
-                        onClick={() => setSelectedAlert(alertItem)}
-                        className="inline-flex items-center space-x-1 rounded-pill bg-brand-blue text-white px-3 py-1.5 text-xs font-semibold shadow-2xs hover:bg-brand-blue-hover transition"
-                      >
-                        <Eye className="h-3.5 w-3.5" />
-                        <span>จัดการ</span>
-                      </button>
+                      <div className="flex items-center space-x-3 shrink-0">
+                        <div className="text-right">
+                          <div className="font-mono font-bold text-ink">฿{alertItem.totalAmount.toFixed(2)}</div>
+                          <div className="font-mono text-[10px] text-ink-muted flex items-center justify-end space-x-1">
+                            <Clock className="h-3 w-3 text-ink-muted" />
+                            <span>{formatThaiDateTime(txDate)}</span>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => setSelectedAlert(alertItem)}
+                          className="inline-flex items-center space-x-1 rounded-pill bg-brand-blue text-white px-3 py-1.5 text-xs font-semibold shadow-2xs hover:bg-brand-blue-hover transition"
+                        >
+                          <Eye className="h-3.5 w-3.5" />
+                          <span>จัดการ</span>
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -778,18 +941,42 @@ export const AdminFraudAlertsPage: React.FC = () => {
             </div>
 
             <div className="space-y-3 text-xs">
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 bg-surface-soft p-3 rounded-2xl">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 bg-surface-soft p-3 sm:p-4 rounded-2xl border border-hairline">
                 <div>
                   <span className="text-ink-muted block text-[10px]">ผู้ซื้อ</span>
-                  <span className="font-bold text-ink">{selectedAlert.customerName}</span>
+                  <span className="font-bold text-ink truncate block">{selectedAlert.customerName}</span>
                 </div>
                 <div>
                   <span className="text-ink-muted block text-[10px]">ร้านค้า</span>
-                  <span className="font-bold text-ink">{selectedAlert.shopName}</span>
+                  <span className="font-bold text-ink truncate block">{selectedAlert.shopName}</span>
                 </div>
                 <div>
                   <span className="text-ink-muted block text-[10px]">ยอดรวม Co-pay</span>
                   <span className="font-mono font-bold text-ink">฿{selectedAlert.totalAmount.toFixed(2)}</span>
+                  <span className="font-mono text-[10px] text-status-error block">
+                    (รัฐ 60%: ฿{selectedAlert.copayAmount.toFixed(2)})
+                  </span>
+                </div>
+                <div>
+                  <span className="text-ink-muted block text-[10px]">วัน-เวลาที่ทำรายการ</span>
+                  <span className="font-semibold text-ink flex items-center space-x-1 pt-0.5 font-mono text-[11px]">
+                    <Calendar className="h-3 w-3 text-brand-blue shrink-0" />
+                    <span>
+                      {formatThaiDateTime(selectedAlert.transactionCreatedAt || selectedAlert.createdAt)}
+                    </span>
+                  </span>
+                </div>
+                <div>
+                  <span className="text-ink-muted block text-[10px]">สถานะการชำระเงิน</span>
+                  <div className="pt-0.5">
+                    {renderTransactionStatusBadge(selectedAlert.transactionStatus, selectedAlert.decision)}
+                  </div>
+                </div>
+                <div>
+                  <span className="text-ink-muted block text-[10px]">ระยะห่างระหว่างพิกัด</span>
+                  <span className="font-mono font-semibold text-ink block pt-0.5">
+                    {formatDistance(selectedAlert.distanceMeters)}
+                  </span>
                 </div>
               </div>
 

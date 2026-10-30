@@ -2,6 +2,7 @@ import React from 'react';
 import { Outlet, ScrollRestoration } from 'react-router-dom';
 import { Navbar } from '../components/common/Navbar';
 import { ScrollToTop } from '../components/common/ScrollToTop';
+import { PaymentPinGate } from '../components/payment/PaymentPinGate';
 
 export const RootLayout: React.FC = () => {
   return (
@@ -9,17 +10,17 @@ export const RootLayout: React.FC = () => {
       {/* เลื่อนหน้าจอขึ้นบนสุดเสมอเมื่อเปลี่ยนหน้า (Route change) รองรับทุกอุปกรณ์ */}
       <ScrollToTop />
       <ScrollRestoration />
+      <PaymentPinGate />
 
       {/* Unified Responsive Navigation (Top bar on Desktop, Top & Bottom Nav on Mobile) */}
       <Navbar />
 
       {/* Main Page Outlet */}
-      <main className="flex-1 w-full">
+      <main id="main-content" tabIndex={-1} className="flex-1 w-full">
         <Outlet />
       </main>
 
-      {/* Desktop Footer (Hidden on mobile to keep mobile bottom nav clear) */}
-      <footer className="hidden md:block border-t border-hairline bg-white py-4 px-6 text-center text-xs text-ink-muted">
+      <footer className="border-t border-hairline bg-white px-6 py-5 text-center text-sm text-ink-muted">
         โครงการไทยช่วยไทยพลีส (THAI Please) &bull; แพลตฟอร์มดิจิทัลชำระเงินร่วม Co-pay 60/40 &bull; กระทรวงการคลัง
       </footer>
     </div>

@@ -1,119 +1,245 @@
 import React from 'react';
-import { NavLink, useNavigate, useLocation } from 'react-router-dom';
-import { LogOut } from 'lucide-react';
+import { NavLink, Link, useNavigate, useLocation } from 'react-router-dom';
+import { LogOut, LogIn } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
-import { APP_ROUTES } from '../../constants/routes';
-import { NAV_BY_ROLE, ROLE_LABEL, resolveNavRole } from './navConfig';
+import { APP_ROUTES, homeRouteForRole } from '../../constants/routes';
+import { ROLE_CONFIG, getNavItems, resolveNavRole } from './navConfig';
 
 export const Navbar: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, isAuthenticated, clearAuth } = useAuthStore();
 
-  // เมนูแยกตามบทบาท (ประชาชน / ร้านค้า / ผู้ดูแลระบบ) — ไม่รวมเมนูหลายบทบาทไว้ด้วยกัน
+  // เมนูแยกตามบทบาท (ประชาชน / ร้านค้า / ผู้ดูแลระบบ) — แยกตามบทบาทเด็ดขาด ไม่ปนกัน
   const role = resolveNavRole(user?.role, location.pathname);
-  const navItems = NAV_BY_ROLE[role];
-  const RoleIcon = ROLE_LABEL[role].icon;
+  const homePath = isAuthenticated ? homeRouteForRole(user?.role) : APP_ROUTES.HOME;
+  const handleSignOut = () => {
+    clearAuth();
+    navigate(APP_ROUTES.HOME, { replace: true });
+  };
+  const roleConfig = ROLE_CONFIG[role];
+  const isMerchant = role === 'MERCHANT';
   const isAdmin = role === 'ADMIN';
+
+  // ลิงก์โปรไฟล์ของผู้ใช้งานตามบทบาท (ร้านค้า -> ข้อมูลร้านค้า, ประชาชน -> โปรไฟล์ส่วนตัว)
+  const profileRoute = isMerchant
+    ? APP_ROUTES.MERCHANT_PROFILE
+    : role === 'CITIZEN'
+    ? APP_ROUTES.PROFILE
+    : null;
+
+  // แสดงแถบนำทางของร้านค้าเฉพาะผู้ใช้ร้านค้าที่ผ่านการยืนยันตัวตนแล้วเท่านั้น (Authenticated Merchant)
+  const isMerchantAuthenticated = isMerchant && isAuthenticated;
+  const navItems = isMerchant && !isMerchantAuthenticated ? [] : getNavItems(role);
+  const RoleIcon = roleConfig.icon;
+
+  // สีของปุ่มเมนูที่ Active บน Desktop (แยกตามบทบาทและฟังก์ชันงาน)
+  const getActiveDesktopClass = (to: string) => {
+    if (isAdmin) {
+      if (to === APP_ROUTES.ADMIN_FRAUD_ALERTS) {
+        return 'bg-rose-600 text-white shadow-xs';
+      }
+      return 'bg-slate-900 text-white shadow-xs';
+    }
+    if (isMerchant) {
+      return 'bg-emerald-600 text-white shadow-xs';
+    }
+    return 'bg-brand-blue text-white shadow-xs';
+  };
 
   return (
     <>
-      {/* 1. TOP NAVBAR (Responsive: Full on Desktop, Clean & Compact on Mobile) */}
-      <nav className="bg-white border-b border-hairline px-3.5 sm:px-6 lg:px-8 py-2.5 shadow-sm sticky top-0 z-30 font-sans">
-        <div className="flex items-center justify-between max-w-7xl mx-auto gap-2 sm:gap-3">
-          {/* Brand Logo & Name */}
-          <div
-            onClick={() => navigate(APP_ROUTES.HOME)}
-            className="flex items-center space-x-2 sm:space-x-2.5 cursor-pointer select-none min-w-0"
-          >
-            <div className="h-8 w-8 sm:h-9 sm:w-9 shrink-0 rounded-2xl bg-brand-blue flex items-center justify-center text-white font-bold text-xs sm:text-sm shadow-sm shadow-blue-500/25">
-              TP
-            </div>
-            <div className="min-w-0">
-              <span className="font-bold text-sm sm:text-base text-ink tracking-tight flex items-center space-x-1.5 leading-none">
-                <span className="truncate">THAI Please</span>
-                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-brand-blue bg-brand-blue-light px-1.5 sm:px-2 py-0.5 rounded-pill border border-blue-200 whitespace-nowrap shrink-0">
-                  <RoleIcon className="h-3 w-3 shrink-0" />
-                  <span className="hidden xs:inline">{ROLE_LABEL[role].label}</span>
+      {/* 1. TOP NAVBAR (Modern, Polished Desktop Header with Distinct Role Presentation) */}
+      <nav
+        aria-label="แถบเมนูหลัก"
+        className="bg-white/95 backdrop-blur-md border-b border-hairline px-3.5 sm:px-6 lg:px-8 py-2.5 sm:py-3 shadow-2xs sticky top-0 z-40 font-sans transition-colors"
+      >
+        <div className="flex items-center justify-between max-w-7xl mx-auto gap-2 sm:gap-4">
+          {/* Brand Logo & Role Indicator */}
+          <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
+            <Link
+              to={homePath}
+              className="flex items-center space-x-2 sm:space-x-2.5 select-none shrink-0 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue rounded-xl p-1 -m-1"
+              aria-label="หน้าแรก ไทยช่วยไทยพลีส"
+            >
+              <div className="h-8 w-8 sm:h-9 sm:w-9 shrink-0 rounded-2xl bg-gradient-to-br from-brand-blue to-blue-700 flex items-center justify-center text-white font-black text-xs sm:text-sm shadow-sm shadow-blue-500/25 group-hover:scale-105 transition-transform">
+                TP
+              </div>
+              <div className="flex flex-col shrink-0">
+                <span className="font-extrabold text-sm sm:text-base text-ink tracking-tight leading-none whitespace-nowrap group-hover:text-brand-blue transition-colors">
+                  THAI Please
                 </span>
-              </span>
-              <span className="text-[10px] sm:text-[11px] text-ink-muted block mt-0.5 truncate">
-                กระเป๋าเงินดิจิทัล &amp; ระบบชำระเงินร่วม
-              </span>
+                <span className="text-[10px] sm:text-[11px] text-ink-muted mt-0.5 whitespace-nowrap leading-none hidden xl:block">
+                  โครงการร่วมจ่าย Co-pay 60/40
+                </span>
+              </div>
+            </Link>
+
+            {/* Role Segmentation Badge (แสดงสถานะ Role ของผู้ใช้ปัจจุบันอย่างชัดเจน) */}
+            <div className="h-5 w-px bg-slate-200 hidden lg:block" aria-hidden="true" />
+            <div className="hidden lg:flex items-center shrink-0">
+              {isAuthenticated ? (
+                <span
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border shadow-2xs transition-colors whitespace-nowrap ${roleConfig.badgeClass}`}
+                >
+                  <RoleIcon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                  <span>{roleConfig.portalLabel}</span>
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium text-slate-600 bg-slate-100 border border-slate-200/80 whitespace-nowrap">
+                  <span className="h-1.5 w-1.5 rounded-full bg-slate-400" aria-hidden="true" />
+                  <span>บริการประชาชนทั่วไป</span>
+                </span>
+              )}
             </div>
           </div>
 
-          {/* Desktop & Tablet Navigation Links — เฉพาะเมนูของบทบาทปัจจุบัน (ซ่อนบนมือถือ) */}
-          <div className="hidden md:flex items-center space-x-1 lg:space-x-1.5 text-xs font-medium">
-            {navItems.map(({ to, label, fullLabel, icon: Icon }) => (
-              <NavLink
-                key={to}
-                to={to}
-                className={({ isActive }) =>
-                  `inline-flex items-center space-x-1.5 px-2.5 lg:px-3 py-1.5 rounded-pill transition whitespace-nowrap ${
-                    isActive
-                      ? isAdmin
-                        ? 'bg-red-600 text-white shadow-sm'
-                        : 'bg-brand-blue text-white shadow-sm'
-                      : 'text-ink-body hover:bg-surface-soft hover:text-ink'
-                  }`
-                }
-              >
-                <Icon className="h-3.5 w-3.5 shrink-0" />
-                <span>
-                  <span className="hidden lg:inline">{fullLabel ?? label}</span>
-                  <span className="lg:hidden">{label}</span>
-                </span>
-              </NavLink>
-            ))}
-          </div>
+          {/* Desktop & Tablet Segmented Track Navigation — ลิงก์เฉพาะบทบาทปัจจุบัน */}
+          {navItems.length > 0 && (
+            <div className="hidden md:flex items-center">
+              <div className="flex items-center p-1 rounded-full bg-slate-100/90 border border-slate-200/70 shadow-2xs space-x-1">
+                {navItems.map(({ to, label, fullLabel, icon: Icon }) => (
+                  <NavLink
+                    key={to}
+                    to={to}
+                    end={
+                      to === APP_ROUTES.HOME ||
+                      to === APP_ROUTES.ADMIN_DASHBOARD ||
+                      to === APP_ROUTES.MERCHANT_HOME ||
+                      to === APP_ROUTES.CITIZEN_HOME
+                    }
+                    className={({ isActive }) =>
+                      `inline-flex items-center space-x-1.5 px-3 lg:px-3.5 py-1.5 rounded-full text-xs lg:text-[13px] font-semibold transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue ${
+                        isActive
+                          ? getActiveDesktopClass(to)
+                          : 'text-slate-600 hover:text-ink hover:bg-white/80'
+                      }`
+                    }
+                  >
+                    <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                    <span>
+                      <span className="hidden lg:inline">{fullLabel ?? label}</span>
+                      <span className="lg:hidden">{label}</span>
+                    </span>
+                  </NavLink>
+                ))}
+              </div>
+            </div>
+          )}
 
-          {/* User Session Info / Auth */}
+          {/* User Session Info / Auth Action */}
           <div className="flex items-center space-x-2 shrink-0">
             {isAuthenticated ? (
-              <div className="flex items-center space-x-2">
-                <span className="text-xs text-ink-muted hidden sm:inline">
-                  สวัสดี, <strong className="text-ink font-semibold">{user?.name || 'ผู้ใช้งาน'}</strong>
-                </span>
-                <span className="text-[11px] font-bold text-brand-blue bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-pill sm:hidden">
-                  {user?.name?.slice(0, 8) || 'ผู้ใช้'}
-                </span>
+              <div className="flex items-center space-x-2 sm:space-x-2.5">
+                {/* User Pill Card (สามารถคลิกเข้าสู่หน้าข้อมูลโปรไฟล์/ร้านค้าได้โดยตรง) */}
+                {profileRoute ? (
+                  <Link
+                    to={profileRoute}
+                    title="จัดการข้อมูลโปรไฟล์"
+                    aria-label="จัดการข้อมูลโปรไฟล์"
+                    className="flex items-center space-x-2 py-1 px-2 sm:px-2.5 rounded-full bg-slate-50 border border-slate-200/80 shadow-2xs hover:bg-slate-100 hover:border-slate-300 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue group"
+                  >
+                    <div
+                      className={`h-6 w-6 rounded-full flex items-center justify-center text-[11px] font-bold shadow-2xs shrink-0 ${roleConfig.avatarBgClass} group-hover:scale-105 transition-transform`}
+                    >
+                      {user?.name ? user.name.charAt(0).toUpperCase() : role.charAt(0)}
+                    </div>
+                    <div className="flex flex-col text-left min-w-0">
+                      <span className="text-xs font-bold text-ink leading-tight max-w-[100px] sm:max-w-[140px] truncate group-hover:text-brand-blue transition-colors">
+                        {user?.name || 'ผู้ใช้งาน'}
+                      </span>
+                      <span className="text-[10px] text-ink-muted leading-none hidden sm:block">
+                        {roleConfig.label}
+                      </span>
+                    </div>
+                  </Link>
+                ) : (
+                  <div className="flex items-center space-x-2 py-1 px-2 sm:px-2.5 rounded-full bg-slate-50 border border-slate-200/80 shadow-2xs">
+                    <div
+                      className={`h-6 w-6 rounded-full flex items-center justify-center text-[11px] font-bold shadow-2xs shrink-0 ${roleConfig.avatarBgClass}`}
+                    >
+                      {user?.name ? user.name.charAt(0).toUpperCase() : role.charAt(0)}
+                    </div>
+                    <div className="flex flex-col text-left min-w-0">
+                      <span className="text-xs font-bold text-ink leading-tight max-w-[100px] sm:max-w-[140px] truncate">
+                        {user?.name || 'ผู้ใช้งาน'}
+                      </span>
+                      <span className="text-[10px] text-ink-muted leading-none hidden sm:block">
+                        {roleConfig.label}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Logout Button */}
                 <button
-                  onClick={clearAuth}
-                  className="p-1.5 text-xs text-status-error hover:bg-red-50 rounded-pill transition border border-red-200"
+                  type="button"
+                  onClick={handleSignOut}
+                  className="h-8 w-8 rounded-full border border-slate-200 bg-white hover:bg-rose-50 hover:border-rose-200 hover:text-rose-600 text-slate-500 flex items-center justify-center transition shadow-2xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500"
                   title="ออกจากระบบ"
+                  aria-label="ออกจากระบบ"
                 >
-                  <LogOut className="h-3.5 w-3.5" />
+                  <LogOut className="h-3.5 w-3.5" aria-hidden="true" />
                 </button>
               </div>
             ) : (
               <button
+                type="button"
                 onClick={() => navigate(APP_ROUTES.LOGIN)}
-                className="px-3.5 py-1.5 text-xs font-semibold rounded-pill bg-brand-blue text-white hover:bg-brand-blue-hover transition shadow-sm"
+                className="h-9 px-3.5 sm:px-4 py-1.5 text-xs font-semibold rounded-full bg-brand-blue text-white hover:bg-brand-blue-hover transition shadow-sm inline-flex items-center space-x-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue active:scale-95"
               >
-                เข้าสู่ระบบ
+                <LogIn className="h-3.5 w-3.5" aria-hidden="true" />
+                <span>เข้าสู่ระบบ</span>
               </button>
             )}
           </div>
         </div>
       </nav>
 
-      {/* 2. MOBILE BOTTOM NAVIGATION BAR — แสดงเฉพาะเมนูของบทบาทปัจจุบัน (Thumb-friendly) */}
+      {/* 2. MOBILE BOTTOM NAVIGATION BAR — แสดงเฉพาะเมนูของบทบาทปัจจุบัน (Thumb-friendly Ergonomics) */}
       {navItems.length > 1 && (
-        <div className="fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-md border-t border-hairline px-2 pt-1 pb-[max(0.25rem,env(safe-area-inset-bottom))] flex justify-around items-end shadow-[0_-2px_12px_rgba(0,0,0,0.08)] md:hidden">
+        <nav
+          aria-label="แถบเมนูด้านล่างบนมือถือ"
+          className="fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-md border-t border-hairline px-1 sm:px-2 pt-1 pb-[max(0.25rem,env(safe-area-inset-bottom))] flex justify-around items-end shadow-[0_-2px_12px_rgba(0,0,0,0.08)] md:hidden"
+        >
           {navItems.map(({ to, label, icon: Icon, primary }) =>
             primary ? (
-              <NavLink key={to} to={to} className="flex flex-col items-center -mt-5">
+              <NavLink
+                key={to}
+                to={to}
+                end={
+                  to === APP_ROUTES.HOME ||
+                  to === APP_ROUTES.ADMIN_DASHBOARD ||
+                  to === APP_ROUTES.MERCHANT_HOME ||
+                  to === APP_ROUTES.CITIZEN_HOME
+                }
+                aria-label={label}
+                className="flex flex-col items-center -mt-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue rounded-full"
+              >
                 {({ isActive }) => (
                   <>
                     <div
-                      className={`h-12 w-12 rounded-full flex items-center justify-center border-2 border-white shadow-lg transition transform active:scale-95 bg-brand-blue text-white ${
-                        isActive ? 'shadow-blue-500/40 ring-2 ring-brand-blue' : 'shadow-blue-500/30'
+                      className={`h-12 w-12 rounded-full flex items-center justify-center border-2 border-white shadow-lg transition transform active:scale-95 text-white ${
+                        isMerchant ? 'bg-emerald-600' : 'bg-brand-blue'
+                      } ${
+                        isActive
+                          ? isMerchant
+                            ? 'shadow-emerald-500/40 ring-2 ring-emerald-600'
+                            : 'shadow-blue-500/40 ring-2 ring-brand-blue'
+                          : isMerchant
+                          ? 'shadow-emerald-500/30'
+                          : 'shadow-blue-500/30'
                       }`}
                     >
-                      <Icon className="h-6 w-6" />
+                      <Icon className="h-6 w-6" aria-hidden="true" />
                     </div>
-                    <span className={`text-[10px] mt-1 ${isActive ? 'text-brand-blue font-bold' : 'text-ink-body font-medium'}`}>
+                    <span
+                      className={`text-[10px] mt-1 ${
+                        isActive
+                          ? `${roleConfig.mobileActiveColor} font-bold`
+                          : 'text-ink-body font-medium'
+                      }`}
+                    >
                       {label}
                     </span>
                   </>
@@ -123,18 +249,27 @@ export const Navbar: React.FC = () => {
               <NavLink
                 key={to}
                 to={to}
+                end={
+                  to === APP_ROUTES.HOME ||
+                  to === APP_ROUTES.ADMIN_DASHBOARD ||
+                  to === APP_ROUTES.MERCHANT_HOME ||
+                  to === APP_ROUTES.CITIZEN_HOME
+                }
+                aria-label={label}
                 className={({ isActive }) =>
-                  `flex flex-col items-center py-1 px-3 rounded-xl transition ${
-                    isActive ? 'text-brand-blue font-semibold' : 'text-ink-muted hover:text-ink'
+                  `flex flex-col items-center min-w-[50px] min-h-[44px] justify-center py-1 px-1 sm:px-2 rounded-xl transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue ${
+                    isActive
+                      ? `${roleConfig.mobileActiveColor} font-bold`
+                      : 'text-ink-muted hover:text-ink'
                   }`
                 }
               >
-                <Icon className="h-5 w-5" />
-                <span className="text-[10px] mt-0.5">{label}</span>
+                <Icon className="h-5 w-5" aria-hidden="true" />
+                <span className="text-[10px] mt-0.5 whitespace-nowrap">{label}</span>
               </NavLink>
             )
           )}
-        </div>
+        </nav>
       )}
     </>
   );
