@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { User } from '../types';
+import { queryClient } from '../lib/queryClient';
 
 interface AuthState {
   user: User | null;
@@ -37,13 +38,19 @@ export const useAuthStore = create<AuthState>((set) => ({
   token: initialToken,
   isAuthenticated: !!initialToken,
   setAuth: (user, token) => {
+    // ล้างแคชข้อมูลเดิมทั้งหมดในหน่วยความจำทันทีเมื่อมีการเข้าสู่ระบบด้วยบัญชีใหม่
+    queryClient.clear();
     localStorage.setItem('auth_token', token);
     localStorage.setItem('auth_user', JSON.stringify(user));
     set({ user, token, isAuthenticated: true });
   },
   clearAuth: () => {
+    // ล้างแคชคำขอทั้งหมด (ยอดเงิน, ประวัติธุรกรรม, ข้อมูลส่วนตัว ฯลฯ) ทันทีที่ออกจากระบบ
+    queryClient.clear();
     localStorage.removeItem('auth_token');
     localStorage.removeItem('auth_user');
+    sessionStorage.removeItem('thai-please:pin-reset-intent');
+    sessionStorage.removeItem('thai-please:pin-reset-return');
     set({ user: null, token: null, isAuthenticated: false });
   },
 }));

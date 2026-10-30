@@ -93,11 +93,8 @@ export const router = createBrowserRouter([
           { path: APP_ROUTES.MERCHANT_PROFILE, element: <MerchantProfilePage /> },
           { path: APP_ROUTES.MERCHANT_POS_QR, element: <MerchantPosQrPage /> },
           { path: APP_ROUTES.MERCHANT_SALES, element: <MerchantSalesHistoryPage /> },
+          { path: APP_ROUTES.MERCHANT_REVIEWS, element: <MerchantReviewsPage /> },
         ],
-      },
-      {
-        path: APP_ROUTES.MERCHANT_REVIEWS,
-        element: <MerchantReviewsPage />,
       },
 
       // Admin routes

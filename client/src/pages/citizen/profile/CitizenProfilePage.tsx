@@ -37,9 +37,9 @@ export const CitizenProfilePage: React.FC = () => {
 
   // ดึงข้อมูลกระเป๋าเงินและยอดเงิน
   const { data: wallet, isLoading: isWalletLoading } = useQuery({
-    queryKey: ['wallet-balance'],
+    queryKey: ['wallet-balance', user?.id],
     queryFn: getWalletBalance,
-    enabled: isAuthenticated,
+    enabled: isAuthenticated && Boolean(user?.id),
     staleTime: 10000,
   });
 

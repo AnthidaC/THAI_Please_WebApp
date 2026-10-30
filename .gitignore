@@ -152,3 +152,6 @@ artifacts/
 # Local agent files and archived reference materials
 /.agents/
 /.DUMP/
+
+# Verification test screenshots
+screenshots/*/

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import {
+  ArrowLeft,
   Star,
   MessageSquare,
   QrCode,
@@ -105,6 +106,7 @@ export const MerchantReviewsPage: React.FC = () => {
       <div className="mx-auto max-w-6xl px-3.5 sm:px-6 lg:px-8 pt-4 sm:pt-6 pb-2">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 sm:gap-3">
           <div className="flex items-center space-x-2.5 min-w-0">
+            <button type="button" onClick={() => navigate(APP_ROUTES.MERCHANT_HOME)} className="flex items-center space-x-1.5 rounded-pill px-2.5 py-1.5 text-xs font-medium text-ink-muted bg-surface-soft hover:bg-gray-200 hover:text-ink transition border border-hairline shrink-0" title="หน้าแรก"><ArrowLeft className="h-4 w-4" /><span className="hidden sm:inline">หน้าแรก</span></button>
             <div className="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-blue-light text-brand-blue shadow-xs">
               <Star className="h-4 w-4 sm:h-5 sm:w-5 fill-brand-blue" />
             </div>

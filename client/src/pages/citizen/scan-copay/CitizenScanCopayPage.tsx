@@ -35,7 +35,7 @@ import type { CitizenReward } from '../../../services/rewardApi';
 
 export const CitizenScanCopayPage: React.FC = () => {
   const navigate = useNavigate();
-  const clearAuth = useAuthStore(state => state.clearAuth);
+  const { user, clearAuth } = useAuthStore();
 
   // พิกัด GPS ผู้ใช้ — ดึงเงียบ ๆ เบื้องหลังเพื่อส่งให้ระบบตรวจสอบ (ไม่แสดงให้ผู้ใช้เห็น)
   const [userLocation, setUserLocation] = useState<{ lat: number; lon: number }>({
@@ -59,8 +59,9 @@ export const CitizenScanCopayPage: React.FC = () => {
 
   // ดึงข้อมูลกระเป๋าเงินเพื่อตรวจสอบยอดเงินและโควตา
   const { data: wallet } = useQuery({
-    queryKey: ['wallet-balance'],
+    queryKey: ['wallet-balance', user?.id],
     queryFn: getWalletBalance,
+    enabled: Boolean(user?.id),
   });
   const {
     data: ownedRewards = [],

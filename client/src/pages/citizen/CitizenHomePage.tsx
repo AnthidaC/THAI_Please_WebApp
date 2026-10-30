@@ -13,17 +13,19 @@ const moneyFormatter = new Intl.NumberFormat('th-TH', {
 });
 
 export const CitizenHomePage: React.FC = () => {
-  const name = useAuthStore((state) => state.user?.name);
+  const user = useAuthStore((state) => state.user);
+  const name = user?.name;
 
   // ดึงข้อมูลกระเป๋าเงินและโควตารัฐสมทบ Co-pay แบบเบาๆ
   const { data: wallet } = useQuery({
-    queryKey: ['citizen-home-wallet'],
+    queryKey: ['citizen-home-wallet', user?.id],
     queryFn: getWalletBalance,
+    enabled: Boolean(user?.id),
     staleTime: 30000,
   });
 
-  const balance = wallet?.balance ?? 3836;
-  const dailyRemaining = wallet?.dailyQuotaRemaining ?? 78;
+  const balance = wallet?.balance ?? 0;
+  const dailyRemaining = wallet?.dailyQuotaRemaining ?? 0;
 
   return (
     <div className="min-h-screen bg-surface-soft pb-24 font-sans text-ink md:pb-14">

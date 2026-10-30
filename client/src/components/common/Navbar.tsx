@@ -21,6 +21,13 @@ export const Navbar: React.FC = () => {
   const isMerchant = role === 'MERCHANT';
   const isAdmin = role === 'ADMIN';
 
+  // ลิงก์โปรไฟล์ของผู้ใช้งานตามบทบาท (ร้านค้า -> ข้อมูลร้านค้า, ประชาชน -> โปรไฟล์ส่วนตัว)
+  const profileRoute = isMerchant
+    ? APP_ROUTES.MERCHANT_PROFILE
+    : role === 'CITIZEN'
+    ? APP_ROUTES.PROFILE
+    : null;
+
   // แสดงแถบนำทางของร้านค้าเฉพาะผู้ใช้ร้านค้าที่ผ่านการยืนยันตัวตนแล้วเท่านั้น (Authenticated Merchant)
   const isMerchantAuthenticated = isMerchant && isAuthenticated;
   const navItems = isMerchant && !isMerchantAuthenticated ? [] : getNavItems(role);
@@ -95,7 +102,12 @@ export const Navbar: React.FC = () => {
                   <NavLink
                     key={to}
                     to={to}
-                    end={to === APP_ROUTES.HOME || to === APP_ROUTES.ADMIN_DASHBOARD}
+                    end={
+                      to === APP_ROUTES.HOME ||
+                      to === APP_ROUTES.ADMIN_DASHBOARD ||
+                      to === APP_ROUTES.MERCHANT_HOME ||
+                      to === APP_ROUTES.CITIZEN_HOME
+                    }
                     className={({ isActive }) =>
                       `inline-flex items-center space-x-1.5 px-3 lg:px-3.5 py-1.5 rounded-full text-xs lg:text-[13px] font-semibold transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue ${
                         isActive
@@ -119,22 +131,45 @@ export const Navbar: React.FC = () => {
           <div className="flex items-center space-x-2 shrink-0">
             {isAuthenticated ? (
               <div className="flex items-center space-x-2 sm:space-x-2.5">
-                {/* User Pill Card */}
-                <div className="flex items-center space-x-2 py-1 px-2 sm:px-2.5 rounded-full bg-slate-50 border border-slate-200/80 shadow-2xs">
-                  <div
-                    className={`h-6 w-6 rounded-full flex items-center justify-center text-[11px] font-bold shadow-2xs shrink-0 ${roleConfig.avatarBgClass}`}
+                {/* User Pill Card (สามารถคลิกเข้าสู่หน้าข้อมูลโปรไฟล์/ร้านค้าได้โดยตรง) */}
+                {profileRoute ? (
+                  <Link
+                    to={profileRoute}
+                    title="จัดการข้อมูลโปรไฟล์"
+                    aria-label="จัดการข้อมูลโปรไฟล์"
+                    className="flex items-center space-x-2 py-1 px-2 sm:px-2.5 rounded-full bg-slate-50 border border-slate-200/80 shadow-2xs hover:bg-slate-100 hover:border-slate-300 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue group"
                   >
-                    {user?.name ? user.name.charAt(0).toUpperCase() : role.charAt(0)}
+                    <div
+                      className={`h-6 w-6 rounded-full flex items-center justify-center text-[11px] font-bold shadow-2xs shrink-0 ${roleConfig.avatarBgClass} group-hover:scale-105 transition-transform`}
+                    >
+                      {user?.name ? user.name.charAt(0).toUpperCase() : role.charAt(0)}
+                    </div>
+                    <div className="flex flex-col text-left min-w-0">
+                      <span className="text-xs font-bold text-ink leading-tight max-w-[100px] sm:max-w-[140px] truncate group-hover:text-brand-blue transition-colors">
+                        {user?.name || 'ผู้ใช้งาน'}
+                      </span>
+                      <span className="text-[10px] text-ink-muted leading-none hidden sm:block">
+                        {roleConfig.label}
+                      </span>
+                    </div>
+                  </Link>
+                ) : (
+                  <div className="flex items-center space-x-2 py-1 px-2 sm:px-2.5 rounded-full bg-slate-50 border border-slate-200/80 shadow-2xs">
+                    <div
+                      className={`h-6 w-6 rounded-full flex items-center justify-center text-[11px] font-bold shadow-2xs shrink-0 ${roleConfig.avatarBgClass}`}
+                    >
+                      {user?.name ? user.name.charAt(0).toUpperCase() : role.charAt(0)}
+                    </div>
+                    <div className="flex flex-col text-left min-w-0">
+                      <span className="text-xs font-bold text-ink leading-tight max-w-[100px] sm:max-w-[140px] truncate">
+                        {user?.name || 'ผู้ใช้งาน'}
+                      </span>
+                      <span className="text-[10px] text-ink-muted leading-none hidden sm:block">
+                        {roleConfig.label}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex flex-col text-left min-w-0">
-                    <span className="text-xs font-bold text-ink leading-tight max-w-[100px] sm:max-w-[140px] truncate">
-                      {user?.name || 'ผู้ใช้งาน'}
-                    </span>
-                    <span className="text-[10px] text-ink-muted leading-none hidden sm:block">
-                      {roleConfig.label}
-                    </span>
-                  </div>
-                </div>
+                )}
 
                 {/* Logout Button */}
                 <button
@@ -172,7 +207,12 @@ export const Navbar: React.FC = () => {
               <NavLink
                 key={to}
                 to={to}
-                end={to === APP_ROUTES.HOME || to === APP_ROUTES.ADMIN_DASHBOARD}
+                end={
+                  to === APP_ROUTES.HOME ||
+                  to === APP_ROUTES.ADMIN_DASHBOARD ||
+                  to === APP_ROUTES.MERCHANT_HOME ||
+                  to === APP_ROUTES.CITIZEN_HOME
+                }
                 aria-label={label}
                 className="flex flex-col items-center -mt-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue rounded-full"
               >
@@ -209,7 +249,12 @@ export const Navbar: React.FC = () => {
               <NavLink
                 key={to}
                 to={to}
-                end={to === APP_ROUTES.HOME || to === APP_ROUTES.ADMIN_DASHBOARD}
+                end={
+                  to === APP_ROUTES.HOME ||
+                  to === APP_ROUTES.ADMIN_DASHBOARD ||
+                  to === APP_ROUTES.MERCHANT_HOME ||
+                  to === APP_ROUTES.CITIZEN_HOME
+                }
                 aria-label={label}
                 className={({ isActive }) =>
                   `flex flex-col items-center min-w-[50px] min-h-[44px] justify-center py-1 px-1 sm:px-2 rounded-xl transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue ${
