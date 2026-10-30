@@ -16,7 +16,6 @@ import { NotFoundPage } from '../pages/notFound/NotFoundPage';
 import { MerchantHomePage } from '../pages/merchant/home/MerchantHomePage';
 import { MerchantApplicationStatusPage } from '../pages/merchant/home/MerchantApplicationStatusPage';
 import { CitizenHomePage } from '../pages/citizen/CitizenHomePage';
-import { CitizenBenefitsRegisterPage } from '../pages/citizen/CitizenBenefitsRegisterPage';
 import { MerchantProfilePage } from '../pages/merchant/profile/MerchantProfilePage';
 
 // Citizen Flow Pages
@@ -64,7 +63,6 @@ export const router = createBrowserRouter([
           { path: APP_ROUTES.CITIZEN_HOME, element: <CitizenHomePage /> },
           { path: APP_ROUTES.CITIZEN_WALLET, element: <CitizenWalletPage /> },
           { path: APP_ROUTES.CITIZEN_REWARDS, element: <CitizenRewardsPage /> },
-          { path: APP_ROUTES.CITIZEN_BENEFITS_REGISTER, element: <CitizenBenefitsRegisterPage /> },
           { path: APP_ROUTES.CITIZEN_SCAN_COPAY, element: <CitizenScanCopayPage /> },
           { path: APP_ROUTES.CITIZEN_SLIP, element: <CitizenPaymentSlipPage /> },
           { path: APP_ROUTES.CITIZEN_TRANSACTIONS, element: <CitizenTransactionsPage /> },

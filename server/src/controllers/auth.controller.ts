@@ -3,7 +3,8 @@ import { prisma } from '../utils/prisma';
 import { signToken, TokenPayload } from '../utils/jwt';
 import { cache } from '../utils/redis';
 import { CredentialLoginOutcome, loginWithCredentials } from '../services/authLogin.service';
-import { authLoginSchema, DEMO_LOGIN_ROLES, DemoLoginRole } from '../validations/auth.validation';
+import { authLoginSchema, citizenRegisterSchema, DEMO_LOGIN_ROLES, DemoLoginRole } from '../validations/auth.validation';
+import { registerCitizen } from '../services/citizenAuth.service';
 
 interface DemoAccount {
   id: string;
@@ -78,6 +79,24 @@ export const createAuthLoginHandler = (
 };
 
 export const authLogin = createAuthLoginHandler(loginWithCredentials);
+
+export const registerCitizenController = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const input = citizenRegisterSchema.parse(req.body);
+    const result = await registerCitizen(input);
+    res.status(201).json({
+      status: 'success',
+      data: result,
+      message: 'ลงทะเบียนประชาชนสำเร็จ',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 
 const testAccountName = /(?:^|[^\p{L}\p{N}])(?:test|demo|synthetic)(?=$|[^\p{L}\p{N}])/iu;
 const selectableDemoMerchantName = 'ร้านข้าวมันไก่ป้าณี (วิสาหกิจชุมชน)';

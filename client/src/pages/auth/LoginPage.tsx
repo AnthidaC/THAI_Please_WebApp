@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { isAxiosError } from 'axios';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { AlertCircle, ArrowRight, LoaderCircle, LogIn, ShieldAlert, Store, User } from 'lucide-react';
+import { AlertCircle, ArrowRight, CheckCircle, LoaderCircle, LogIn, ShieldAlert, Store, User } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import { APP_ROUTES, homeRouteForRole } from '../../constants/routes';
 import { authApi } from '../../services/authApi';
@@ -43,6 +43,7 @@ export const LoginPage: React.FC = () => {
   const [isLoadingMerchants, setIsLoadingMerchants] = useState(import.meta.env.DEV);
   const [merchantLoadError, setMerchantLoadError] = useState<string | null>(null);
   const from = (location.state as { from?: { pathname: string } } | null)?.from?.pathname;
+  const registeredMsg = (location.state as { registeredMessage?: string } | null)?.registeredMessage;
 
   const loadDemoCitizens = useCallback(async () => {
     setIsLoadingCitizens(true);
@@ -103,7 +104,7 @@ export const LoginPage: React.FC = () => {
           : 'ใบสมัครร้านค้าอยู่ระหว่างตรวจสอบ');
         return;
       }
-      if (user.role !== 'ADMIN' && user.role !== 'MERCHANT') {
+      if (!['USER', 'ADMIN', 'MERCHANT'].includes(user.role)) {
         setErrorMsg('ไม่สามารถเข้าสู่ระบบด้วยบทบาทนี้ได้');
         return;
       }
@@ -201,6 +202,12 @@ export const LoginPage: React.FC = () => {
             className="min-h-11 w-full rounded-xl border border-hairline bg-white px-3 text-sm text-ink focus:border-brand-blue focus:outline-none focus:ring-2 focus:ring-blue-100"
           />
         </div>
+        {registeredMsg && !errorMsg && (
+          <div role="status" className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-status-success">
+            <CheckCircle className="h-4 w-4 shrink-0 text-emerald-600" aria-hidden="true" />
+            <span className="text-emerald-800">{registeredMsg}</span>
+          </div>
+        )}
         {errorMsg && (
           <div role="alert" className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-status-error">
             <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" />

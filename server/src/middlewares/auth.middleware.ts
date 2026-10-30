@@ -1,5 +1,25 @@
 import { Request, Response, NextFunction } from 'express';
-import { verifyToken } from '../utils/jwt';
+import { isAllowedMerchantApplicationStatusRequest, isRestrictedToken, verifyToken } from '../utils/jwt';
+
+export const restrictScopedTokens = (req: Request, res: Response, next: NextFunction): void => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith('Bearer ')) {
+    next();
+    return;
+  }
+  try {
+    const payload = verifyToken(authHeader.slice('Bearer '.length).trim());
+    if (isRestrictedToken(payload)
+      && !isAllowedMerchantApplicationStatusRequest(payload, req.method, req.originalUrl.split('?')[0])) {
+      res.status(403).json({ status: 'error', message: 'Token is restricted to merchant application status' });
+      return;
+    }
+    next();
+  } catch {
+    // Existing route authentication owns invalid-token responses. This gate only handles valid scoped tokens.
+    next();
+  }
+};
 
 export const authenticate = async (
   req: Request,
@@ -25,11 +45,8 @@ export const authenticate = async (
       return;
     }
 
-    if (payload.tokenScope === 'MERCHANT_APPLICATION_STATUS') {
-      const requestPath = req.originalUrl.split('?')[0];
-      if (payload.role !== 'MERCHANT_APPLICATION_STATUS'
-        || req.method !== 'GET'
-        || requestPath !== '/api/merchant-applications/me/status') {
+    if (isRestrictedToken(payload)) {
+      if (!isAllowedMerchantApplicationStatusRequest(payload, req.method, req.originalUrl.split('?')[0])) {
         res.status(403).json({ status: 'error', message: 'Token is restricted to merchant application status' });
         return;
       }

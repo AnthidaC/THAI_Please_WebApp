@@ -4,7 +4,7 @@ import {
   recordRecommendationClick,
 } from '../controllers/recommendation.controller';
 import { authenticate, requireCitizen } from '../middlewares/auth.middleware';
-import { verifyToken } from '../utils/jwt';
+import { isRestrictedToken, verifyToken } from '../utils/jwt';
 import { sendError } from '../utils/response';
 
 const router = Router();
@@ -49,6 +49,10 @@ export const optionalAuthenticate = (
   // 4. ตรวจสอบความถูกต้องและวันหมดอายุของ JWT
   try {
     const payload = verifyToken(token);
+    if (isRestrictedToken(payload)) {
+      sendError(res, 'Token is restricted to merchant application status', 403);
+      return;
+    }
     req.user = payload;
     return next();
   } catch {

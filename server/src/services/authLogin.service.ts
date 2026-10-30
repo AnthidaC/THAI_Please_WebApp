@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { comparePassword, hashPassword } from '../utils/bcrypt';
 import { HttpError } from '../utils/http-error';
-import { signToken } from '../utils/jwt';
+import { signMerchantApplicationStatusToken, signToken } from '../utils/jwt';
 import { prisma } from '../utils/prisma';
 
 export interface LoginUser {
@@ -57,7 +57,7 @@ const getDummyHash = (): Promise<string> => {
   return dummyHashPromise;
 };
 
-const findMerchantCredential: CredentialProvider = async (email) => {
+export const findMerchantCredential: CredentialProvider = async (email) => {
   const application = await prisma.merchantApplication.findFirst({
     where: { email },
     orderBy: { created_at: 'desc' },
@@ -69,10 +69,10 @@ const findMerchantCredential: CredentialProvider = async (email) => {
     passwordHash: application.password_hash,
     authenticate: async () => {
       if (application.status === 'PENDING') {
-        return { kind: 'application-status', applicationStatus: 'PENDING', token: signToken({ userId: application.application_id, role: 'MERCHANT_APPLICATION_STATUS', tokenScope: 'MERCHANT_APPLICATION_STATUS' }) };
+        return { kind: 'application-status', applicationStatus: 'PENDING', token: signMerchantApplicationStatusToken(application.application_id) };
       }
       if (application.status === 'REJECTED') {
-        return { kind: 'application-status', applicationStatus: 'REJECTED', token: signToken({ userId: application.application_id, role: 'MERCHANT_APPLICATION_STATUS', tokenScope: 'MERCHANT_APPLICATION_STATUS' }) };
+        return { kind: 'application-status', applicationStatus: 'REJECTED', token: signMerchantApplicationStatusToken(application.application_id) };
       }
       if (application.status !== 'APPROVED' || !application.merchant?.is_approved) {
         throw new HttpError(401, INVALID_CREDENTIALS_MESSAGE);
@@ -99,7 +99,7 @@ const findMerchantCredential: CredentialProvider = async (email) => {
   };
 };
 
-const findStaffCredential: CredentialProvider = async (email) => {
+export const findStaffCredential: CredentialProvider = async (email) => {
   const staff = await prisma.staff_accounts.findUnique({ where: { email } });
   if (!staff) return null;
 
@@ -124,8 +124,42 @@ const findStaffCredential: CredentialProvider = async (email) => {
   };
 };
 
+export const findCitizenCredential: CredentialProvider = async (email) => {
+  const normalizedEmail = email.trim().toLowerCase();
+  const identity = await prisma.auth_identities.findUnique({
+    where: { email: normalizedEmail },
+  });
+  if (!identity || identity.account_type !== 'CITIZEN_ACCOUNT') return null;
+
+  const credentials = await prisma.citizen_credentials.findUnique({
+    where: { user_id: identity.account_id },
+    include: { users: true },
+  });
+  if (!credentials || !credentials.users) return null;
+
+  return {
+    passwordHash: credentials.password_hash,
+    authenticate: async () => {
+      const user = credentials.users;
+      return {
+        kind: 'authenticated',
+        data: {
+          user: {
+            id: user.user_id,
+            email: identity.email,
+            name: user.full_name,
+            role: 'USER',
+            createdAt: user.created_at.toISOString(),
+          },
+          token: signToken({ userId: user.user_id, role: 'CITIZEN' }),
+        },
+      };
+    },
+  };
+};
+
 export const loginWithCredentials = createCredentialLoginService(
-  [findMerchantCredential, findStaffCredential],
+  [findMerchantCredential, findStaffCredential, findCitizenCredential],
   comparePassword,
   getDummyHash,
 );

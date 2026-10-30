@@ -4,12 +4,28 @@ const crypto = require('crypto');
 const prisma = new PrismaClient();
 
 const DEMO = {
-  citizenId: '1101700203456',
+  citizenId: '1101700203450',
+  citizenEmail: 'dev-citizen@example.test',
+  citizenPassword: 'DevOnlyPass123!',
   merchantEmail: 'noodle.shop@thaiplease.go.th',
   merchantPassword: 'DemoMerchant123!',
   staffEmail: 'admin.super@thaiplease.go.th',
   staffPassword: 'DemoAdmin123!',
 };
+
+const DEV_CITIZEN_ID_HMAC_SECRET = 'dev-thai-please-citizen-hmac-secret-only';
+
+function getCitizenIdHash(citizenId) {
+  const envSecret = process.env.CITIZEN_ID_HMAC_SECRET?.trim();
+  if (envSecret) {
+    return crypto.createHmac('sha256', envSecret).update(citizenId.trim()).digest('hex');
+  }
+  const nodeEnv = process.env.NODE_ENV || 'development';
+  if (nodeEnv === 'development') {
+    return crypto.createHmac('sha256', DEV_CITIZEN_ID_HMAC_SECRET).update(citizenId.trim()).digest('hex');
+  }
+  throw new Error('CITIZEN_ID_HMAC_SECRET is required outside development');
+}
 
 async function main() {
   console.log('Seeding demo data...');
@@ -105,7 +121,8 @@ async function main() {
     },
   });
 
-  const citizenIdHash = crypto.createHash('sha256').update(DEMO.citizenId).digest('hex');
+  // 3. Citizen (Somchai Citizen Demo with HMAC-SHA256 citizen_id_hash and real credentials)
+  const citizenIdHash = getCitizenIdHash(DEMO.citizenId);
   const user = await prisma.user.upsert({
     where: { citizen_id_hash: citizenIdHash },
     update: { full_name: 'Somchai Citizen Demo', province_code: '10', is_registered_thai_plus: true },
@@ -116,17 +133,54 @@ async function main() {
       is_registered_thai_plus: true,
     },
   });
+
   if (user) {
-    await prisma.wallets.updateMany({
+    await prisma.wallets.upsert({
       where: { user_id: user.user_id },
-      data: {
+      update: {
         campaign_id: campaign.campaign_id,
         balance: 2000.0,
         daily_quota_limit: 200.0,
         total_quota_remaining: 3000.0,
         eligibility_status: 'ELIGIBLE',
+        status: 'ACTIVE',
+      },
+      create: {
+        user_id: user.user_id,
+        campaign_id: campaign.campaign_id,
+        balance: 2000.0,
+        daily_quota_limit: 200.0,
+        daily_quota_used: 0.0,
+        total_quota_remaining: 3000.0,
+        eligibility_status: 'ELIGIBLE',
+        status: 'ACTIVE',
       },
     });
+
+    await prisma.citizen_credentials.upsert({
+      where: { user_id: user.user_id },
+      update: {
+        password_hash: await bcrypt.hash(DEMO.citizenPassword, 10),
+      },
+      create: {
+        user_id: user.user_id,
+        password_hash: await bcrypt.hash(DEMO.citizenPassword, 10),
+      },
+    });
+
+    await prisma.auth_identities.upsert({
+      where: { email: DEMO.citizenEmail },
+      update: {
+        account_type: 'CITIZEN_ACCOUNT',
+        account_id: user.user_id,
+      },
+      create: {
+        email: DEMO.citizenEmail,
+        account_type: 'CITIZEN_ACCOUNT',
+        account_id: user.user_id,
+      },
+    });
+    console.log('Citizen dev account seeded:', DEMO.citizenEmail);
   }
 
   // 4. Fraud check for existing tx d504c4c0-bb3a-482c-a810-6dbc2e50925d

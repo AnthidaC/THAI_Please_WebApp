@@ -169,11 +169,6 @@ export const MerchantRegisterPage: React.FC = () => {
         <p className="mt-1 text-xs text-ink-muted">กรอกข้อมูลกิจการและแนบหลักฐานเพื่อประกอบการตรวจสอบ</p>
       </div>
 
-      <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-relaxed text-amber-900">
-        ระบบอยู่ในสภาพแวดล้อม staging เอกสารที่แนบจะถูกส่งไปยัง private storage เพื่อทดสอบ
-        โปรดอย่าแนบเอกสารจริงหรือข้อมูลบัญชีจริงจนกว่าจะยืนยันนโยบายและเปิดระบบ production
-      </div>
-
       {errorMessage && (
         <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-status-error">
           {errorMessage}

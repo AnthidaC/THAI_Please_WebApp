@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { verifyToken } from '../utils/jwt';
+import { isRestrictedToken, verifyToken } from '../utils/jwt';
 
 /** Allows management endpoints only for valid JWT sessions with the Admin role. */
 export const authenticateAdmin = (
@@ -21,6 +21,11 @@ export const authenticateAdmin = (
     const payload = verifyToken(token);
     if (!payload.userId || !payload.role) {
       res.status(401).json({ status: 'error', message: 'Invalid or expired token' });
+      return;
+    }
+
+    if (isRestrictedToken(payload)) {
+      res.status(403).json({ status: 'error', message: 'Token is restricted to merchant application status' });
       return;
     }
 
