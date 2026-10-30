@@ -227,7 +227,7 @@ const main = async () => {
     assert.equal(adminLogin.body.data.user.role, 'ADMIN');
     const adminToken = adminLogin.body.data.token as string;
 
-    assert.equal((await fetchJson(baseUrl, '/auth/login', undefined, { method: 'POST', body: '{}' })).response.status, 404);
+    assert.equal((await fetchJson(baseUrl, '/auth/login', undefined, { method: 'POST', body: '{}' })).response.status, 400);
     assert.equal((await fetchJson(baseUrl, '/auth/register', undefined, { method: 'POST', body: '{}' })).response.status, 404);
     assert.equal((await fetchJson(baseUrl, '/auth/demo-login', undefined, {
       method: 'POST', body: JSON.stringify({ role: 'CITIZEN', accountId: secondCitizenId }),

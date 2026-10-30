@@ -82,7 +82,7 @@ export const LoginPage: React.FC = () => {
           : 'ใบสมัครร้านค้าอยู่ระหว่างตรวจสอบ');
         return;
       }
-      if (user.role !== 'ADMIN' && user.role !== 'MERCHANT') {
+      if (!['USER', 'ADMIN', 'MERCHANT'].includes(user.role)) {
         setErrorMsg('ไม่สามารถเข้าสู่ระบบด้วยบทบาทนี้ได้');
         return;
       }
