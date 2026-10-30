@@ -6,13 +6,15 @@ import { MapPin } from 'lucide-react';
 interface MerchantLocationPickerProps {
   latitude: number;
   longitude: number;
-  onChange: (latitude: number, longitude: number) => void;
+  onChange?: (latitude: number, longitude: number) => void;
+  readOnly?: boolean;
 }
 
 export const MerchantLocationPicker: React.FC<MerchantLocationPickerProps> = ({
   latitude,
   longitude,
   onChange,
+  readOnly = false,
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -36,16 +38,19 @@ export const MerchantLocationPicker: React.FC<MerchantLocationPickerProps> = ({
       fillColor: '#0052ff',
       fillOpacity: 1,
     }).addTo(map);
-    map.on('click', (event: L.LeafletMouseEvent) => {
-      onChangeRef.current(event.latlng.lat, event.latlng.lng);
-    });
+
+    if (!readOnly) {
+      map.on('click', (event: L.LeafletMouseEvent) => {
+        onChangeRef.current?.(event.latlng.lat, event.latlng.lng);
+      });
+    }
 
     return () => {
       map.remove();
       mapRef.current = null;
       markerRef.current = null;
     };
-  }, []);
+  }, [readOnly]);
 
   useEffect(() => {
     const marker = markerRef.current;
@@ -58,11 +63,11 @@ export const MerchantLocationPicker: React.FC<MerchantLocationPickerProps> = ({
 
   return (
     <div className="overflow-hidden rounded-xl border border-hairline">
-      <div className="flex items-center gap-2 bg-blue-50 px-3 py-2 text-xs font-semibold text-brand-blue">
-        <MapPin className="h-4 w-4" />
-        คลิกบนแผนที่เพื่อเลือกพิกัดร้าน
+      <div className={`flex items-center gap-2 px-3 py-2 text-xs font-semibold ${readOnly ? 'bg-slate-50 text-slate-700' : 'bg-blue-50 text-brand-blue'}`}>
+        <MapPin className="h-4 w-4 shrink-0" aria-hidden="true" />
+        <span>{readOnly ? 'ตำแหน่งร้านค้าปัจจุบันบนแผนที่' : 'คลิกบนแผนที่เพื่อเลือกพิกัดร้าน'}</span>
       </div>
-      <div ref={containerRef} className="h-64 w-full" aria-label="แผนที่เลือกพิกัดร้านค้า" />
+      <div ref={containerRef} className="h-64 w-full" aria-label="แผนที่แสดงพิกัดร้านค้า" />
     </div>
   );
 };
