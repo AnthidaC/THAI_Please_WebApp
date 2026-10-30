@@ -109,10 +109,11 @@ export const BankPinDialog = ({
       setSuccessMessage(msg);
       setError(null);
     if (dialogRef.current) dialogRef.current.scrollTop = 0;
+      client.setQueryData(['payment-pin-status', token], { isSet: true, lockedUntil: null });
       await client.invalidateQueries({ queryKey: ['payment-pin-status'] });
       setTimeout(() => {
         onSuccess?.();
-        if (!mandatory) onClose?.();
+        onClose?.();
       }, 700);
     },
     onError: (err: any) => {
