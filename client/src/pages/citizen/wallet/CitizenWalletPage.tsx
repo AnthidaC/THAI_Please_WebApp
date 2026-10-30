@@ -91,6 +91,17 @@ export const CitizenWalletPage: React.FC = () => {
     ? Math.min(100, Math.round((wallet.dailyQuotaUsed / dailyLimit) * 100))
     : 0;
 
+  // คำนวณยอดใช้ไปและเปอร์เซ็นต์ของช่วงสิทธิ / ยอดรวม
+  const periodLimit = wallet?.periodQuota.enabled && wallet.periodQuota.currentPeriod
+    ? wallet.periodQuota.currentPeriod.quotaLimit
+    : (wallet?.campaignInfo?.totalLimit || 0);
+  const periodUsed = wallet?.periodQuota.enabled && wallet.periodQuota.currentPeriod
+    ? wallet.periodQuota.currentPeriod.quotaUsed
+    : (wallet?.campaignInfo ? Math.max(0, wallet.campaignInfo.totalLimit - (wallet.totalQuotaRemaining || 0)) : 0);
+  const periodUsedPercent = periodLimit > 0
+    ? Math.min(100, Math.round((periodUsed / periodLimit) * 100))
+    : 0;
+
   // คำนวณวันสิ้นสุดของงวดปัจจุบัน (วันสิ้นเดือนของงวดปัจจุบัน)
   const getFallbackCycleDates = () => {
     const thaiMonths = [
@@ -309,11 +320,20 @@ export const CitizenWalletPage: React.FC = () => {
                       </div>
                     </div>
 
-                    <div className="mt-2 pt-1.5 border-t border-hairline/60 flex items-center justify-between text-[9px] sm:text-[11px] text-ink-muted">
-                      <span>สิ้นสุด:</span>
-                      <span className="font-medium text-ink truncate">
-                        {wallet.campaignInfo?.endDate ? formatThaiDate(wallet.campaignInfo.endDate) : currentValidUntil}
-                      </span>
+                    {/* Mini progress bar */}
+                    <div className="mt-2 pt-1.5 border-t border-hairline/60">
+                      <div className="flex items-center justify-between text-[9px] sm:text-[11px] text-ink-muted mb-1">
+                        <span>ใช้แล้ว</span>
+                        <span className="font-mono font-semibold text-ink">
+                          ฿{periodUsed.toFixed(0)} ({periodUsedPercent}%)
+                        </span>
+                      </div>
+                      <div className="h-1.5 w-full rounded-full bg-slate-200 overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-emerald-600 transition-all duration-500"
+                          style={{ width: `${periodUsedPercent}%` }}
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
