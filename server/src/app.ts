@@ -10,6 +10,9 @@ import { env } from './config/env';
 
 const app: Application = express();
 
+// Trust reverse proxies (e.g. Nginx, Cloudflare) for accurate client IP resolution
+app.set('trust proxy', 1);
+
 // Security and utility middlewares
 app.use(helmet());
 app.use(

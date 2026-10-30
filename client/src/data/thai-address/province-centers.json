@@ -1,0 +1,541 @@
+{
+  "10": {
+    "pro_code": "10",
+    "pro_th": "กรุงเทพมหานคร",
+    "pro_en": "Bangkok",
+    "lat": 13.770991,
+    "lng": 100.621882
+  },
+  "11": {
+    "pro_code": "11",
+    "pro_th": "สมุทรปราการ",
+    "pro_en": "Samut Prakan",
+    "lat": 13.596058,
+    "lng": 100.708973
+  },
+  "12": {
+    "pro_code": "12",
+    "pro_th": "นนทบุรี",
+    "pro_en": "Nonthaburi",
+    "lat": 13.92502,
+    "lng": 100.392164
+  },
+  "13": {
+    "pro_code": "13",
+    "pro_th": "ปทุมธานี",
+    "pro_en": "Pathum Thani",
+    "lat": 14.065008,
+    "lng": 100.682005
+  },
+  "14": {
+    "pro_code": "14",
+    "pro_th": "พระนครศรีอยุธยา",
+    "pro_en": "Phra Nakhon Si Ayutthaya",
+    "lat": 14.34516,
+    "lng": 100.527112
+  },
+  "15": {
+    "pro_code": "15",
+    "pro_th": "อ่างทอง",
+    "pro_en": "Ang Thong",
+    "lat": 14.623975,
+    "lng": 100.348387
+  },
+  "16": {
+    "pro_code": "16",
+    "pro_th": "ลพบุรี",
+    "pro_en": "Lopburi",
+    "lat": 15.108919,
+    "lng": 100.907921
+  },
+  "17": {
+    "pro_code": "17",
+    "pro_th": "สิงห์บุรี",
+    "pro_en": "Sing Buri",
+    "lat": 14.912043,
+    "lng": 100.3472
+  },
+  "18": {
+    "pro_code": "18",
+    "pro_th": "ชัยนาท",
+    "pro_en": "Chainat",
+    "lat": 15.132718,
+    "lng": 100.027904
+  },
+  "19": {
+    "pro_code": "19",
+    "pro_th": "สระบุรี",
+    "pro_en": "Saraburi",
+    "lat": 14.627204,
+    "lng": 101.01672
+  },
+  "20": {
+    "pro_code": "20",
+    "pro_th": "ชลบุรี",
+    "pro_en": "Chonburi",
+    "lat": 13.190733,
+    "lng": 101.202384
+  },
+  "21": {
+    "pro_code": "21",
+    "pro_th": "ระยอง",
+    "pro_en": "Rayong",
+    "lat": 12.853447,
+    "lng": 101.428846
+  },
+  "22": {
+    "pro_code": "22",
+    "pro_th": "จันทบุรี",
+    "pro_en": "Chanthaburi",
+    "lat": 12.880544,
+    "lng": 102.12989
+  },
+  "23": {
+    "pro_code": "23",
+    "pro_th": "ตราด",
+    "pro_en": "Trat",
+    "lat": 12.31725,
+    "lng": 102.520569
+  },
+  "24": {
+    "pro_code": "24",
+    "pro_th": "ฉะเชิงเทรา",
+    "pro_en": "Chachoengsao",
+    "lat": 13.606488,
+    "lng": 101.425737
+  },
+  "25": {
+    "pro_code": "25",
+    "pro_th": "ปราจีนบุรี",
+    "pro_en": "Prachin Buri",
+    "lat": 14.047888,
+    "lng": 101.648106
+  },
+  "26": {
+    "pro_code": "26",
+    "pro_th": "นครนายก",
+    "pro_en": "Nakhon Nayok",
+    "lat": 14.217188,
+    "lng": 101.171021
+  },
+  "27": {
+    "pro_code": "27",
+    "pro_th": "สระแก้ว",
+    "pro_en": "Sa Kaeo",
+    "lat": 13.788348,
+    "lng": 102.321766
+  },
+  "30": {
+    "pro_code": "30",
+    "pro_th": "นครราชสีมา",
+    "pro_en": "Nakhon Ratchasima",
+    "lat": 14.956326,
+    "lng": 102.109244
+  },
+  "31": {
+    "pro_code": "31",
+    "pro_th": "บุรีรัมย์",
+    "pro_en": "Buriram",
+    "lat": 14.820638,
+    "lng": 102.956746
+  },
+  "32": {
+    "pro_code": "32",
+    "pro_th": "สุรินทร์",
+    "pro_en": "Surin",
+    "lat": 14.885472,
+    "lng": 103.655466
+  },
+  "33": {
+    "pro_code": "33",
+    "pro_th": "ศรีสะเกษ",
+    "pro_en": "Sisaket",
+    "lat": 14.856133,
+    "lng": 104.368903
+  },
+  "34": {
+    "pro_code": "34",
+    "pro_th": "อุบลราชธานี",
+    "pro_en": "Ubon Ratchathani",
+    "lat": 15.183153,
+    "lng": 105.110829
+  },
+  "35": {
+    "pro_code": "35",
+    "pro_th": "ยโสธร",
+    "pro_en": "Yasothon",
+    "lat": 15.895288,
+    "lng": 104.338237
+  },
+  "36": {
+    "pro_code": "36",
+    "pro_th": "ชัยภูมิ",
+    "pro_en": "Chaiyaphum",
+    "lat": 16.031213,
+    "lng": 101.817141
+  },
+  "37": {
+    "pro_code": "37",
+    "pro_th": "อำนาจเจริญ",
+    "pro_en": "Amnat Charoen",
+    "lat": 15.892202,
+    "lng": 104.740748
+  },
+  "38": {
+    "pro_code": "38",
+    "pro_th": "บึงกาฬ",
+    "pro_en": "Bueng Kan",
+    "lat": 18.148621,
+    "lng": 103.71048
+  },
+  "39": {
+    "pro_code": "39",
+    "pro_th": "หนองบัวลำภู",
+    "pro_en": "Nong Bua Lamphu",
+    "lat": 17.181813,
+    "lng": 102.302262
+  },
+  "40": {
+    "pro_code": "40",
+    "pro_th": "ขอนแก่น",
+    "pro_en": "Khon Kaen",
+    "lat": 16.4081,
+    "lng": 102.578707
+  },
+  "41": {
+    "pro_code": "41",
+    "pro_th": "อุดรธานี",
+    "pro_en": "Udon Thani",
+    "lat": 17.424934,
+    "lng": 102.863725
+  },
+  "42": {
+    "pro_code": "42",
+    "pro_th": "เลย",
+    "pro_en": "Loei",
+    "lat": 17.408296,
+    "lng": 101.634955
+  },
+  "43": {
+    "pro_code": "43",
+    "pro_th": "หนองคาย",
+    "pro_en": "Nong Khai",
+    "lat": 17.940341,
+    "lng": 102.833177
+  },
+  "44": {
+    "pro_code": "44",
+    "pro_th": "มหาสารคาม",
+    "pro_en": "Maha Sarakham",
+    "lat": 15.999434,
+    "lng": 103.165479
+  },
+  "45": {
+    "pro_code": "45",
+    "pro_th": "ร้อยเอ็ด",
+    "pro_en": "Roi Et",
+    "lat": 15.919344,
+    "lng": 103.812979
+  },
+  "46": {
+    "pro_code": "46",
+    "pro_th": "กาฬสินธุ์",
+    "pro_en": "Kalasin",
+    "lat": 16.628058,
+    "lng": 103.621829
+  },
+  "47": {
+    "pro_code": "47",
+    "pro_th": "สกลนคร",
+    "pro_en": "Sakon Nakhon",
+    "lat": 17.389631,
+    "lng": 103.824696
+  },
+  "48": {
+    "pro_code": "48",
+    "pro_th": "นครพนม",
+    "pro_en": "Nakhon Phanom",
+    "lat": 17.383404,
+    "lng": 104.429051
+  },
+  "49": {
+    "pro_code": "49",
+    "pro_th": "มุกดาหาร",
+    "pro_en": "Mukdahan",
+    "lat": 16.561555,
+    "lng": 104.517639
+  },
+  "50": {
+    "pro_code": "50",
+    "pro_th": "เชียงใหม่",
+    "pro_en": "Chiang Mai",
+    "lat": 18.788562,
+    "lng": 98.72598
+  },
+  "51": {
+    "pro_code": "51",
+    "pro_th": "ลำพูน",
+    "pro_en": "Lamphun",
+    "lat": 18.118502,
+    "lng": 98.954425
+  },
+  "52": {
+    "pro_code": "52",
+    "pro_th": "ลำปาง",
+    "pro_en": "Lampang",
+    "lat": 18.326055,
+    "lng": 99.511337
+  },
+  "53": {
+    "pro_code": "53",
+    "pro_th": "อุตรดิตถ์",
+    "pro_en": "Uttaradit",
+    "lat": 17.749526,
+    "lng": 100.516211
+  },
+  "54": {
+    "pro_code": "54",
+    "pro_th": "แพร่",
+    "pro_en": "Phrae",
+    "lat": 18.199481,
+    "lng": 100.064278
+  },
+  "55": {
+    "pro_code": "55",
+    "pro_th": "น่าน",
+    "pro_en": "Nan",
+    "lat": 18.849997,
+    "lng": 100.834698
+  },
+  "56": {
+    "pro_code": "56",
+    "pro_th": "พะเยา",
+    "pro_en": "Phayao",
+    "lat": 19.234218,
+    "lng": 100.19137
+  },
+  "57": {
+    "pro_code": "57",
+    "pro_th": "เชียงราย",
+    "pro_en": "Chiang Rai",
+    "lat": 19.8469,
+    "lng": 99.865484
+  },
+  "58": {
+    "pro_code": "58",
+    "pro_th": "แม่ฮ่องสอน",
+    "pro_en": "Mae Hong Son",
+    "lat": 18.809214,
+    "lng": 98.02996
+  },
+  "60": {
+    "pro_code": "60",
+    "pro_th": "นครสวรรค์",
+    "pro_en": "Nakhon Sawan",
+    "lat": 15.683721,
+    "lng": 100.150068
+  },
+  "61": {
+    "pro_code": "61",
+    "pro_th": "อุทัยธานี",
+    "pro_en": "Uthai Thani",
+    "lat": 15.349355,
+    "lng": 99.477602
+  },
+  "62": {
+    "pro_code": "62",
+    "pro_th": "กำแพงเพชร",
+    "pro_en": "Kamphaeng Phet",
+    "lat": 16.330889,
+    "lng": 99.534772
+  },
+  "63": {
+    "pro_code": "63",
+    "pro_th": "ตาก",
+    "pro_en": "Tak",
+    "lat": 16.716649,
+    "lng": 98.793993
+  },
+  "64": {
+    "pro_code": "64",
+    "pro_th": "สุโขทัย",
+    "pro_en": "Sukhothai",
+    "lat": 17.263227,
+    "lng": 99.711106
+  },
+  "65": {
+    "pro_code": "65",
+    "pro_th": "พิษณุโลก",
+    "pro_en": "Phitsanulok",
+    "lat": 16.982722,
+    "lng": 100.542795
+  },
+  "66": {
+    "pro_code": "66",
+    "pro_th": "พิจิตร",
+    "pro_en": "Phichit",
+    "lat": 16.259561,
+    "lng": 100.343079
+  },
+  "67": {
+    "pro_code": "67",
+    "pro_th": "เพชรบูรณ์",
+    "pro_en": "Phetchabun",
+    "lat": 16.277124,
+    "lng": 101.14606
+  },
+  "70": {
+    "pro_code": "70",
+    "pro_th": "ราชบุรี",
+    "pro_en": "Ratchaburi",
+    "lat": 13.53456,
+    "lng": 99.577796
+  },
+  "71": {
+    "pro_code": "71",
+    "pro_th": "กาญจนบุรี",
+    "pro_en": "Kanchanaburi",
+    "lat": 14.583795,
+    "lng": 99.048974
+  },
+  "72": {
+    "pro_code": "72",
+    "pro_th": "สุพรรณบุรี",
+    "pro_en": "Suphan Buri",
+    "lat": 14.608771,
+    "lng": 99.89222
+  },
+  "73": {
+    "pro_code": "73",
+    "pro_th": "นครปฐม",
+    "pro_en": "Nakhon Pathom",
+    "lat": 13.924203,
+    "lng": 100.102649
+  },
+  "74": {
+    "pro_code": "74",
+    "pro_th": "สมุทรสาคร",
+    "pro_en": "Samut Sakhon",
+    "lat": 13.568923,
+    "lng": 100.212367
+  },
+  "75": {
+    "pro_code": "75",
+    "pro_th": "สมุทรสงคราม",
+    "pro_en": "Samut Songkhram",
+    "lat": 13.397032,
+    "lng": 99.95338
+  },
+  "76": {
+    "pro_code": "76",
+    "pro_th": "เพชรบุรี",
+    "pro_en": "Phetchaburi",
+    "lat": 12.94709,
+    "lng": 99.618742
+  },
+  "77": {
+    "pro_code": "77",
+    "pro_th": "ประจวบคีรีขันธ์",
+    "pro_en": "Prachuap Khiri Khan",
+    "lat": 11.945814,
+    "lng": 99.634679
+  },
+  "80": {
+    "pro_code": "80",
+    "pro_th": "นครศรีธรรมราช",
+    "pro_en": "Nakhon Si Thammarat",
+    "lat": 8.379264,
+    "lng": 99.786916
+  },
+  "81": {
+    "pro_code": "81",
+    "pro_th": "กระบี่",
+    "pro_en": "Krabi",
+    "lat": 8.141099,
+    "lng": 99.00761
+  },
+  "82": {
+    "pro_code": "82",
+    "pro_th": "พังงา",
+    "pro_en": "Phang Nga",
+    "lat": 8.675919,
+    "lng": 98.416987
+  },
+  "83": {
+    "pro_code": "83",
+    "pro_th": "ภูเก็ต",
+    "pro_en": "Phuket",
+    "lat": 7.970354,
+    "lng": 98.345748
+  },
+  "84": {
+    "pro_code": "84",
+    "pro_th": "สุราษฎร์ธานี",
+    "pro_en": "Surat Thani",
+    "lat": 9.051208,
+    "lng": 99.089284
+  },
+  "85": {
+    "pro_code": "85",
+    "pro_th": "ระนอง",
+    "pro_en": "Ranong",
+    "lat": 9.970173,
+    "lng": 98.698955
+  },
+  "86": {
+    "pro_code": "86",
+    "pro_th": "ชุมพร",
+    "pro_en": "Chumphon",
+    "lat": 10.344248,
+    "lng": 99.061298
+  },
+  "90": {
+    "pro_code": "90",
+    "pro_th": "สงขลา",
+    "pro_en": "Songkhla",
+    "lat": 6.934065,
+    "lng": 100.545827
+  },
+  "91": {
+    "pro_code": "91",
+    "pro_th": "สตูล",
+    "pro_en": "Satun",
+    "lat": 6.834717,
+    "lng": 99.928203
+  },
+  "92": {
+    "pro_code": "92",
+    "pro_th": "ตรัง",
+    "pro_en": "Trang",
+    "lat": 7.544006,
+    "lng": 99.595132
+  },
+  "93": {
+    "pro_code": "93",
+    "pro_th": "พัทลุง",
+    "pro_en": "Phatthalung",
+    "lat": 7.516271,
+    "lng": 100.070154
+  },
+  "94": {
+    "pro_code": "94",
+    "pro_th": "ปัตตานี",
+    "pro_en": "Pattani",
+    "lat": 6.73066,
+    "lng": 101.34984
+  },
+  "95": {
+    "pro_code": "95",
+    "pro_th": "ยะลา",
+    "pro_en": "Yala",
+    "lat": 6.190438,
+    "lng": 101.227947
+  },
+  "96": {
+    "pro_code": "96",
+    "pro_th": "นราธิวาส",
+    "pro_en": "Narathiwat",
+    "lat": 6.177906,
+    "lng": 101.718472
+  }
+}

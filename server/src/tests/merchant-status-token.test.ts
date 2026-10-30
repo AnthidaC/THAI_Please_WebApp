@@ -86,3 +86,4 @@ test('merchant status token expires within 15 minutes', () => {
   assert.ok((payload.exp ?? 0) - (payload.iat ?? 0) <= 15 * 60);
   assert.equal(jwt.verify(token, env.JWT_SECRET).toString() !== '', true);
 });
+

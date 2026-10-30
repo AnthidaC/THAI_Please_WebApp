@@ -1,73 +1,280 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { Loader } from '@googlemaps/js-api-loader';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { MapPin } from 'lucide-react';
+import { MapPin, Navigation, AlertTriangle, CheckCircle2 } from 'lucide-react';
 
-interface MerchantLocationPickerProps {
+export interface LocationPickerProps {
   latitude: number;
   longitude: number;
-  onChange?: (latitude: number, longitude: number) => void;
+  onChange?: (latitude: number, longitude: number, isUserConfirmed?: boolean) => void;
+  isConfirmed?: boolean;
+  isApproximate?: boolean;
+  approximateSource?: 'IP' | 'PROVINCE' | null;
+  onLocateUser?: () => void;
+  isLocating?: boolean;
   readOnly?: boolean;
 }
 
-export const MerchantLocationPicker: React.FC<MerchantLocationPickerProps> = ({
+export const MerchantLocationPicker: React.FC<LocationPickerProps> = ({
   latitude,
   longitude,
   onChange,
+  isConfirmed = false,
+  isApproximate = false,
+  approximateSource = null,
+  onLocateUser,
+  isLocating = false,
   readOnly = false,
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const mapRef = useRef<L.Map | null>(null);
-  const markerRef = useRef<L.CircleMarker | null>(null);
+  const [mapEngine, setMapEngine] = useState<'GOOGLE' | 'LEAFLET'>('LEAFLET');
+  const [googleLoadError, setGoogleLoadError] = useState(false);
+
+  // References for Google Maps
+  const googleMapRef = useRef<google.maps.Map | null>(null);
+  const googleMarkerRef = useRef<google.maps.Marker | null>(null);
+
+  // References for Leaflet
+  const leafletMapRef = useRef<L.Map | null>(null);
+  const leafletMarkerRef = useRef<L.Marker | null>(null);
+
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
 
-  useEffect(() => {
-    if (!containerRef.current) return;
+  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY?.trim() || '';
 
-    const map = L.map(containerRef.current, { center: [latitude, longitude], zoom: 15 });
-    mapRef.current = map;
+  // Handle user manual pin relocation (Click or Drag) -> Marks as user confirmed
+  const handleLocationUpdate = useCallback((newLat: number, newLng: number) => {
+    if (readOnly) return;
+    onChangeRef.current?.(Number(newLat.toFixed(6)), Number(newLng.toFixed(6)), true);
+  }, [readOnly]);
+
+  // Initialize Map Engine (Google Maps if key provided, otherwise Leaflet OSM fallback)
+  useEffect(() => {
+    if (!apiKey) {
+      setMapEngine('LEAFLET');
+      return;
+    }
+
+    let isMounted = true;
+    const loader = new Loader({
+      apiKey,
+      version: 'weekly',
+    });
+
+    loader
+      .importLibrary('maps')
+      .then(() => {
+        if (isMounted) {
+          setMapEngine('GOOGLE');
+          setGoogleLoadError(false);
+        }
+      })
+      .catch((err) => {
+        console.warn('Google Maps failed to load, falling back to Leaflet (OSM):', err);
+        if (isMounted) {
+          setGoogleLoadError(true);
+          setMapEngine('LEAFLET');
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [apiKey]);
+
+  // Render Google Maps when engine is GOOGLE
+  useEffect(() => {
+    if (mapEngine !== 'GOOGLE' || !containerRef.current || !window.google?.maps) return;
+
+    const initialCenter = { lat: latitude, lng: longitude };
+    const map = new google.maps.Map(containerRef.current, {
+      center: initialCenter,
+      zoom: 16,
+      mapTypeControl: false,
+      streetViewControl: false,
+      fullscreenControl: false,
+      gestureHandling: readOnly ? 'none' : 'auto',
+    });
+    googleMapRef.current = map;
+
+    // Standard Google Maps Marker
+    const marker = new google.maps.Marker({
+      position: initialCenter,
+      map,
+      draggable: !readOnly,
+      animation: google.maps.Animation.DROP,
+      title: readOnly ? 'ตำแหน่งร้านค้า' : 'ลากเพื่อปรับตำแหน่งร้านค้า',
+    });
+    googleMarkerRef.current = marker;
+
+    if (!readOnly) {
+      marker.addListener('dragend', (event: google.maps.MapMouseEvent) => {
+        if (event.latLng) {
+          handleLocationUpdate(event.latLng.lat(), event.latLng.lng());
+        }
+      });
+
+      map.addListener('click', (event: google.maps.MapMouseEvent) => {
+        if (event.latLng) {
+          marker.setPosition(event.latLng);
+          handleLocationUpdate(event.latLng.lat(), event.latLng.lng());
+        }
+      });
+    }
+
+    return () => {
+      googleMarkerRef.current?.setMap(null);
+      googleMarkerRef.current = null;
+      googleMapRef.current = null;
+    };
+  }, [mapEngine, handleLocationUpdate, readOnly]);
+
+  // Update Google Marker position when lat/lng change from outside (e.g. GPS or province select)
+  useEffect(() => {
+    if (mapEngine !== 'GOOGLE' || !googleMarkerRef.current || !googleMapRef.current) return;
+    const currentPos = googleMarkerRef.current.getPosition();
+    if (currentPos && Math.abs(currentPos.lat() - latitude) < 0.00001 && Math.abs(currentPos.lng() - longitude) < 0.00001) {
+      return;
+    }
+    const nextPos = new google.maps.LatLng(latitude, longitude);
+    googleMarkerRef.current.setPosition(nextPos);
+    googleMapRef.current.panTo(nextPos);
+  }, [latitude, longitude, mapEngine]);
+
+  // Render Leaflet Map when engine is LEAFLET (Fallback or default)
+  useEffect(() => {
+    if (mapEngine !== 'LEAFLET' || !containerRef.current) return;
+
+    const map = L.map(containerRef.current, { center: [latitude, longitude], zoom: 16 });
+    leafletMapRef.current = map;
+
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; OpenStreetMap contributors',
       maxZoom: 19,
     }).addTo(map);
-    markerRef.current = L.circleMarker([latitude, longitude], {
-      radius: 9,
-      color: '#ffffff',
-      weight: 3,
-      fillColor: '#0052ff',
-      fillOpacity: 1,
+
+    // Custom distinct draggable marker icon for Leaflet
+    const defaultIcon = L.icon({
+      iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+      iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+      shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+      iconSize: [25, 41],
+      iconAnchor: [12, 41],
+      popupAnchor: [1, -34],
+      shadowSize: [41, 41],
+    });
+
+    const marker = L.marker([latitude, longitude], {
+      icon: defaultIcon,
+      draggable: !readOnly,
     }).addTo(map);
+    leafletMarkerRef.current = marker;
 
     if (!readOnly) {
+      marker.on('dragend', () => {
+        const pos = marker.getLatLng();
+        handleLocationUpdate(pos.lat, pos.lng);
+      });
+
       map.on('click', (event: L.LeafletMouseEvent) => {
-        onChangeRef.current?.(event.latlng.lat, event.latlng.lng);
+        marker.setLatLng(event.latlng);
+        handleLocationUpdate(event.latlng.lat, event.latlng.lng);
       });
     }
 
     return () => {
       map.remove();
-      mapRef.current = null;
-      markerRef.current = null;
+      leafletMapRef.current = null;
+      leafletMarkerRef.current = null;
     };
-  }, [readOnly]);
+  }, [mapEngine, handleLocationUpdate, readOnly]);
 
+  // Update Leaflet Marker position when lat/lng change from outside
   useEffect(() => {
-    const marker = markerRef.current;
-    const map = mapRef.current;
-    if (!marker || !map) return;
-    const coordinates: L.LatLngExpression = [latitude, longitude];
-    marker.setLatLng(coordinates);
-    map.setView(coordinates, Math.max(map.getZoom(), 15));
-  }, [latitude, longitude]);
+    if (mapEngine !== 'LEAFLET' || !leafletMarkerRef.current || !leafletMapRef.current) return;
+    const currentLatLng = leafletMarkerRef.current.getLatLng();
+    if (Math.abs(currentLatLng.lat - latitude) < 0.00001 && Math.abs(currentLatLng.lng - longitude) < 0.00001) {
+      return;
+    }
+    const nextCoords: L.LatLngExpression = [latitude, longitude];
+    leafletMarkerRef.current.setLatLng(nextCoords);
+    leafletMapRef.current.setView(nextCoords, Math.max(leafletMapRef.current.getZoom(), 16));
+  }, [latitude, longitude, mapEngine]);
 
   return (
-    <div className="overflow-hidden rounded-xl border border-hairline">
-      <div className={`flex items-center gap-2 px-3 py-2 text-xs font-semibold ${readOnly ? 'bg-slate-50 text-slate-700' : 'bg-blue-50 text-brand-blue'}`}>
-        <MapPin className="h-4 w-4 shrink-0" aria-hidden="true" />
-        <span>{readOnly ? 'ตำแหน่งร้านค้าปัจจุบันบนแผนที่' : 'คลิกบนแผนที่เพื่อเลือกพิกัดร้าน'}</span>
+    <div className="space-y-2 font-sans">
+      <div className="overflow-hidden rounded-xl border border-hairline bg-white shadow-xs">
+        {/* Header / Controls Bar */}
+        <div className={`flex flex-wrap items-center justify-between gap-2 border-b border-hairline px-3 py-2 text-xs ${readOnly ? 'bg-slate-50 text-slate-700' : 'bg-slate-50/80 text-ink'}`}>
+          <div className="flex items-center gap-1.5 font-semibold">
+            <MapPin className={`h-4 w-4 ${readOnly ? 'text-slate-500' : 'text-brand-blue'}`} />
+            <span>{readOnly ? 'ตำแหน่งร้านค้าปัจจุบันบนแผนที่' : 'ปักหมุดที่ตั้งร้านค้า (แตะหรือลากหมุดได้)'}</span>
+          </div>
+
+          {!readOnly && onLocateUser && (
+            <button
+              type="button"
+              onClick={onLocateUser}
+              disabled={isLocating}
+              className="inline-flex items-center gap-1 rounded-pill border border-blue-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-blue shadow-2xs hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue disabled:opacity-60"
+            >
+              <Navigation className={`h-3 w-3 ${isLocating ? 'animate-spin' : ''}`} />
+              <span>{isLocating ? 'กำลังค้นหาพิกัด...' : 'ใช้ตำแหน่งปัจจุบันของฉัน'}</span>
+            </button>
+          )}
+        </div>
+
+        {/* Map Canvas */}
+        <div ref={containerRef} className="h-64 sm:h-72 w-full touch-pan-x touch-pan-y" aria-label="แผนที่แสดงพิกัดร้านค้า" />
+
+        {/* Status / Accuracy Info Banner (When not readOnly) */}
+        {!readOnly && (
+          <div className="border-t border-hairline px-3 py-2 text-xs">
+            {isConfirmed ? (
+              <div className="flex items-center gap-1.5 text-emerald-700">
+                <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                <span className="font-semibold">ยืนยันตำแหน่งเรียบร้อยแล้ว:</span>
+                <span className="font-mono text-[11px] text-slate-600">
+                  {latitude.toFixed(6)}, {longitude.toFixed(6)}
+                </span>
+              </div>
+            ) : isApproximate ? (
+              <div className="flex items-start gap-1.5 text-amber-800 bg-amber-50/70 p-2 rounded-lg">
+                <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 mt-0.5" />
+                <div>
+                  <span className="font-semibold">
+                    {approximateSource === 'IP' ? 'พิกัดนี้ได้จาก IP โดยประมาณ' : 'พิกัดนี้เป็นศูนย์กลางจังหวัดที่เลือก'}:
+                  </span>
+                  <span className="ml-1 text-ink-muted">
+                    กรุณาแตะบนแผนที่ หรือลากหมุดเพื่อระบุตำแหน่งจริงของร้านค้าก่อนส่งฟอร์ม
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 text-ink-muted">
+                <span>พิกัดปัจจุบัน:</span>
+                <span className="font-mono text-[11px]">{latitude.toFixed(6)}, {longitude.toFixed(6)}</span>
+              </div>
+            )}
+
+            {/* Fallback Engine Notice if no Google Maps API key provided */}
+            {mapEngine === 'LEAFLET' && (
+              <p className="mt-1.5 text-[10px] text-ink-muted">
+                {googleLoadError
+                  ? 'ระบบสลับมาใช้ OpenStreetMap เนื่องจาก Google Maps โหลดไม่สำเร็จ'
+                  : !apiKey
+                  ? 'ระบบใช้งาน OpenStreetMap เป็นแผนที่สำรอง'
+                  : ''}
+              </p>
+            )}
+          </div>
+        )}
       </div>
-      <div ref={containerRef} className="h-64 w-full" aria-label="แผนที่แสดงพิกัดร้านค้า" />
     </div>
   );
 };
+
+// Export as both MerchantLocationPicker and LocationPicker for backward compatibility
+export const LocationPicker = MerchantLocationPicker;

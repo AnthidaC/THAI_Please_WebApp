@@ -247,29 +247,35 @@ export const AdminMerchantApplicationsPage: React.FC = () => {
 
               <div>
                 <h3 className="mb-2 text-sm font-bold">เอกสารยืนยัน</h3>
-                <ul className="space-y-2">
-                  {selected.documents.map((document) => (
-                    <li key={document.id} className="flex items-center justify-between gap-3 rounded-xl border border-hairline p-3">
-                      <span className="flex min-w-0 items-center gap-2 text-xs">
-                        <FileText className="h-4 w-4 shrink-0 text-brand-blue" />
-                        <span className="truncate">
-                          <span className="block font-semibold">{document.label}</span>
-                          <span className="text-ink-muted">{(document.fileSize / (1024 * 1024)).toFixed(2)} MB · {document.mimeType}</span>
+                {selected.documents.length === 0 ? (
+                  <p className="rounded-xl border border-dashed border-hairline bg-slate-50/70 p-3 text-xs text-ink-muted">
+                    ไม่มีเอกสารแนบ (ยื่นคำขอในโหมดไม่ต้องใช้เอกสาร)
+                  </p>
+                ) : (
+                  <ul className="space-y-2">
+                    {selected.documents.map((document) => (
+                      <li key={document.id} className="flex items-center justify-between gap-3 rounded-xl border border-hairline p-3">
+                        <span className="flex min-w-0 items-center gap-2 text-xs">
+                          <FileText className="h-4 w-4 shrink-0 text-brand-blue" />
+                          <span className="truncate">
+                            <span className="block font-semibold">{document.label}</span>
+                            <span className="text-ink-muted">{(document.fileSize / (1024 * 1024)).toFixed(2)} MB · {document.mimeType}</span>
+                          </span>
                         </span>
-                      </span>
-                      {document.signedUrl && (
-                        <a
-                          href={document.signedUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex shrink-0 items-center gap-1 rounded-pill bg-blue-50 px-3 py-1.5 text-xs font-semibold text-brand-blue hover:bg-blue-100"
-                        >
-                          เปิด <ExternalLink className="h-3.5 w-3.5" />
-                        </a>
-                      )}
-                    </li>
-                  ))}
-                </ul>
+                        {document.signedUrl && (
+                          <a
+                            href={document.signedUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex shrink-0 items-center gap-1 rounded-pill bg-blue-50 px-3 py-1.5 text-xs font-semibold text-brand-blue hover:bg-blue-100"
+                          >
+                            เปิด <ExternalLink className="h-3.5 w-3.5" />
+                          </a>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
 
               {selected.rejectionReason && (

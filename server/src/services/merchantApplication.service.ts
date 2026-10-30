@@ -6,6 +6,7 @@ import { signToken } from '../utils/jwt';
 import { HttpError } from '../utils/http-error';
 import { MerchantApplicationInput } from '../validations/merchant-application.validation';
 import { privateStorageService } from './privateStorage.service';
+import { env } from '../config/env';
 
 const DOCUMENT_LABELS: Record<string, string> = {
   storePhoto: 'รูปหน้าร้าน',
@@ -38,6 +39,10 @@ const getRequiredFiles = (
   businessType: MerchantApplicationInput['businessType'],
   files: UploadedDocuments
 ): Array<{ type: string; file: Express.Multer.File }> => {
+  // FEATURE FLAG: when MERCHANT_REQUIRE_DOCUMENTS=false, skip document validation entirely
+  // Set MERCHANT_REQUIRE_DOCUMENTS=true (default) to re-enable document requirements
+  if (!env.MERCHANT_REQUIRE_DOCUMENTS) return [];
+
   const required = businessType === 'JURISTIC'
     ? ['storePhoto', 'bankProof', 'companyCertificate']
     : ['storePhoto', 'bankProof'];

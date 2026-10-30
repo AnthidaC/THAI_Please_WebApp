@@ -21,6 +21,13 @@ const envSchema = z.object({
   AI_FRAUD_API_KEY: z.string().optional(),
   AI_FRAUD_MODEL: z.string().default('gemini-1.5-flash'),
   AI_FRAUD_ENDPOINT: z.string().optional(),
+  // FEATURE FLAG: ควบคุมการบังคับอัปโหลดเอกสารสมัครร้านค้า
+  // Default = true (บังคับเอกสาร). ข้ามได้เฉพาะเมื่อ MERCHANT_REQUIRE_DOCUMENTS=false ชัดเจน
+  MERCHANT_REQUIRE_DOCUMENTS: z
+    .string()
+    .optional()
+    .default('true')
+    .transform((val) => val.trim().toLowerCase() !== 'false'),
 });
 
 const parsedEnv = envSchema.safeParse(process.env);

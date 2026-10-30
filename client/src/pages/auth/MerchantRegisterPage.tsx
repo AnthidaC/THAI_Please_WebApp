@@ -1,16 +1,28 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { isAxiosError } from 'axios';
 import { ArrowLeft, CheckCircle2, FileText, MapPin, Store, Upload, UserRound } from 'lucide-react';
 import { APP_ROUTES } from '../../constants/routes';
 import { ThaiAddressSelect, ThaiAddressValue } from '../../components/common/ThaiAddressSelect';
-import { submitMerchantApplication } from '../../services/merchantApplicationApi';
+import { MerchantLocationPicker } from '../../components/common/MerchantLocationPicker';
+import { submitMerchantApplication, getIpLocation } from '../../services/merchantApplicationApi';
+import provinceCentersData from '../../data/thai-address/province-centers.json';
+
+type ProvinceCenter = { pro_code: string; pro_th: string; pro_en: string; lat: number; lng: number };
+const provinceCenters = provinceCentersData as Record<string, ProvinceCenter>;
 
 type BusinessType = 'INDIVIDUAL' | 'JURISTIC';
 type DocumentKey = 'storePhoto' | 'bankProof' | 'businessRegistration' | 'companyCertificate' | 'authorization';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const ACCEPTED_FILE_TYPES = ['image/jpeg', 'image/png', 'application/pdf'];
+
+// FEATURE FLAG: ควบคุมการบังคับอัปโหลดเอกสารร้านค้า
+// Default = true (บังคับเอกสาร) ยกเว้นกำหนด VITE_MERCHANT_REQUIRE_DOCUMENTS=false ชัดเจนใน .env
+const REQUIRE_DOCUMENTS = import.meta.env.VITE_MERCHANT_REQUIRE_DOCUMENTS !== 'false';
+
+// Default Bangkok fallback if no province or IP yet
+const DEFAULT_FALLBACK_COORDS = { lat: 13.7563, lng: 100.5018 };
 
 export const MerchantRegisterPage: React.FC = () => {
   const [businessType, setBusinessType] = useState<BusinessType>('INDIVIDUAL');
@@ -21,8 +33,18 @@ export const MerchantRegisterPage: React.FC = () => {
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [address, setAddress] = useState('');
-  const [latitude, setLatitude] = useState('');
-  const [longitude, setLongitude] = useState('');
+
+  // Location & Map State
+  const [latitude, setLatitude] = useState<number>(DEFAULT_FALLBACK_COORDS.lat);
+  const [longitude, setLongitude] = useState<number>(DEFAULT_FALLBACK_COORDS.lng);
+  const [isLocationConfirmed, setIsLocationConfirmed] = useState(false);
+  const [isApproximate, setIsApproximate] = useState(true);
+  const [approximateSource, setApproximateSource] = useState<'IP' | 'PROVINCE' | null>('IP');
+  const [isLocating, setIsLocating] = useState(false);
+
+  // Track if user explicitly placed pin (GPS / Click / Drag) so selecting province won't overwrite it
+  const isUserPinnedRef = useRef(false);
+
   const [documents, setDocuments] = useState<Partial<Record<DocumentKey, File>>>({});
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -30,10 +52,115 @@ export const MerchantRegisterPage: React.FC = () => {
   const [applicationId, setApplicationId] = useState<string | null>(null);
   const [addressSelection, setAddressSelection] = useState<ThaiAddressValue | null>(null);
 
+  // 1. Initial Location Strategy: Try GPS first (if supported), else fallback to Server IP Location
+  useEffect(() => {
+    let active = true;
+
+    if ('geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          if (!active || isUserPinnedRef.current) return;
+          setLatitude(Number(position.coords.latitude.toFixed(6)));
+          setLongitude(Number(position.coords.longitude.toFixed(6)));
+          setIsLocationConfirmed(true);
+          setIsApproximate(false);
+          setApproximateSource(null);
+          isUserPinnedRef.current = true;
+        },
+        () => {
+          // Geolocation denied or unavailable -> Fallback to server IP lookup
+          if (!active || isUserPinnedRef.current) return;
+          void getIpLocation().then((ipData) => {
+            if (!active || isUserPinnedRef.current) return;
+            if (ipData?.latitude && ipData?.longitude) {
+              setLatitude(Number(ipData.latitude.toFixed(6)));
+              setLongitude(Number(ipData.longitude.toFixed(6)));
+              setIsApproximate(true);
+              setApproximateSource('IP');
+              setIsLocationConfirmed(false);
+            }
+          });
+        },
+        { timeout: 6000, enableHighAccuracy: true }
+      );
+    } else {
+      void getIpLocation().then((ipData) => {
+        if (!active || isUserPinnedRef.current) return;
+        if (ipData?.latitude && ipData?.longitude) {
+          setLatitude(Number(ipData.latitude.toFixed(6)));
+          setLongitude(Number(ipData.longitude.toFixed(6)));
+          setIsApproximate(true);
+          setApproximateSource('IP');
+          setIsLocationConfirmed(false);
+        }
+      });
+    }
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // Request Current Location manually (Button trigger)
+  const handleLocateUser = () => {
+    if (!('geolocation' in navigator)) {
+      setErrorMessage('เบราว์เซอร์ของคุณไม่รองรับการระบุตำแหน่ง GPS');
+      return;
+    }
+
+    setIsLocating(true);
+    setErrorMessage(null);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setIsLocating(false);
+        const lat = Number(position.coords.latitude.toFixed(6));
+        const lng = Number(position.coords.longitude.toFixed(6));
+        setLatitude(lat);
+        setLongitude(lng);
+        setIsLocationConfirmed(true);
+        setIsApproximate(false);
+        setApproximateSource(null);
+        isUserPinnedRef.current = true;
+      },
+      () => {
+        setIsLocating(false);
+        setErrorMessage('ไม่สามารถเข้าถึงตำแหน่ง GPS ของอุปกรณ์ได้ กรุณาแตะบนแผนที่เพื่อเลือกตำแหน่ง');
+      },
+      { timeout: 10000, enableHighAccuracy: true }
+    );
+  };
+
+  // Callback when user drags or clicks marker on map
+  const handleLocationChange = (newLat: number, newLng: number, userConfirmed: boolean) => {
+    setLatitude(newLat);
+    setLongitude(newLng);
+    if (userConfirmed) {
+      setIsLocationConfirmed(true);
+      setIsApproximate(false);
+      setApproximateSource(null);
+      isUserPinnedRef.current = true;
+    }
+  };
+
+  // Address selection handler: If user hasn't confirmed a pin with GPS/Click/Drag, move pin to province center
   const applyAddressSelection = (selected: ThaiAddressValue) => {
     setAddressSelection(selected);
     if (!selected.subdistrictCode) return;
     setAddress(`${selected.subdistrictName} ${selected.districtName} ${selected.provinceName}${selected.postalCode ? ` ${selected.postalCode}` : ''}`);
+
+    // If user has NOT manually confirmed or pinned via GPS, move marker to province center
+    if (!isUserPinnedRef.current && selected.provinceCode) {
+      const targetCode = String(selected.provinceCode).padStart(2, '0');
+      const center = provinceCenters[targetCode];
+
+      if (center?.lat && center?.lng) {
+        setLatitude(Number(Number(center.lat).toFixed(6)));
+        setLongitude(Number(Number(center.lng).toFixed(6)));
+        setIsApproximate(true);
+        setApproximateSource('PROVINCE');
+        setIsLocationConfirmed(false);
+      }
+    }
   };
 
   const selectDocument = (key: DocumentKey, file?: File) => {
@@ -69,14 +196,19 @@ export const MerchantRegisterPage: React.FC = () => {
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const missingCommonDocuments = !documents.storePhoto || !documents.bankProof;
-    const missingCompanyCertificate = businessType === 'JURISTIC' && !documents.companyCertificate;
+    const missingCommonDocuments = REQUIRE_DOCUMENTS && (!documents.storePhoto || !documents.bankProof);
+    const missingCompanyCertificate = REQUIRE_DOCUMENTS && businessType === 'JURISTIC' && !documents.companyCertificate;
+
+    if (!isLocationConfirmed) {
+      setErrorMessage('กรุณาแตะบนแผนที่ หรือลากหมุดเพื่อยืนยันตำแหน่งจริงของร้านค้าก่อนส่งคำขอ');
+      return;
+    }
 
     if (missingCommonDocuments || missingCompanyCertificate || !taxId.match(/^\d{13}$/) || !addressSelection?.subdistrictCode) {
       setErrorMessage(!addressSelection?.subdistrictCode
         ? 'กรุณาเลือกจังหวัด อำเภอ/เขต และตำบล/แขวงให้ครบ'
         : !taxId.match(/^\d{13}$/)
-          ? 'กรุณากรอกเลขประจำตัวผู้เสียภาษี 13 หลัก'
+          ? 'กรุณากรอกเลขประจำตัว 13 หลัก'
           : 'กรุณาแนบรูปหน้าร้านและหลักฐานบัญชีธนาคาร' +
           (missingCompanyCertificate ? ' รวมถึงหนังสือรับรองนิติบุคคล' : ''));
       return;
@@ -93,8 +225,8 @@ export const MerchantRegisterPage: React.FC = () => {
     formData.append('phone', phone);
     formData.append('password', password);
     formData.append('address', address);
-    formData.append('latitude', latitude);
-    formData.append('longitude', longitude);
+    formData.append('latitude', String(latitude));
+    formData.append('longitude', String(longitude));
     Object.entries(documents).forEach(([key, file]) => {
       if (file) formData.append(key, file);
     });
@@ -106,18 +238,15 @@ export const MerchantRegisterPage: React.FC = () => {
       setDocuments({});
       setIsSubmitted(true);
     } catch (error) {
-      const message = isAxiosError<{ message?: string }>(error)
-        ? error.response?.data?.message
+      const data = isAxiosError<{ message?: string; errors?: Array<{ field: string; message: string }> }>(error)
+        ? error.response?.data
         : undefined;
+      const message = data?.errors?.map((e) => e.message).join(', ') || data?.message;
       setErrorMessage(message || 'ส่งคำขอไม่สำเร็จ กรุณาลองอีกครั้ง');
     } finally {
       setIsSubmitting(false);
     }
   };
-
-  const mapsSearchUrl = address.trim()
-    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address.trim())}`
-    : null;
 
   const documentField = (key: DocumentKey, label: string, required = false, hint?: string) => (
     <label className="block rounded-xl border border-hairline bg-white p-3">
@@ -197,7 +326,7 @@ export const MerchantRegisterPage: React.FC = () => {
           </div>
 
           <div>
-            <label htmlFor="merchant-tax-id" className="mb-1 block text-xs font-semibold text-ink">เลขประจำตัวผู้เสียภาษี 13 หลัก</label>
+            <label htmlFor="merchant-tax-id" className="mb-1 block text-xs font-semibold text-ink">เลขประจำตัว 13 หลัก</label>
             <input id="merchant-tax-id" inputMode="numeric" pattern="[0-9]{13}" maxLength={13} required value={taxId} onChange={(event) => setTaxId(event.target.value.replace(/\D/g, '').slice(0, 13))} className="w-full rounded-xl border border-hairline bg-white px-3 py-2.5 text-xs focus:border-brand-blue focus:outline-none focus:ring-2 focus:ring-blue-100" />
             <p className="mt-1 text-[11px] text-ink-muted">ใช้ตรวจสอบกิจการและป้องกันการสมัครซ้ำ</p>
           </div>
@@ -243,44 +372,44 @@ export const MerchantRegisterPage: React.FC = () => {
               placeholder="บ้านเลขที่ ถนน ตำบล/แขวง อำเภอ/เขต จังหวัด และรหัสไปรษณีย์"
               className="w-full rounded-xl border border-hairline bg-white px-3 py-2.5 text-xs focus:border-brand-blue focus:outline-none focus:ring-2 focus:ring-blue-100"
             />
-            {mapsSearchUrl && (
-              <a href={mapsSearchUrl} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-brand-blue hover:underline">
-                <MapPin className="h-3.5 w-3.5" />
-                ตรวจสอบตำแหน่งบน Google Maps
-              </a>
-            )}
-            <p className="mt-2 text-[11px] text-ink-muted">ระบุพิกัดจาก Google Maps (คลิกขวาที่ตำแหน่งร้านเพื่อคัดลอกพิกัด)</p>
-            <div className="mt-2 grid grid-cols-2 gap-3">
-              <div>
-                <label htmlFor="merchant-latitude" className="mb-1 block text-xs font-semibold text-ink">Latitude</label>
-                <input id="merchant-latitude" type="number" step="any" min="-90" max="90" required value={latitude} onChange={(event) => setLatitude(event.target.value)} className="w-full rounded-xl border border-hairline bg-white px-3 py-2.5 text-xs focus:border-brand-blue focus:outline-none focus:ring-2 focus:ring-blue-100" />
-              </div>
-              <div>
-                <label htmlFor="merchant-longitude" className="mb-1 block text-xs font-semibold text-ink">Longitude</label>
-                <input id="merchant-longitude" type="number" step="any" min="-180" max="180" required value={longitude} onChange={(event) => setLongitude(event.target.value)} className="w-full rounded-xl border border-hairline bg-white px-3 py-2.5 text-xs focus:border-brand-blue focus:outline-none focus:ring-2 focus:ring-blue-100" />
-              </div>
+
+            {/* แผนที่เลือกพิกัดร้านค้า (MerchantLocationPicker) */}
+            <div className="mt-3">
+              <MerchantLocationPicker
+                latitude={latitude}
+                longitude={longitude}
+                onChange={handleLocationChange}
+                isConfirmed={isLocationConfirmed}
+                isApproximate={isApproximate}
+                approximateSource={approximateSource}
+                onLocateUser={handleLocateUser}
+                isLocating={isLocating}
+              />
             </div>
           </div>
         </section>
 
-        <section className="space-y-3 border-t border-hairline pt-4">
-          <div>
-            <h3 className="text-sm font-bold text-ink">เอกสารประกอบการตรวจสอบ</h3>
-            <p className="mt-1 text-[11px] leading-relaxed text-ink-muted">
-              เอกสารตัวอย่างที่แนะนำ อาจต้องปรับตามหลักเกณฑ์ของโครงการและประเภทร้านค้า
-            </p>
-          </div>
-          {documentField('storePhoto', 'รูปหน้าร้านหรือจุดขายที่เห็นชื่อร้าน', true, 'ควรเป็นภาพปัจจุบันที่ช่วยยืนยันว่ามีสถานที่ประกอบการจริง')}
-          {documentField('bankProof', 'หลักฐานบัญชีธนาคารหรือ PromptPay ในนามผู้สมัคร/กิจการ', true)}
-          {businessType === 'INDIVIDUAL'
-            ? documentField('businessRegistration', 'ทะเบียนพาณิชย์หรือหลักฐานการประกอบกิจการ')
-            : (
-              <>
-                {documentField('companyCertificate', 'หนังสือรับรองนิติบุคคลฉบับล่าสุด', true)}
-                {documentField('authorization', 'เอกสารผู้มีอำนาจลงนามหรือหนังสือมอบอำนาจ')}
-              </>
-            )}
-        </section>
+        {/* FEATURE FLAG: ซ่อนส่วนอัปโหลดเอกสารชั่วคราวเมื่อ REQUIRE_DOCUMENTS=false (เปิดคืนโดยตั้ง VITE_MERCHANT_REQUIRE_DOCUMENTS=true ใน .env) */}
+        {REQUIRE_DOCUMENTS && (
+          <section className="space-y-3 border-t border-hairline pt-4">
+            <div>
+              <h3 className="text-sm font-bold text-ink">เอกสารประกอบการตรวจสอบ</h3>
+              <p className="mt-1 text-[11px] leading-relaxed text-ink-muted">
+                เอกสารตัวอย่างที่แนะนำ อาจต้องปรับตามหลักเกณฑ์ของโครงการและประเภทร้านค้า
+              </p>
+            </div>
+            {documentField('storePhoto', 'รูปหน้าร้านหรือจุดขายที่เห็นชื่อร้าน', true, 'ควรเป็นภาพปัจจุบันที่ช่วยยืนยันว่ามีสถานที่ประกอบการจริง')}
+            {documentField('bankProof', 'หลักฐานบัญชีธนาคารหรือ PromptPay ในนามผู้สมัคร/กิจการ', true)}
+            {businessType === 'INDIVIDUAL'
+              ? documentField('businessRegistration', 'ทะเบียนพาณิชย์หรือหลักฐานการประกอบกิจการ')
+              : (
+                <>
+                  {documentField('companyCertificate', 'หนังสือรับรองนิติบุคคลฉบับล่าสุด', true)}
+                  {documentField('authorization', 'เอกสารผู้มีอำนาจลงนามหรือหนังสือมอบอำนาจ')}
+                </>
+              )}
+          </section>
+        )}
 
         <button type="submit" disabled={isSubmitting} className="w-full rounded-pill bg-brand-blue py-3 text-sm font-semibold text-white shadow-md transition hover:bg-brand-blue-hover disabled:opacity-60">
           {isSubmitting ? 'กำลังส่งข้อมูลและเอกสาร...' : 'ส่งคำขอสมัครร้านค้า'}
