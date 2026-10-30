@@ -92,6 +92,8 @@ export interface DiscountValidationResult {
   userRewardId?: string;
 }
 
+export type DiscountCodeType = 'referral' | 'coupon';
+
 export interface CopayPreviewData {
   qrData: DynamicQrResponse;
   walletInfo?: WalletData;
@@ -462,11 +464,13 @@ export const streamMerchantPayments = async (
 export const getQrDetails = async (
   reference: string,
   discountCode?: string,
-  userLocation?: { lat: number; lon: number }
+  userLocation?: { lat: number; lon: number },
+  discountCodeType?: DiscountCodeType
 ): Promise<CopayPreviewData> => {
   const res = await axios.get(`/payment/qr/${reference}`, {
     params: {
       ...(discountCode ? { discountCode } : {}),
+      ...(discountCodeType ? { discountCodeType } : {}),
       ...(userLocation
         ? { userLatitude: userLocation.lat, userLongitude: userLocation.lon }
         : {}),
@@ -477,6 +481,7 @@ export const getQrDetails = async (
 
 export const validateDiscountCode = async (params: {
   code: string;
+  codeType: DiscountCodeType;
   totalAmount: number;
   merchantId?: string;
 }): Promise<DiscountValidationResult> => {
@@ -491,6 +496,7 @@ export const checkoutCopay = async (payload: {
   merchantId?: string;
   pin: string;
   discountCode?: string;
+  discountCodeType?: DiscountCodeType;
 }): Promise<CheckoutResult> => {
   const res = await axios.post('/payment/qr/checkout', payload);
   return res.data.data;
