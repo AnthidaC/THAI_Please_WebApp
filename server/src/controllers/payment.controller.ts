@@ -27,6 +27,16 @@ export const getQrDetails = async (req: Request, res: Response): Promise<void> =
     const reference = Array.isArray(req.params.reference) ? req.params.reference[0] : req.params.reference;
     const userId = req.user?.userId;
     const discountCode = req.query.discountCode as string | undefined;
+    const requestedCodeType = req.query.discountCodeType;
+    if (requestedCodeType !== undefined && requestedCodeType !== 'referral' && requestedCodeType !== 'coupon') {
+      sendError(res, 'ประเภทโค้ดส่วนลดไม่ถูกต้อง', 400);
+      return;
+    }
+    if (discountCode && requestedCodeType === undefined) {
+      sendError(res, 'กรุณาระบุประเภทโค้ดส่วนลด', 400);
+      return;
+    }
+    const discountCodeType = requestedCodeType as 'referral' | 'coupon' | undefined;
     const userLatitude = req.query.userLatitude ? Number(req.query.userLatitude) : undefined;
     const userLongitude = req.query.userLongitude ? Number(req.query.userLongitude) : undefined;
 
@@ -38,7 +48,7 @@ export const getQrDetails = async (req: Request, res: Response): Promise<void> =
         ? { lat: userLatitude, lon: userLongitude }
         : undefined;
 
-    const details = await paymentService.getQrDetails(reference, userId, discountCode, userLocation);
+    const details = await paymentService.getQrDetails(reference, userId, discountCode, userLocation, discountCodeType);
     sendSuccess(res, details, 'ดึงข้อมูล QR Code สำเร็จ');
   } catch (error: any) {
     sendError(res, error.message || 'ไม่พบข้อมูล QR Code', 400);
@@ -198,11 +208,12 @@ export const streamMerchantPayments = async (req: Request, res: Response): Promi
 
 export const validateDiscount = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { code, merchantId, totalAmount } = req.body;
+    const { code, codeType, merchantId, totalAmount } = req.body;
     const userId = req.user?.userId;
 
     const result = await paymentService.validateDiscountCode({
       code,
+      codeType,
       userId,
       merchantId,
       totalAmount: Number(totalAmount),
@@ -222,7 +233,7 @@ export const checkoutCopay = async (req: Request, res: Response): Promise<void> 
       return;
     }
 
-    const { qrReference, userLatitude, userLongitude, merchantId, discountCode, pin } = req.body;
+    const { qrReference, userLatitude, userLongitude, merchantId, discountCode, discountCodeType, pin } = req.body;
 
     const result = await paymentService.checkout({
       userId,
@@ -231,6 +242,7 @@ export const checkoutCopay = async (req: Request, res: Response): Promise<void> 
       userLongitude: Number(userLongitude),
       merchantId,
       discountCode,
+      discountCodeType,
       pin,
     });
 

@@ -11,7 +11,6 @@ import {
   CheckCircle2,
   Gift,
   Tag,
-  Users,
   Check,
   X,
   Clock,
@@ -24,6 +23,7 @@ import {
   validateDiscountCode,
   CopayPreviewData,
   DiscountValidationResult,
+  DiscountCodeType,
 } from '../../../services/paymentApi';
 import { APP_ROUTES } from '../../../constants/routes';
 import { useAuthStore } from '../../../stores/authStore';
@@ -58,6 +58,9 @@ export const CitizenScanCopayPage: React.FC = () => {
   const [discountCodeInput, setDiscountCodeInput] = useState<string>('');
   const [appliedDiscount, setAppliedDiscount] = useState<DiscountValidationResult | null>(null);
   const [discountError, setDiscountError] = useState<string | null>(null);
+  const appliedDiscountCodeType: DiscountCodeType | undefined = appliedDiscount
+    ? appliedDiscount.discountSource === 'FRIEND_REFERRAL' ? 'referral' : 'coupon'
+    : undefined;
 
   // รับโค้ดคำชวนเพื่อนจาก URL parameter (Deep Link จากระบบชวนเพื่อน)
   useEffect(() => {
@@ -141,8 +144,8 @@ export const CitizenScanCopayPage: React.FC = () => {
 
   // Mutation ตรวจสอบรหัส QR เพื่อพรีวิวยอดเงิน Co-pay (ส่งพิกัด GPS ตรวจสอบทันทีตั้งแต่ตอนสแกน)
   const previewMutation = useMutation({
-    mutationFn: ({ ref, code }: { ref: string; code?: string }) =>
-      getQrDetails(ref, code, userLocation),
+    mutationFn: ({ ref, code, codeType }: { ref: string; code?: string; codeType?: DiscountCodeType }) =>
+      getQrDetails(ref, code, userLocation, codeType),
     onSuccess: (data) => {
       setScannedData(data);
       if (data.discountInfo) {
@@ -171,7 +174,10 @@ export const CitizenScanCopayPage: React.FC = () => {
       const parsed = JSON.parse(savedPending);
       if (parsed?.ref) {
         setQrReference(parsed.ref);
-        previewMutation.mutate({ ref: parsed.ref, code: parsed.code });
+        const codeType: DiscountCodeType | undefined = parsed.codeType === 'referral' || parsed.codeType === 'coupon'
+          ? parsed.codeType
+          : parsed.code ? 'referral' : undefined;
+        previewMutation.mutate({ ref: parsed.ref, code: parsed.code, codeType });
       }
     } catch {
       // ignore invalid storage
@@ -180,9 +186,10 @@ export const CitizenScanCopayPage: React.FC = () => {
 
   // Mutation ตรวจสอบความถูกต้องของคูปองหรือโค้ดคำชวนของเพื่อน
   const discountMutation = useMutation({
-    mutationFn: (code: string) =>
+    mutationFn: ({ code, codeType }: { code: string; codeType: DiscountCodeType }) =>
       validateDiscountCode({
         code,
+        codeType,
         totalAmount: scannedData?.qrData.totalAmount || 0,
         merchantId: scannedData?.qrData.merchantId,
       }),
@@ -191,19 +198,20 @@ export const CitizenScanCopayPage: React.FC = () => {
       setDiscountError(null);
       // โหลดการแบ่งจ่าย Co-pay ใหม่โดยส่ง discountCode เข้าไปด้วย
       if (qrReference) {
-        previewMutation.mutate({ ref: qrReference, code: discountRes.code });
+        const codeType: DiscountCodeType = discountRes.discountSource === 'FRIEND_REFERRAL' ? 'referral' : 'coupon';
+        previewMutation.mutate({ ref: qrReference, code: discountRes.code, codeType });
       }
     },
     onError: (err: any) => {
-      setDiscountError(err.response?.data?.message || err.message || 'รหัสคูปองไม่ถูกต้อง');
+      setDiscountError(err.response?.data?.message || err.message || 'ตรวจสอบโค้ดไม่สำเร็จ');
     },
   });
 
-  const handleApplyDiscount = (code: string) => {
+  const handleApplyDiscount = (code: string, codeType: DiscountCodeType = 'referral') => {
     const clean = code.trim().toUpperCase();
     if (!clean) return;
     setDiscountError(null);
-    discountMutation.mutate(clean);
+    discountMutation.mutate({ code: clean, codeType });
   };
 
   const handleRemoveDiscount = () => {
@@ -225,6 +233,7 @@ export const CitizenScanCopayPage: React.FC = () => {
         merchantId: scannedData?.qrData.merchantId,
         pin,
         discountCode: appliedDiscount?.code,
+        discountCodeType: appliedDiscountCodeType,
       }),
     onSuccess: (data) => {
       setShowPinConfirmation(false);
@@ -471,7 +480,7 @@ export const CitizenScanCopayPage: React.FC = () => {
                                       disabled={discountMutation.isPending}
                                       onClick={() => {
                                         setDiscountCodeInput(reward.rewardCode);
-                                        handleApplyDiscount(reward.rewardCode);
+                                        handleApplyDiscount(reward.rewardCode, 'coupon');
                                       }}
                                       className="flex w-full min-w-0 items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-white px-3 py-2.5 text-left transition hover:border-emerald-400 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-60"
                                       aria-label={`ใช้คูปอง ${reward.rewardName} ลด ${discountLabel}; ยอดซื้อขั้นต่ำ ${reward.minimumSpend.toLocaleString('th-TH')} บาท`}
@@ -520,7 +529,7 @@ export const CitizenScanCopayPage: React.FC = () => {
                           <div className="space-y-1.5 pt-1">
                             <label htmlFor="input-discount-code" className="text-xs font-semibold text-ink flex items-center space-x-1.5">
                               <Tag className="h-3.5 w-3.5 text-brand-blue" aria-hidden="true" />
-                              <span>กรอกโค้ดส่วนลด หรือโค้ดชวนเพื่อน:</span>
+                              <span>กรอกโค้ดแนะนำเพื่อน:</span>
                             </label>
                             <div className="flex space-x-2">
                               <div className="relative flex-1 min-w-0">
@@ -531,7 +540,7 @@ export const CitizenScanCopayPage: React.FC = () => {
                                   type="text"
                                   autoComplete="off"
                                   spellCheck={false}
-                                  placeholder="กรอกโค้ด เช่น TP-XXXX หรือรหัสคูปอง…"
+                                  placeholder="กรอกโค้ดแนะนำเพื่อน เช่น TP-XXXX…"
                                   value={discountCodeInput}
                                   onChange={(e) => setDiscountCodeInput(e.target.value.toUpperCase())}
                                   onKeyDown={(e) => {
@@ -566,47 +575,6 @@ export const CitizenScanCopayPage: React.FC = () => {
                             </p>
                           )}
 
-                          {/* แนะนำโค้ดสิทธิพิเศษและเพื่อนชวนเพื่อน */}
-                          <div className="pt-1">
-                            <span className="text-[10px] text-ink-muted block mb-1">
-                              สิทธิพิเศษและโค้ดแนะนำ:
-                            </span>
-                            <div className="flex flex-wrap gap-1.5">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setDiscountCodeInput('FRIEND30');
-                                  handleApplyDiscount('FRIEND30');
-                                }}
-                                className="rounded-pill border border-emerald-200 bg-emerald-50/80 px-2.5 py-1 text-[10px] font-medium text-emerald-800 transition hover:bg-emerald-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue focus-visible:ring-offset-2 flex items-center space-x-1"
-                              >
-                                <Users className="h-3 w-3 text-emerald-600 shrink-0" aria-hidden="true" />
-                                <span>FRIEND30 (ลด ฿30 เพื่อนชวนเพื่อน)</span>
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setDiscountCodeInput('DUO50');
-                                  handleApplyDiscount('DUO50');
-                                }}
-                                className="rounded-pill border border-blue-200 bg-blue-50/80 px-2.5 py-1 text-[10px] font-medium text-brand-blue transition hover:bg-blue-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue focus-visible:ring-offset-2 flex items-center space-x-1"
-                              >
-                                <Tag className="h-3 w-3 text-brand-blue shrink-0" aria-hidden="true" />
-                                <span>DUO50 (ลด ฿50 สิทธิพิเศษคู่หู)</span>
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setDiscountCodeInput('WELCOME20');
-                                  handleApplyDiscount('WELCOME20');
-                                }}
-                                className="rounded-pill border border-hairline bg-surface-soft px-2.5 py-1 text-[10px] font-medium text-ink transition hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue focus-visible:ring-offset-2 flex items-center space-x-1"
-                              >
-                                <Gift className="h-3 w-3 text-ink-muted shrink-0" aria-hidden="true" />
-                                <span>WELCOME20 (ลด ฿20 สิทธิพิเศษต้อนรับ)</span>
-                              </button>
-                            </div>
-                          </div>
                         </div>
                       ) : (
                         <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-3 flex items-start justify-between gap-2">
@@ -790,13 +758,17 @@ export const CitizenScanCopayPage: React.FC = () => {
               JSON.stringify({
                 ref: scannedData.qrData.qrReference,
                 code: appliedDiscount?.code || undefined,
+                codeType: appliedDiscountCodeType,
               })
             );
           }
           sessionStorage.setItem('thai-please:pin-reset-intent', '1');
+          if (user?.id) {
+            sessionStorage.setItem('thai-please:pin-reset-user-id', user.id);
+          }
           sessionStorage.setItem('thai-please:pin-reset-return', APP_ROUTES.CITIZEN_SCAN_COPAY);
           clearAuth();
-          navigate(APP_ROUTES.LOGIN, { state: { from: { pathname: APP_ROUTES.CITIZEN_WALLET } } });
+          navigate(APP_ROUTES.LOGIN, { replace: true, state: { from: { pathname: APP_ROUTES.CITIZEN_SCAN_COPAY } } });
         }}
       />
     </div>

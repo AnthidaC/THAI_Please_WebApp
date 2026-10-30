@@ -12,7 +12,6 @@ import {
   Compass,
   LogOut,
   Sparkles,
-  Award,
   CheckCircle2,
   ArrowRight,
   Info,
@@ -64,10 +63,6 @@ export const CitizenProfilePage: React.FC = () => {
 
   const badgeList = badges ?? [];
   const unlockedBadges = badgeList.filter((b) => b.isUnlocked);
-  const nextTargetBadge = badgeList.find((b) => !b.isUnlocked && !b.isMaxTier);
-  const badgeCompletion = badgeList.length > 0
-    ? Math.round((unlockedBadges.length / badgeList.length) * 100)
-    : 0;
   const rewardList = rewards ?? [];
   const availableRewardCount = rewardList.filter((reward) =>
     reward.status === 'available' &&
@@ -164,39 +159,60 @@ export const CitizenProfilePage: React.FC = () => {
               </button>
             </div>
           </div>
-        </section>
 
-        {unlockedBadges.length > 0 && (
-          <section aria-label="เหรียญตราที่ได้รับ" className="-mt-2 flex flex-wrap items-center gap-2.5 px-5 sm:px-6">
-            {unlockedBadges.map((badge) => {
-              const tier = badge.currentTier;
-              if (!tier) return null;
+          <section aria-labelledby="earned-badges-heading" className="mt-4 -mx-3 rounded-2xl border border-hairline bg-surface-soft/60 p-3 sm:mt-5">
+            <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
+              <h3 id="earned-badges-heading" className="text-sm font-semibold text-ink">
+                เหรียญตราที่ได้รับ
+              </h3>
+              <Link
+                to={APP_ROUTES.CITIZEN_ACHIEVEMENTS}
+                className="touch-manipulation inline-flex min-h-11 items-center gap-1.5 rounded-lg px-2 text-xs font-semibold text-brand-blue transition-colors hover:text-brand-blue-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue focus-visible:ring-offset-2 motion-reduce:transition-none"
+              >
+                <span>ดูเหรียญตราทั้งหมด</span>
+                <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+              </Link>
+            </div>
 
-              const tooltip = `${badge.name} · ${tier.name}`;
+            {isBadgesLoading ? (
+              <p role="status" aria-live="polite" className="text-sm text-ink-muted">กำลังโหลดเหรียญตรา…</p>
+            ) : isBadgesError ? (
+              <p role="alert" className="text-sm text-ink-muted">โหลดเหรียญตราไม่สำเร็จ ลองดูเหรียญตราทั้งหมดอีกครั้ง</p>
+            ) : unlockedBadges.length > 0 ? (
+              <div className="flex flex-wrap items-center gap-2.5">
+                {unlockedBadges.map((badge) => {
+                  const tier = badge.currentTier;
+                  if (!tier) return null;
 
-              return (
-                <span
-                  key={badge.id}
-                  role="img"
-                  tabIndex={0}
-                  aria-label={tooltip}
-                  title={tooltip}
-                  className="inline-flex h-12 w-12 shrink-0 cursor-help items-center justify-center rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue focus-visible:ring-offset-2"
-                >
-                  <img
-                    src={getBadgeTierIcon(tier.level)}
-                    alt=""
-                    aria-hidden="true"
-                    width={48}
-                    height={48}
-                    loading="lazy"
-                    className="h-12 w-12 object-contain"
-                  />
-                </span>
-              );
-            })}
+                  const tooltip = `${badge.name} · ${tier.name}`;
+
+                  return (
+                    <span
+                      key={badge.id}
+                      role="img"
+                      tabIndex={0}
+                      aria-label={tooltip}
+                      title={tooltip}
+                      className="inline-flex h-12 w-12 shrink-0 cursor-help items-center justify-center rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue focus-visible:ring-offset-2"
+                    >
+                      <img
+                        src={getBadgeTierIcon(tier.level)}
+                        alt=""
+                        aria-hidden="true"
+                        width={48}
+                        height={48}
+                        loading="lazy"
+                        className="h-12 w-12 object-contain"
+                      />
+                    </span>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-sm text-ink-muted">ยังไม่มีเหรียญตราที่ได้รับ</p>
+            )}
           </section>
-        )}
+        </section>
 
         {/* ================= 3. QUICK WALLET & CO-PAY STATS ================= */}
         <section aria-label="สถิติกระเป๋าเงินและสิทธิ์คนละครึ่ง" className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
@@ -219,7 +235,7 @@ export const CitizenProfilePage: React.FC = () => {
               onClick={() => navigate(APP_ROUTES.CITIZEN_WALLET)}
               className="px-3.5 py-2 text-xs font-semibold text-brand-blue bg-brand-blue-light hover:bg-blue-100 rounded-pill transition border border-blue-200"
             >
-              เติมเงิน / สิทธิ์
+              ไป  กระเป๋าเงิน
             </button>
           </div>
 
@@ -246,6 +262,38 @@ export const CitizenProfilePage: React.FC = () => {
           </div>
         </section>
 
+        <Link
+          to={APP_ROUTES.CITIZEN_REWARDS}
+          aria-labelledby="owned-rewards-heading"
+          className="group block rounded-2xl border border-hairline bg-white shadow-xs transition-colors hover:border-emerald-200 hover:bg-emerald-50/30 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200 focus-visible:ring-offset-2 motion-reduce:transition-none"
+        >
+          <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
+                <Gift className="h-5 w-5" aria-hidden="true" />
+              </div>
+              <div className="min-w-0">
+                <h2 id="owned-rewards-heading" className="text-sm font-bold text-ink sm:text-base">
+                  รางวัลของฉัน
+                </h2>
+                <p className="mt-0.5 text-xs text-ink-muted">
+                  ดูรหัสรางวัล สถานะ และวันหมดอายุของคุณ
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center justify-between gap-3 sm:justify-end">
+              <span className="text-xs font-medium text-ink-muted">
+                {isRewardsLoading
+                  ? 'กำลังโหลด…'
+                  : isRewardsError
+                  ? 'ดูรางวัลทั้งหมด'
+                  : `ทั้งหมด ${numberFormat.format(rewardList.length)} รายการ · พร้อมใช้ ${numberFormat.format(availableRewardCount)}`}
+              </span>
+              <ArrowRight className="h-4 w-4 shrink-0 text-emerald-700 transition-transform group-hover:translate-x-1 motion-reduce:transition-none" aria-hidden="true" />
+            </div>
+          </div>
+        </Link>
+
         {/* ================= ประวัติการรีวิวของฉัน ================= */}
         <section aria-label="ประวัติการรีวิวร้านค้า" className="bg-white rounded-2xl border border-hairline p-4 sm:p-5 flex items-center justify-between shadow-xs">
           <div className="space-y-1">
@@ -268,101 +316,6 @@ export const CitizenProfilePage: React.FC = () => {
             ดูรีวิว
           </button>
         </section>
-
-        <Link
-          to={APP_ROUTES.CITIZEN_REWARDS}
-          aria-labelledby="owned-rewards-heading"
-          className="group block overflow-hidden rounded-2xl border border-emerald-700 bg-emerald-800 shadow-sm transition-colors hover:bg-emerald-900 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-300 focus-visible:ring-offset-2 motion-reduce:transition-none"
-        >
-          <div className="flex flex-col gap-3 px-5 py-4 text-white sm:flex-row sm:items-center sm:justify-between sm:px-6">
-            <div className="flex min-w-0 items-center gap-3">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/10 text-white">
-                <Gift className="h-5 w-5" aria-hidden="true" />
-              </div>
-              <div className="min-w-0">
-                <h2 id="owned-rewards-heading" className="text-base font-bold text-white sm:text-lg">
-                  รางวัลของฉัน
-                </h2>
-                <p className="mt-0.5 text-xs text-emerald-100">
-                  ดูรหัสรางวัล สถานะ และวันหมดอายุของคุณ
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center justify-between gap-3 sm:justify-end">
-              <span className="text-xs font-semibold text-emerald-50">
-                {isRewardsLoading
-                  ? 'กำลังโหลด…'
-                  : isRewardsError
-                  ? 'ดูรางวัลทั้งหมด'
-                  : `ทั้งหมด ${numberFormat.format(rewardList.length)} รายการ · พร้อมใช้ ${numberFormat.format(availableRewardCount)}`}
-              </span>
-              <ArrowRight className="h-5 w-5 shrink-0 transition-transform group-hover:translate-x-1 motion-reduce:transition-none" aria-hidden="true" />
-            </div>
-          </div>
-        </Link>
-
-        {/* Badge portal */}
-        <article
-          aria-labelledby="badge-portal-heading"
-          className="flex flex-col rounded-2xl border border-blue-200 bg-blue-50/80 p-5 sm:p-6"
-        >
-          <div className="flex items-start gap-3.5">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-brand-blue text-white">
-              <Award className="h-6 w-6" aria-hidden="true" />
-            </div>
-            <div className="min-w-0">
-              <h2 id="badge-portal-heading" className="text-pretty text-base font-bold leading-snug text-ink sm:text-lg">
-                ล่าเหรียญตราความสำเร็จ
-              </h2>
-              <p className="mt-1.5 text-sm leading-relaxed text-ink-body">
-                สะสมความคืบหน้าจากการสแกนจ่าย Co-pay และรีวิวร้านค้า
-              </p>
-            </div>
-          </div>
-
-          <div className="mt-5 border-t border-blue-200 pt-4">
-            {isBadgesLoading ? (
-              <p role="status" aria-live="polite" className="text-sm text-ink-body">กำลังโหลดเหรียญตรา…</p>
-            ) : isBadgesError ? (
-              <p role="alert" className="text-sm text-ink-body">โหลดความคืบหน้าไม่สำเร็จ ลองเปิดหน้าเหรียญตราอีกครั้ง</p>
-            ) : badgeList.length > 0 ? (
-              <>
-                <div className="flex items-baseline justify-between gap-3">
-                  <p className="text-xs font-medium text-ink-body">ปลดล็อกแล้ว</p>
-                  <p className="shrink-0 font-mono text-sm font-semibold tabular-nums text-ink">
-                    {numberFormat.format(unlockedBadges.length)} / {numberFormat.format(badgeList.length)}
-                    <span className="ml-1 font-sans text-xs font-normal text-ink-body">เหรียญตรา</span>
-                  </p>
-                </div>
-                <div
-                  role="progressbar"
-                  aria-label="ความคืบหน้าการปลดล็อกเหรียญตรา"
-                  aria-valuemin={0}
-                  aria-valuemax={badgeList.length}
-                  aria-valuenow={unlockedBadges.length}
-                  aria-valuetext={`ปลดล็อกแล้ว ${numberFormat.format(unlockedBadges.length)} จาก ${numberFormat.format(badgeList.length)} เหรียญตรา`}
-                  className="mt-2 h-2 overflow-hidden rounded-pill bg-blue-100"
-                >
-                  <div className="h-full rounded-pill bg-brand-blue transition-[width] duration-300 motion-reduce:transition-none" style={{ width: `${badgeCompletion}%` }} />
-                </div>
-                <p className="mt-2 text-xs text-ink-body">
-                  {nextTargetBadge ? <>ถัดไป: <strong className="font-semibold text-ink-body">{nextTargetBadge.name}</strong></> : 'ปลดล็อกครบทุกเหรียญตราแล้ว'}
-                </p>
-              </>
-            ) : (
-              <p className="text-sm text-ink-body">ยังไม่มีเหรียญตราที่เปิดให้สะสม</p>
-            )}
-          </div>
-
-          <Link
-            to={APP_ROUTES.CITIZEN_ACHIEVEMENTS}
-            className="touch-manipulation mt-auto inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-brand-blue px-4 py-3 text-sm font-bold text-white transition-colors hover:bg-brand-blue-hover focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-200"
-          >
-            <Award className="h-4 w-4" aria-hidden="true" />
-            <span>ดูเหรียญตราของฉัน</span>
-            <ArrowRight className="h-4 w-4" aria-hidden="true" />
-          </Link>
-        </article>
 
         {/* ================= 5. ทางไปหน้าตั้งค่า (SETTINGS & SECURITY HUB) ================= */}
         <section aria-labelledby="settings-hub-heading" className="bg-white rounded-3xl border border-hairline p-5 sm:p-6 shadow-sm space-y-4">

@@ -60,6 +60,7 @@ export const BankPinDialog = ({
     setNewPin('');
     setDigits('');
     setError(null);
+    if (dialogRef.current) dialogRef.current.scrollTop = 0;
     setSuccessMessage(null);
   };
 
@@ -107,10 +108,12 @@ export const BankPinDialog = ({
         : 'ตั้งรหัส PIN สำเร็จ';
       setSuccessMessage(msg);
       setError(null);
+    if (dialogRef.current) dialogRef.current.scrollTop = 0;
+      client.setQueryData(['payment-pin-status', token], { isSet: true, lockedUntil: null });
       await client.invalidateQueries({ queryKey: ['payment-pin-status'] });
       setTimeout(() => {
         onSuccess?.();
-        if (!mandatory) onClose?.();
+        onClose?.();
       }, 700);
     },
     onError: (err: any) => {
@@ -136,6 +139,7 @@ export const BankPinDialog = ({
   const enterDigit = (digit: string) => {
     if (disabled || digits.length >= 6) return;
     setError(null);
+    if (dialogRef.current) dialogRef.current.scrollTop = 0;
     const next = digits + digit;
     setDigits(next);
 
@@ -147,6 +151,7 @@ export const BankPinDialog = ({
   const removeDigit = () => {
     if (disabled || digits.length === 0) return;
     setError(null);
+    if (dialogRef.current) dialogRef.current.scrollTop = 0;
     const next = digits.slice(0, -1);
     setDigits(next);
     if (step === 'current') setCurrentPin(next);
@@ -180,6 +185,7 @@ export const BankPinDialog = ({
   const handleBack = () => {
     if (disabled) return;
     setError(null);
+    if (dialogRef.current) dialogRef.current.scrollTop = 0;
     if (view === 'forgot') {
       setView('pin');
       return;
@@ -262,7 +268,7 @@ export const BankPinDialog = ({
       <div className="mx-auto flex min-h-[100dvh] w-full max-w-md flex-col px-6 pb-5 pt-4">
         {/* Header */}
         <header className="flex h-12 shrink-0 items-center justify-between">
-          {mandatory && step === 'new' ? (
+          {mandatory && step === 'new' && view !== 'forgot' ? (
             <button
               type="button"
               onClick={() => {
@@ -316,7 +322,10 @@ export const BankPinDialog = ({
               </button>
               <button
                 type="button"
-                onClick={() => setView('pin')}
+                onClick={() => {
+                  setView('pin');
+                  if (dialogRef.current) dialogRef.current.scrollTop = 0;
+                }}
                 className="w-full rounded-2xl border border-hairline py-3 text-sm text-ink-muted transition hover:bg-surface-soft"
               >
                 ย้อนกลับ

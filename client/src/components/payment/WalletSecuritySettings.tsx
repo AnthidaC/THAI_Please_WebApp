@@ -5,31 +5,28 @@ import { BankPinDialog } from './BankPinDialog';
 import { useAuthStore } from '../../stores/authStore';
 import { APP_ROUTES } from '../../constants/routes';
 
-/** Set before the forced re-login so the wallet reopens straight into the reset form. */
 const RESET_INTENT_KEY = 'thai-please:pin-reset-intent';
+const RESET_USER_KEY = 'thai-please:pin-reset-user-id';
+const RESET_RETURN_KEY = 'thai-please:pin-reset-return';
 
 export const WalletSecuritySettings = () => {
   const navigate = useNavigate();
-  const clearAuth = useAuthStore(state => state.clearAuth);
-  const hasResetIntent = () => sessionStorage.getItem(RESET_INTENT_KEY) === '1';
-  const [open, setOpen] = useState(hasResetIntent);
-  const isReset = hasResetIntent();
+  const { user, clearAuth } = useAuthStore();
+  const [open, setOpen] = useState(false);
 
-  const close = () => {
-    sessionStorage.removeItem(RESET_INTENT_KEY);
-    const returnPath = sessionStorage.getItem('thai-please:pin-reset-return');
-    sessionStorage.removeItem('thai-please:pin-reset-return');
-    setOpen(false);
-    if (returnPath) {
-      navigate(returnPath, { replace: true });
-    }
-  };
-
-  // Forgot PIN: prove identity again with the account login, then set a new PIN without the old one.
+  // Forgot PIN: prove identity again with the account login, then global PaymentPinGate handles reset
   const reLoginForReset = () => {
     sessionStorage.setItem(RESET_INTENT_KEY, '1');
+    if (user?.id) {
+      sessionStorage.setItem(RESET_USER_KEY, user.id);
+    }
+    sessionStorage.setItem(RESET_RETURN_KEY, window.location.pathname);
+    setOpen(false);
     clearAuth();
-    navigate(APP_ROUTES.LOGIN, { replace: true, state: { from: { pathname: APP_ROUTES.CITIZEN_WALLET } } });
+    navigate(APP_ROUTES.LOGIN, {
+      replace: true,
+      state: { from: { pathname: window.location.pathname } },
+    });
   };
 
   return (
@@ -46,15 +43,12 @@ export const WalletSecuritySettings = () => {
         <ChevronRight className="h-4 w-4 shrink-0" />
       </button>
 
-      {/* Standalone Bank-style PIN Dialog for Change / Reset */}
+      {/* Standalone Bank-style PIN Dialog for Change */}
       <BankPinDialog
         open={open}
-        mode={isReset ? 'reset' : 'change'}
-        onClose={close}
-        onSuccess={() => {
-          if (isReset) sessionStorage.removeItem(RESET_INTENT_KEY);
-          close();
-        }}
+        mode="change"
+        onClose={() => setOpen(false)}
+        onSuccess={() => setOpen(false)}
         onForgot={reLoginForReset}
       />
     </>

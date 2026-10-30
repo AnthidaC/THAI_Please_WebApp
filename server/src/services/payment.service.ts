@@ -139,6 +139,7 @@ export class PaymentService {
    */
   public async validateDiscountCode(params: {
     code: string;
+    codeType?: 'referral' | 'coupon';
     userId?: string;
     merchantId?: string;
     totalAmount: number;
@@ -150,14 +151,16 @@ export class PaymentService {
 
     // 1. ตรวจสอบในตาราง referrals (โค้ดคำชวนของเพื่อน / Friend Referral)
     try {
-      const referral = await prisma.referrals.findUnique({
-        where: { referral_code: cleanCode },
-        include: {
-          users_referrals_referrer_user_idTousers: {
-            select: { full_name: true },
-          },
-        },
-      });
+      const referral = params.codeType === 'coupon'
+        ? null
+        : await prisma.referrals.findUnique({
+            where: { referral_code: cleanCode },
+            include: {
+              users_referrals_referrer_user_idTousers: {
+                select: { full_name: true },
+              },
+            },
+          });
 
       if (referral) {
         if (referral.status === 'redeemed') {
@@ -196,6 +199,10 @@ export class PaymentService {
       if (e.message && !e.message.includes('PrismaClient')) {
         throw e;
       }
+    }
+
+    if (params.codeType === 'referral') {
+      throw new Error(`ไม่พบโค้ดแนะนำเพื่อน '${cleanCode}' ในระบบ`);
     }
 
     // 2. ตรวจสอบในตาราง user_rewards (คูปองรางวัล / Discount Coupons)
@@ -256,6 +263,10 @@ export class PaymentService {
       }
     }
 
+    if (params.codeType === 'coupon') {
+      throw new Error(`ไม่พบคูปองส่วนลด '${cleanCode}' ในบัญชีคุณ`);
+    }
+
     // 3. โค้ดโปรโมชันและคำชวนเพื่อนจำลองมาตรฐาน (Duo Coupon & Demo Codes)
     const demoCodes: Record<
       string,
@@ -285,7 +296,7 @@ export class PaymentService {
       },
     };
 
-    if (process.env.NODE_ENV !== 'production' && demoCodes[cleanCode]) {
+    if (!params.codeType && process.env.NODE_ENV !== 'production' && demoCodes[cleanCode]) {
       const demo = demoCodes[cleanCode];
       const discount = Math.min(params.totalAmount, demo.amount);
       return {
@@ -426,7 +437,8 @@ export class PaymentService {
     qrReference: string,
     userId?: string,
     discountCode?: string,
-    userLocation?: { lat: number; lon: number }
+    userLocation?: { lat: number; lon: number },
+    discountCodeType?: 'referral' | 'coupon'
   ) {
     let qrData = await qrStore.get(qrReference);
 
@@ -542,6 +554,7 @@ export class PaymentService {
       try {
         discountInfo = await this.validateDiscountCode({
           code: discountCode,
+          codeType: discountCodeType,
           userId,
           merchantId: qrData.merchantId,
           totalAmount: qrData.totalAmount,
@@ -619,6 +632,7 @@ export class PaymentService {
     userLongitude: number;
     merchantId?: string;
     discountCode?: string;
+    discountCodeType?: 'referral' | 'coupon';
     pin: string;
   }) {
     await paymentPinService.verify(params.userId, params.pin);
@@ -657,6 +671,7 @@ export class PaymentService {
     if (params.discountCode) {
       discountInfo = await this.validateDiscountCode({
         code: params.discountCode,
+        codeType: params.discountCodeType,
         userId: params.userId,
         merchantId,
         totalAmount: qrData.totalAmount,

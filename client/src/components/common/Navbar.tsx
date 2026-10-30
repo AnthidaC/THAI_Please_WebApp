@@ -64,7 +64,7 @@ export const Navbar: React.FC = () => {
       {/* 1. TOP NAVBAR (Modern, Polished Desktop Header with Distinct Role Presentation) */}
       <nav
         aria-label="แถบเมนูหลัก"
-        className="bg-white/95 backdrop-blur-md border-b border-hairline px-3.5 sm:px-6 lg:px-8 py-2.5 sm:py-3 shadow-2xs sticky top-0 z-30 font-sans transition-colors"
+        className="bg-white/95 backdrop-blur-md border-b border-hairline px-3.5 sm:px-6 lg:px-8 py-2.5 sm:py-3 shadow-2xs sticky top-0 z-40 font-sans transition-colors"
       >
         <div className="flex items-center justify-between max-w-7xl mx-auto gap-2 sm:gap-4">
           {/* Brand Logo & Role Indicator */}

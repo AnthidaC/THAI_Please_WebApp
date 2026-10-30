@@ -7,12 +7,13 @@ import { MapPin, Navigation, AlertTriangle, CheckCircle2 } from 'lucide-react';
 export interface LocationPickerProps {
   latitude: number;
   longitude: number;
-  onChange: (latitude: number, longitude: number, isUserConfirmed: boolean) => void;
+  onChange?: (latitude: number, longitude: number, isUserConfirmed?: boolean) => void;
   isConfirmed?: boolean;
   isApproximate?: boolean;
   approximateSource?: 'IP' | 'PROVINCE' | null;
   onLocateUser?: () => void;
   isLocating?: boolean;
+  readOnly?: boolean;
 }
 
 export const MerchantLocationPicker: React.FC<LocationPickerProps> = ({
@@ -24,6 +25,7 @@ export const MerchantLocationPicker: React.FC<LocationPickerProps> = ({
   approximateSource = null,
   onLocateUser,
   isLocating = false,
+  readOnly = false,
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [mapEngine, setMapEngine] = useState<'GOOGLE' | 'LEAFLET'>('LEAFLET');
@@ -44,38 +46,41 @@ export const MerchantLocationPicker: React.FC<LocationPickerProps> = ({
 
   // Handle user manual pin relocation (Click or Drag) -> Marks as user confirmed
   const handleLocationUpdate = useCallback((newLat: number, newLng: number) => {
-    onChangeRef.current(Number(newLat.toFixed(6)), Number(newLng.toFixed(6)), true);
-  }, []);
+    if (readOnly) return;
+    onChangeRef.current?.(Number(newLat.toFixed(6)), Number(newLng.toFixed(6)), true);
+  }, [readOnly]);
 
   // Initialize Map Engine (Google Maps if key provided, otherwise Leaflet OSM fallback)
   useEffect(() => {
-    let active = true;
-
     if (!apiKey) {
       setMapEngine('LEAFLET');
       return;
     }
 
+    let isMounted = true;
     const loader = new Loader({
       apiKey,
-      version: 'quarterly',
-      libraries: ['places'],
+      version: 'weekly',
     });
 
     loader
-      .load()
+      .importLibrary('maps')
       .then(() => {
-        if (!active) return;
-        setMapEngine('GOOGLE');
+        if (isMounted) {
+          setMapEngine('GOOGLE');
+          setGoogleLoadError(false);
+        }
       })
-      .catch(() => {
-        if (!active) return;
-        setGoogleLoadError(true);
-        setMapEngine('LEAFLET');
+      .catch((err) => {
+        console.warn('Google Maps failed to load, falling back to Leaflet (OSM):', err);
+        if (isMounted) {
+          setGoogleLoadError(true);
+          setMapEngine('LEAFLET');
+        }
       });
 
     return () => {
-      active = false;
+      isMounted = false;
     };
   }, [apiKey]);
 
@@ -90,38 +95,41 @@ export const MerchantLocationPicker: React.FC<LocationPickerProps> = ({
       mapTypeControl: false,
       streetViewControl: false,
       fullscreenControl: false,
+      gestureHandling: readOnly ? 'none' : 'auto',
     });
     googleMapRef.current = map;
 
-    // Standard Google Maps Marker (draggable, supports touch/mouse)
+    // Standard Google Maps Marker
     const marker = new google.maps.Marker({
       position: initialCenter,
       map,
-      draggable: true,
+      draggable: !readOnly,
       animation: google.maps.Animation.DROP,
-      title: 'ลากเพื่อปรับตำแหน่งร้านค้า',
+      title: readOnly ? 'ตำแหน่งร้านค้า' : 'ลากเพื่อปรับตำแหน่งร้านค้า',
     });
     googleMarkerRef.current = marker;
 
-    marker.addListener('dragend', (event: google.maps.MapMouseEvent) => {
-      if (event.latLng) {
-        handleLocationUpdate(event.latLng.lat(), event.latLng.lng());
-      }
-    });
+    if (!readOnly) {
+      marker.addListener('dragend', (event: google.maps.MapMouseEvent) => {
+        if (event.latLng) {
+          handleLocationUpdate(event.latLng.lat(), event.latLng.lng());
+        }
+      });
 
-    map.addListener('click', (event: google.maps.MapMouseEvent) => {
-      if (event.latLng) {
-        marker.setPosition(event.latLng);
-        handleLocationUpdate(event.latLng.lat(), event.latLng.lng());
-      }
-    });
+      map.addListener('click', (event: google.maps.MapMouseEvent) => {
+        if (event.latLng) {
+          marker.setPosition(event.latLng);
+          handleLocationUpdate(event.latLng.lat(), event.latLng.lng());
+        }
+      });
+    }
 
     return () => {
       googleMarkerRef.current?.setMap(null);
       googleMarkerRef.current = null;
       googleMapRef.current = null;
     };
-  }, [mapEngine, handleLocationUpdate]);
+  }, [mapEngine, handleLocationUpdate, readOnly]);
 
   // Update Google Marker position when lat/lng change from outside (e.g. GPS or province select)
   useEffect(() => {
@@ -160,26 +168,28 @@ export const MerchantLocationPicker: React.FC<LocationPickerProps> = ({
 
     const marker = L.marker([latitude, longitude], {
       icon: defaultIcon,
-      draggable: true,
+      draggable: !readOnly,
     }).addTo(map);
     leafletMarkerRef.current = marker;
 
-    marker.on('dragend', () => {
-      const pos = marker.getLatLng();
-      handleLocationUpdate(pos.lat, pos.lng);
-    });
+    if (!readOnly) {
+      marker.on('dragend', () => {
+        const pos = marker.getLatLng();
+        handleLocationUpdate(pos.lat, pos.lng);
+      });
 
-    map.on('click', (event: L.LeafletMouseEvent) => {
-      marker.setLatLng(event.latlng);
-      handleLocationUpdate(event.latlng.lat, event.latlng.lng);
-    });
+      map.on('click', (event: L.LeafletMouseEvent) => {
+        marker.setLatLng(event.latlng);
+        handleLocationUpdate(event.latlng.lat, event.latlng.lng);
+      });
+    }
 
     return () => {
       map.remove();
       leafletMapRef.current = null;
       leafletMarkerRef.current = null;
     };
-  }, [mapEngine, handleLocationUpdate]);
+  }, [mapEngine, handleLocationUpdate, readOnly]);
 
   // Update Leaflet Marker position when lat/lng change from outside
   useEffect(() => {
@@ -197,13 +207,13 @@ export const MerchantLocationPicker: React.FC<LocationPickerProps> = ({
     <div className="space-y-2 font-sans">
       <div className="overflow-hidden rounded-xl border border-hairline bg-white shadow-xs">
         {/* Header / Controls Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-hairline bg-slate-50/80 px-3 py-2 text-xs">
-          <div className="flex items-center gap-1.5 font-semibold text-ink">
-            <MapPin className="h-4 w-4 text-brand-blue" />
-            <span>ปักหมุดที่ตั้งร้านค้า (แตะหรือลากหมุดได้)</span>
+        <div className={`flex flex-wrap items-center justify-between gap-2 border-b border-hairline px-3 py-2 text-xs ${readOnly ? 'bg-slate-50 text-slate-700' : 'bg-slate-50/80 text-ink'}`}>
+          <div className="flex items-center gap-1.5 font-semibold">
+            <MapPin className={`h-4 w-4 ${readOnly ? 'text-slate-500' : 'text-brand-blue'}`} />
+            <span>{readOnly ? 'ตำแหน่งร้านค้าปัจจุบันบนแผนที่' : 'ปักหมุดที่ตั้งร้านค้า (แตะหรือลากหมุดได้)'}</span>
           </div>
 
-          {onLocateUser && (
+          {!readOnly && onLocateUser && (
             <button
               type="button"
               onClick={onLocateUser}
@@ -217,48 +227,50 @@ export const MerchantLocationPicker: React.FC<LocationPickerProps> = ({
         </div>
 
         {/* Map Canvas */}
-        <div ref={containerRef} className="h-64 sm:h-72 w-full touch-pan-x touch-pan-y" aria-label="แผนที่เลือกพิกัดร้านค้า" />
+        <div ref={containerRef} className="h-64 sm:h-72 w-full touch-pan-x touch-pan-y" aria-label="แผนที่แสดงพิกัดร้านค้า" />
 
-        {/* Status / Accuracy Info Banner */}
-        <div className="border-t border-hairline px-3 py-2 text-xs">
-          {isConfirmed ? (
-            <div className="flex items-center gap-1.5 text-emerald-700">
-              <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
-              <span className="font-semibold">ยืนยันตำแหน่งเรียบร้อยแล้ว:</span>
-              <span className="font-mono text-[11px] text-slate-600">
-                {latitude.toFixed(6)}, {longitude.toFixed(6)}
-              </span>
-            </div>
-          ) : isApproximate ? (
-            <div className="flex items-start gap-1.5 text-amber-800 bg-amber-50/70 p-2 rounded-lg">
-              <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 mt-0.5" />
-              <div>
-                <span className="font-semibold">
-                  {approximateSource === 'IP' ? 'พิกัดนี้ได้จาก IP โดยประมาณ' : 'พิกัดนี้เป็นศูนย์กลางจังหวัดที่เลือก'}:
-                </span>
-                <span className="ml-1 text-ink-muted">
-                  กรุณาแตะบนแผนที่ หรือลากหมุดเพื่อระบุตำแหน่งจริงของร้านค้าก่อนส่งฟอร์ม
+        {/* Status / Accuracy Info Banner (When not readOnly) */}
+        {!readOnly && (
+          <div className="border-t border-hairline px-3 py-2 text-xs">
+            {isConfirmed ? (
+              <div className="flex items-center gap-1.5 text-emerald-700">
+                <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                <span className="font-semibold">ยืนยันตำแหน่งเรียบร้อยแล้ว:</span>
+                <span className="font-mono text-[11px] text-slate-600">
+                  {latitude.toFixed(6)}, {longitude.toFixed(6)}
                 </span>
               </div>
-            </div>
-          ) : (
-            <div className="flex items-center gap-1.5 text-ink-muted">
-              <span>พิกัดปัจจุบัน:</span>
-              <span className="font-mono text-[11px]">{latitude.toFixed(6)}, {longitude.toFixed(6)}</span>
-            </div>
-          )}
+            ) : isApproximate ? (
+              <div className="flex items-start gap-1.5 text-amber-800 bg-amber-50/70 p-2 rounded-lg">
+                <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 mt-0.5" />
+                <div>
+                  <span className="font-semibold">
+                    {approximateSource === 'IP' ? 'พิกัดนี้ได้จาก IP โดยประมาณ' : 'พิกัดนี้เป็นศูนย์กลางจังหวัดที่เลือก'}:
+                  </span>
+                  <span className="ml-1 text-ink-muted">
+                    กรุณาแตะบนแผนที่ หรือลากหมุดเพื่อระบุตำแหน่งจริงของร้านค้าก่อนส่งฟอร์ม
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 text-ink-muted">
+                <span>พิกัดปัจจุบัน:</span>
+                <span className="font-mono text-[11px]">{latitude.toFixed(6)}, {longitude.toFixed(6)}</span>
+              </div>
+            )}
 
-          {/* Fallback Engine Notice if no Google Maps API key provided */}
-          {mapEngine === 'LEAFLET' && (
-            <p className="mt-1.5 text-[10px] text-ink-muted">
-              {googleLoadError
-                ? 'ระบบสลับมาใช้ OpenStreetMap เนื่องจาก Google Maps โหลดไม่สำเร็จ'
-                : !apiKey
-                ? 'ระบบใช้งาน OpenStreetMap เป็นแผนที่สำรอง'
-                : ''}
-            </p>
-          )}
-        </div>
+            {/* Fallback Engine Notice if no Google Maps API key provided */}
+            {mapEngine === 'LEAFLET' && (
+              <p className="mt-1.5 text-[10px] text-ink-muted">
+                {googleLoadError
+                  ? 'ระบบสลับมาใช้ OpenStreetMap เนื่องจาก Google Maps โหลดไม่สำเร็จ'
+                  : !apiKey
+                  ? 'ระบบใช้งาน OpenStreetMap เป็นแผนที่สำรอง'
+                  : ''}
+              </p>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

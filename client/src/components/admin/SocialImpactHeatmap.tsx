@@ -68,5 +68,5 @@ export const SocialImpactHeatmap: React.FC<SocialImpactHeatmapProps> = ({ locati
     };
   }, [locations]);
 
-  return <div ref={containerRef} className="h-[420px] w-full" aria-label="แผนที่ heatmap ยอดใช้จ่ายแยกตามพื้นที่" />;
+  return <div ref={containerRef} className="relative z-0 isolate h-[420px] w-full" aria-label="แผนที่ heatmap ยอดใช้จ่ายแยกตามพื้นที่" />;
 };

@@ -26,6 +26,8 @@ export const CitizenHomePage: React.FC = () => {
 
   const balance = wallet?.balance ?? 0;
   const dailyRemaining = wallet?.dailyQuotaRemaining ?? 0;
+  const dailyLimit = wallet?.dailyQuotaLimit;
+  const dailyLimitLabel = dailyLimit === undefined ? '—' : moneyFormatter.format(dailyLimit);
 
   return (
     <div className="min-h-screen bg-surface-soft pb-24 font-sans text-ink md:pb-14">
@@ -45,7 +47,7 @@ export const CitizenHomePage: React.FC = () => {
             {/* Quick Status Pill */}
             <div className="inline-flex items-center gap-1.5 rounded-pill bg-blue-50 px-3 py-1 text-xs font-semibold text-brand-blue border border-blue-200 self-start sm:self-auto">
               <span className="h-1.5 w-1.5 rounded-full bg-brand-blue" aria-hidden="true" />
-              <span>รัฐสมทบ 60% สูงสุด 150 บ./วัน</span>
+              <span>รัฐสมทบ 60% สูงสุด {dailyLimitLabel}/วัน</span>
             </div>
           </div>
         </div>
@@ -68,7 +70,7 @@ export const CitizenHomePage: React.FC = () => {
                     <span className="font-mono text-base sm:text-lg font-bold text-ink">
                       {moneyFormatter.format(dailyRemaining)}
                     </span>
-                    <span className="text-[11px] text-ink-muted ml-1">(เพดาน 150 บ.)</span>
+                    <span className="text-[11px] text-ink-muted ml-1">(เพดาน {dailyLimitLabel})</span>
                   </div>
                   <div className="text-slate-300 hidden sm:inline" aria-hidden="true">•</div>
                   <div>
