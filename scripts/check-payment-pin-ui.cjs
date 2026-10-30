@@ -7,21 +7,21 @@ const { spawn } = require('node:child_process');
 
 async function main() {
   const browserPath = process.env.CHROME_PATH || 'C:/Program Files/Google/Chrome/Application/chrome.exe';
-  const base = process.env.PIN_UI_URL || 'http://127.0.0.1:5176';
+  const base = process.env.PIN_UI_URL || 'http://127.0.0.1:5173';
   const screenshots = path.join(os.tmpdir(), 'thai-please-pin-ui');
   fs.mkdirSync(screenshots, { recursive: true });
   let browser;
   let vite;
   try {
     if (!process.env.PIN_UI_URL) {
-      vite = spawn(process.execPath, [path.resolve(__dirname, '../client/node_modules/vite/bin/vite.js'), '--host', '127.0.0.1', '--port', '5176', '--strictPort'], {
+      vite = spawn(process.execPath, [path.resolve(__dirname, '../client/node_modules/vite/bin/vite.js'), '--host', '127.0.0.1', '--port', '5173', '--strictPort'], {
         cwd: path.resolve(__dirname, '../client'), windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'],
       });
       await new Promise((resolve, reject) => {
         const timer = setTimeout(() => reject(new Error('Vite startup timed out')), 30000);
         const onData = data => {
           const text = data.toString();
-          if (text.includes('Local:') || text.includes('5176')) {
+          if (text.includes('Local:') || text.includes('5173')) {
             clearTimeout(timer);
             resolve();
           }
