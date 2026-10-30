@@ -645,7 +645,10 @@ export const CitizenReferralPage: React.FC = () => {
               </div>
               <div className="flex flex-col gap-2 sm:flex-row">
                 <Link
-                  to={APP_ROUTES.CITIZEN_MISSIONS}
+                  to={{
+                    pathname: APP_ROUTES.CITIZEN_MISSIONS,
+                    search: '?condition=referral_count',
+                  }}
                   className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-brand-blue px-4 py-2.5 text-xs font-semibold text-white transition-colors hover:bg-brand-blue-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue focus-visible:ring-offset-2"
                 >
                   <Sparkles aria-hidden="true" className="h-4 w-4" />

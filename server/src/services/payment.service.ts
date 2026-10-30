@@ -225,6 +225,11 @@ export class PaymentService {
           }
         }
 
+        const minimumSpend = Number(userReward.rewards.minimum_spend);
+        if (params.totalAmount < minimumSpend) {
+          throw new Error(`ยอดซื้อขั้นต่ำสำหรับคูปองนี้คือ ฿${minimumSpend.toLocaleString('th-TH', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`);
+        }
+
         let discountVal = 0;
         if (userReward.rewards.discount_type === 'percent') {
           const pct = Number(userReward.rewards.discount_value || 10);

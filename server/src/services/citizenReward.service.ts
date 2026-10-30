@@ -8,6 +8,7 @@ export interface CitizenRewardView {
   rewardType: string;
   discountType: string | null;
   discountValue: number | null;
+  minimumSpend: number;
   status: string;
   earnedAt: string;
   expiresAt: string | null;
@@ -40,6 +41,7 @@ export const listCitizenRewards = async (
       discountValue: userReward.rewards.discount_value === null
         ? null
         : Number(userReward.rewards.discount_value),
+      minimumSpend: Number(userReward.rewards.minimum_spend),
       status: isExpired && userReward.status === 'available' ? 'expired' : userReward.status,
       earnedAt: userReward.earned_at.toISOString(),
       expiresAt: userReward.expires_at?.toISOString() ?? null,

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Award, Check, Lock, Trophy } from 'lucide-react';
+import { Check, Lock } from 'lucide-react';
 import type { CitizenBadge, CitizenBadgeTier } from '../../services/badgeApi';
 
 const CONDITION_LABEL: Record<string, string> = {
@@ -32,6 +32,13 @@ const progressPercent = (progress: number, required: number): number => {
 const hasReachedTier = (progress: number | null, tier: CitizenBadgeTier): boolean =>
   progress !== null && progress >= tier.requiredCount;
 
+const TIER_ICON_BY_LEVEL: Record<number, string> = {
+  1: '/icons/badges/bronze.svg',
+  2: '/icons/badges/silver.svg',
+  3: '/icons/badges/gold.svg',
+  4: '/icons/badges/platinum.svg',
+};
+
 interface BadgeProgressCardProps {
   badge: CitizenBadge;
 }
@@ -40,6 +47,8 @@ export const BadgeProgressCard: React.FC<BadgeProgressCardProps> = ({ badge }) =
   const conditionLabel = badge.conditionDisplayName || CONDITION_LABEL[badge.conditionType] || 'เงื่อนไขความสำเร็จ';
   const progress = badge.progress;
   const target = badge.nextTier;
+  const iconTierLevel = badge.currentTier?.level ?? badge.nextTier?.level ?? 1;
+  const tierIcon = TIER_ICON_BY_LEVEL[iconTierLevel] ?? TIER_ICON_BY_LEVEL[1];
   const targetReached = target ? hasReachedTier(progress, target) : false;
   const percent = progress !== null && target
     ? progressPercent(progress, target.requiredCount)
@@ -68,13 +77,7 @@ export const BadgeProgressCard: React.FC<BadgeProgressCardProps> = ({ badge }) =
     <article className="rounded-3xl border border-hairline bg-white p-4 shadow-2xs sm:p-5">
       <div className="flex items-start gap-3.5">
         <div className={`flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border ${badge.isUnlocked ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-blue-100 bg-blue-50 text-brand-blue'}`}>
-          {badge.iconUrl ? (
-            <img src={badge.iconUrl} alt="" width={56} height={56} loading="lazy" className="h-full w-full object-cover" />
-          ) : badge.isUnlocked ? (
-            <Award className="h-7 w-7" aria-hidden="true" />
-          ) : (
-            <Trophy className="h-6 w-6" aria-hidden="true" />
-          )}
+          <img src={tierIcon} alt="" aria-hidden="true" width={56} height={56} loading="lazy" className="h-full w-full object-contain p-1" />
         </div>
 
         <div className="min-w-0 flex-1">
