@@ -34,7 +34,7 @@ export const CitizenReferralPage: React.FC = () => {
   const [selectedMerchantId, setSelectedMerchantId] = useState<string>('');
 
   // 2. Filter & UI Interaction State
-  const [friendFilter, setFriendFilter] = useState<'all' | 'redeemed' | 'pending'>('all');
+  const [merchantTab, setMerchantTab] = useState<'available' | 'credited'>('available');
   const [isCopied, setIsCopied] = useState<boolean>(false);
   const [shareFeedback, setShareFeedback] = useState<string | null>(null);
 
@@ -56,8 +56,21 @@ export const CitizenReferralPage: React.FC = () => {
     queryFn: referralApi.getEligibleMerchants,
   });
 
-  // Auto-select first eligible merchant when data arrives if none selected
-  const activeMerchantId = selectedMerchantId || (eligibleMerchants.length > 0 ? eligibleMerchants[0].merchantId : '');
+  // แยกรายชื่อร้านค้า: ร้านที่พร้อมชวน กับ ร้านที่แนะนำสำเร็จแล้ว
+  const availableMerchants = useMemo(
+    () => eligibleMerchants.filter((m) => !m.isCredited),
+    [eligibleMerchants]
+  );
+  const creditedMerchants = useMemo(
+    () => eligibleMerchants.filter((m) => m.isCredited),
+    [eligibleMerchants]
+  );
+
+  // Auto-select first available merchant (or credited if no available left)
+  const defaultMerchantId = availableMerchants.length > 0
+    ? availableMerchants[0].merchantId
+    : (eligibleMerchants.length > 0 ? eligibleMerchants[0].merchantId : '');
+  const activeMerchantId = selectedMerchantId || defaultMerchantId;
   const activeMerchant = useMemo(
     () => eligibleMerchants.find((m) => m.merchantId === activeMerchantId),
     [eligibleMerchants, activeMerchantId]
@@ -104,11 +117,10 @@ export const CitizenReferralPage: React.FC = () => {
 
   const friendsList = statsData?.invitedFriends || [];
 
-  // Filter friends list
-  const filteredFriends = useMemo(() => {
-    if (friendFilter === 'all') return friendsList;
-    return friendsList.filter((f) => f.status === friendFilter);
-  }, [friendsList, friendFilter]);
+  // ประวัติการแนะนำเพื่อนสำเร็จ — แสดงเฉพาะสถานะสำเร็จแล้ว (redeemed) เท่านั้น
+  const successfulFriends = useMemo(() => {
+    return friendsList.filter((f) => f.status === 'redeemed');
+  }, [friendsList]);
 
   // Handle Copy Code
   const handleCopyCode = async (code: string) => {
@@ -124,7 +136,11 @@ export const CitizenReferralPage: React.FC = () => {
         document.body.removeChild(textArea);
       }
       setIsCopied(true);
-      setTimeout(() => setIsCopied(false), 2200);
+      setShareFeedback(`คัดลอกโค้ด "${code}" แล้ว นำไปกรอกในช่องส่วนลดที่หน้าจ่ายเงินได้เลย!`);
+      setTimeout(() => {
+        setIsCopied(false);
+        setShareFeedback(null);
+      }, 3500);
     } catch (err) {
       console.warn('Copy to clipboard failed:', err);
     }
@@ -134,24 +150,22 @@ export const CitizenReferralPage: React.FC = () => {
   const handleShareCode = async () => {
     if (!referralCodeData) return;
 
+    const shareText = `โค้ดชวนเพื่อนร้าน "${referralCodeData.shopName}": ${referralCodeData.referralCode}\n(นำโค้ดนี้ไปกรอกในช่องส่วนลด/โค้ดเพื่อน ที่หน้าสแกนจ่ายเงิน Co-pay นะครับ)`;
     const shareData = {
-      title: `โครงการไทยช่วยไทยพลีส - สิทธิ์ชวนเพื่อนร้าน ${referralCodeData.shopName}`,
-      text: `ใช้รหัสแนะนำ ${referralCodeData.referralCode} สำหรับการชำระเงินที่ร้าน ${referralCodeData.shopName}`,
-      url: referralCodeData.shareUrl,
+      title: `โค้ดชวนเพื่อนร้าน ${referralCodeData.shopName}`,
+      text: shareText,
     };
 
     if (navigator.share) {
       try {
         await navigator.share(shareData);
-        setShareFeedback('แชร์ลิงก์คำชวนสำเร็จแล้ว');
+        setShareFeedback('แชร์โค้ดชวนเพื่อนสำเร็จแล้ว');
         setTimeout(() => setShareFeedback(null), 3000);
       } catch (err) {
         // User cancelled share
       }
     } else {
-      handleCopyCode(referralCodeData.shareUrl);
-      setShareFeedback('คัดลอกลิงก์คำชวนสำหรับส่งให้เพื่อนแล้ว');
-      setTimeout(() => setShareFeedback(null), 3000);
+      handleCopyCode(referralCodeData.referralCode);
     }
   };
 
@@ -351,41 +365,120 @@ export const CitizenReferralPage: React.FC = () => {
           <>
             {/* 2.1 MERCHANT SELECTOR BAR */}
             <div className="bg-white rounded-card border border-hairline p-4 sm:p-5 shadow-2xs space-y-3">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-hairline/70 pb-3">
                 <div className="flex items-center gap-2">
                   <div className="h-8 w-8 rounded-xl bg-blue-50 text-brand-blue flex items-center justify-center border border-blue-200">
                     <Store className="h-4 w-4" />
                   </div>
                   <div>
                     <h3 className="text-xs sm:text-sm font-bold text-ink">
-                      เลือกร้านค้าที่คุณต้องการแนะนำเพื่อน (Eligible Merchants)
+                      เลือกร้านค้าที่คุณต้องการแนะนำเพื่อน
                     </h3>
                     <p className="text-[11px] text-ink-muted">
-                      คุณสามารถชวนเพื่อนได้เฉพาะร้านที่คุณเคยชำระเงินสำเร็จแล้วเท่านั้น ({eligibleMerchants.length} ร้าน)
+                      {merchantTab === 'available'
+                        ? `ร้านที่คุณเคยไปใช้บริการและพร้อมสร้างโค้ชวนเพื่อน (${availableMerchants.length} ร้าน)`
+                        : `ร้านที่คุณแนะนำเพื่อนสำเร็จครบสิทธิ์แล้ว (${creditedMerchants.length} ร้าน)`}
                     </p>
                   </div>
                 </div>
+
+                {/* Sub-tab switcher: พร้อมชวน vs สำเร็จแล้ว */}
+                {creditedMerchants.length > 0 && (
+                  <div className="flex items-center gap-1 bg-surface-soft p-1 rounded-pill self-start sm:self-auto text-xs border border-hairline">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMerchantTab('available');
+                        if (availableMerchants.length > 0 && !availableMerchants.some(m => m.merchantId === activeMerchantId)) {
+                          setSelectedMerchantId(availableMerchants[0].merchantId);
+                        }
+                      }}
+                      className={`px-3 py-1 rounded-pill transition text-xs ${
+                        merchantTab === 'available'
+                          ? 'bg-brand-blue text-white font-semibold shadow-xs'
+                          : 'text-ink-muted hover:text-ink'
+                      }`}
+                    >
+                      พร้อมชวน ({availableMerchants.length})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMerchantTab('credited');
+                        if (creditedMerchants.length > 0 && !creditedMerchants.some(m => m.merchantId === activeMerchantId)) {
+                          setSelectedMerchantId(creditedMerchants[0].merchantId);
+                        }
+                      }}
+                      className={`px-3 py-1 rounded-pill transition text-xs ${
+                        merchantTab === 'credited'
+                          ? 'bg-status-success text-white font-semibold shadow-xs'
+                          : 'text-ink-muted hover:text-ink'
+                      }`}
+                    >
+                      ชวนสำเร็จแล้ว ({creditedMerchants.length})
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Horizontal Pill Selector */}
-              <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pt-1">
-                {eligibleMerchants.map((merchant) => {
-                  const isSelected = merchant.merchantId === activeMerchantId;
-                  return (
-                    <button
-                      key={merchant.merchantId}
-                      type="button"
-                      onClick={() => setSelectedMerchantId(merchant.merchantId)}
-                      className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-2xl border text-xs font-semibold transition shrink-0 ${
-                        isSelected
-                          ? 'bg-brand-blue text-white border-brand-blue shadow-xs'
-                          : merchant.isCredited
-                          ? 'bg-emerald-50 text-status-success border-emerald-200 hover:bg-emerald-100/60'
-                          : 'bg-surface-soft text-ink-body border-hairline hover:bg-gray-200'
-                      }`}
-                    >
-                      <span>{merchant.shopName}</span>
-                      {merchant.isCredited ? (
+              {merchantTab === 'available' ? (
+                availableMerchants.length > 0 ? (
+                  <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pt-1">
+                    {availableMerchants.map((merchant) => {
+                      const isSelected = merchant.merchantId === activeMerchantId;
+                      return (
+                        <button
+                          key={merchant.merchantId}
+                          type="button"
+                          onClick={() => setSelectedMerchantId(merchant.merchantId)}
+                          className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-2xl border text-xs font-semibold transition shrink-0 ${
+                            isSelected
+                              ? 'bg-brand-blue text-white border-brand-blue shadow-xs'
+                              : 'bg-surface-soft text-ink-body border-hairline hover:bg-gray-200'
+                          }`}
+                        >
+                          <span>{merchant.shopName}</span>
+                          {merchant.categoryNameTh && (
+                            <span
+                              className={`text-[10px] px-2 py-0.5 rounded-pill font-normal ${
+                                isSelected
+                                  ? 'bg-white/20 text-white'
+                                  : 'bg-white text-ink-muted border border-hairline'
+                              }`}
+                            >
+                              {merchant.categoryNameTh}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-3.5 text-xs text-emerald-900 flex items-center gap-2.5">
+                    <CheckCircle2 className="h-5 w-5 text-status-success shrink-0" />
+                    <div>
+                      <span className="font-bold">แนะนำครบทุกร้านแล้ว: </span>
+                      <span>คุณได้แนะนำเพื่อนครบทุกร้านที่คุณเคยไปใช้บริการแล้ว ({creditedMerchants.length} ร้าน) ขอบคุณที่ร่วมสนับสนุนร้านค้าชุมชน!</span>
+                    </div>
+                  </div>
+                )
+              ) : (
+                <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pt-1">
+                  {creditedMerchants.map((merchant) => {
+                    const isSelected = merchant.merchantId === activeMerchantId;
+                    return (
+                      <button
+                        key={merchant.merchantId}
+                        type="button"
+                        onClick={() => setSelectedMerchantId(merchant.merchantId)}
+                        className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-2xl border text-xs font-semibold transition shrink-0 ${
+                          isSelected
+                            ? 'bg-brand-blue text-white border-brand-blue shadow-xs'
+                            : 'bg-emerald-50 text-status-success border-emerald-200 hover:bg-emerald-100/60'
+                        }`}
+                      >
+                        <span>{merchant.shopName}</span>
                         <span
                           className={`text-[10px] px-2 py-0.5 rounded-pill font-semibold inline-flex items-center gap-1 ${
                             isSelected
@@ -396,21 +489,11 @@ export const CitizenReferralPage: React.FC = () => {
                           <CheckCircle2 className="h-3 w-3" />
                           <span>สำเร็จแล้ว</span>
                         </span>
-                      ) : merchant.categoryNameTh ? (
-                        <span
-                          className={`text-[10px] px-2 py-0.5 rounded-pill font-normal ${
-                            isSelected
-                              ? 'bg-white/20 text-white'
-                              : 'bg-white text-ink-muted border border-hairline'
-                          }`}
-                        >
-                          {merchant.categoryNameTh}
-                        </span>
-                      ) : null}
-                    </button>
-                  );
-                })}
-              </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             {/* Notification Banner when user already received invitation for this merchant */}
@@ -570,10 +653,7 @@ export const CitizenReferralPage: React.FC = () => {
               <div className="pt-3 border-t border-hairline/60 flex items-start gap-2 text-xs text-ink-muted leading-relaxed">
                 <Info className="h-4 w-4 text-brand-blue shrink-0 mt-0.5" />
                 <span>
-                  <strong>เงื่อนไขการแนะนำเพื่อน:</strong> เพื่อนต้องเป็นลูกค้าใหม่ที่ไม่เคยชำระเงินที่ร้านค้านี้มาก่อน
-                  เมื่อเพื่อนชำระเงินสำเร็จบิลแรก ระบบจะนับเป็นร้านค้าที่แนะนำสำเร็จ 1 ร้าน (จำกัด 1 สิทธิ์สำเร็จต่อร้านค้าตลอดโครงการ)
-                  ตรวจดูภารกิจที่เกี่ยวข้องเพื่อดูเงื่อนไขและรางวัลที่เปิดใช้งาน
-                </span>
+                  <strong>วิธีใช้งานโค้ด:</strong> คัดลอกรหัสนี้ส่งให้เพื่อน เมื่อเพื่อนไปที่ร้านและเปิดหน้า <strong>"สแกนจ่ายเงิน Co-pay"</strong> จะมีช่องให้กรอกโค้ดส่วนลด ให้นำรหัสนี้ไปกรอกเพื่อบันทึกสิทธิ์ (เมื่อเพื่อนชำระเงินสำเร็จบิลแรก ผู้แนะนำจะได้รับความคืบหน้าสะสมร้านค้าเพื่อรับคูปอง ฿40)</span>
               </div>
             </div>
 
@@ -775,118 +855,74 @@ export const CitizenReferralPage: React.FC = () => {
               )}
             </div>
 
-            {/* 2.7 SECTION: REFERRED FRIENDS LIST */}
+            {/* 2.7 SECTION: SUCCESSFUL REFERRAL HISTORY */}
             <div className="space-y-3">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5">
                 <div>
                   <h3 className="text-sm font-bold text-ink flex items-center gap-1.5">
                     <Clock className="h-4 w-4 text-brand-blue" />
-                    <span>ประวัติคำชวนและรายชื่อเพื่อนที่แนะนำสำหรับร้านนี้</span>
+                    <span>ประวัติการแนะนำเพื่อนสำเร็จ</span>
                   </h3>
                   <p className="text-xs text-ink-muted">
-                    แสดงสถานะการใช้สิทธิ์ของเพื่อนตามลำดับเวลาล่าสุด
+                    แสดงประวัติร้านค้าและเพื่อนที่ใช้สิทธิ์ชวนเพื่อนสำเร็จตามลำดับเวลาล่าสุด (รวมทุกร้านค้า)
                   </p>
                 </div>
 
-                <div className="flex items-center gap-1 bg-white border border-hairline p-1 rounded-pill self-start sm:self-auto text-xs">
-                  <button
-                    type="button"
-                    onClick={() => setFriendFilter('all')}
-                    className={`px-3 py-1 rounded-pill transition ${
-                      friendFilter === 'all'
-                        ? 'bg-ink text-white font-semibold shadow-xs'
-                        : 'text-ink-muted hover:text-ink'
-                    }`}
-                  >
-                    ทั้งหมด ({friendsList.length})
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setFriendFilter('redeemed')}
-                    className={`px-3 py-1 rounded-pill transition ${
-                      friendFilter === 'redeemed'
-                        ? 'bg-status-success text-white font-semibold shadow-xs'
-                        : 'text-ink-muted hover:text-ink'
-                    }`}
-                  >
-                    สำเร็จ ({summary.totalRedeemed})
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setFriendFilter('pending')}
-                    className={`px-3 py-1 rounded-pill transition ${
-                      friendFilter === 'pending'
-                        ? 'bg-amber-500 text-white font-semibold shadow-xs'
-                        : 'text-ink-muted hover:text-ink'
-                    }`}
-                  >
-                    รอใช้สิทธิ์ ({summary.totalPending})
-                  </button>
+                <div className="flex items-center gap-1.5 self-start sm:self-auto">
+                  <span className="inline-flex items-center gap-1.5 rounded-pill bg-emerald-50 px-3 py-1 text-xs font-semibold text-status-success border border-emerald-200 shadow-2xs">
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    <span>ชวนสำเร็จแล้ว {successfulFriends.length} รายการ</span>
+                  </span>
                 </div>
               </div>
 
-              {filteredFriends.length > 0 ? (
+              {successfulFriends.length > 0 ? (
                 <div className="space-y-2.5">
-                  {filteredFriends.map((friend) => (
+                  {successfulFriends.map((friend) => (
                     <article
                       key={friend.referralId}
-                      className="bg-white border border-hairline rounded-card p-4 shadow-2xs hover:shadow-xs transition flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                      className="bg-white border border-hairline rounded-card p-4 shadow-2xs hover:shadow-xs transition flex flex-col sm:flex-row sm:items-center justify-between gap-3.5"
                     >
-                      <div className="flex items-start sm:items-center gap-3 min-w-0">
-                        <div
-                          className={`h-10 w-10 rounded-2xl flex items-center justify-center shrink-0 border ${
-                            friend.status === 'redeemed'
-                              ? 'bg-emerald-50 text-status-success border-emerald-200'
-                              : 'bg-amber-50 text-amber-600 border-amber-200'
-                          }`}
-                        >
-                          {friend.status === 'redeemed' ? (
-                            <CheckCircle2 className="h-5 w-5" />
-                          ) : (
-                            <Clock className="h-5 w-5" />
-                          )}
+                      <div className="flex items-start sm:items-center gap-3.5 min-w-0">
+                        <div className="h-11 w-11 rounded-2xl flex items-center justify-center shrink-0 border bg-emerald-50 text-status-success border-emerald-200">
+                          <CheckCircle2 className="h-5 w-5" />
                         </div>
 
-                        <div className="min-w-0 space-y-0.5">
+                        <div className="min-w-0 space-y-1">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <h4 className="text-xs sm:text-sm font-bold text-ink truncate">
-                              {friend.friendName}
-                            </h4>
+                            <span className="text-xs sm:text-sm font-bold text-ink truncate flex items-center gap-1.5">
+                              <Store className="h-3.5 w-3.5 text-brand-blue shrink-0" />
+                              <span>{friend.merchantName || 'ร้านค้าชุมชน'}</span>
+                            </span>
                             <span className="font-mono font-numeric text-[11px] text-ink-muted bg-surface-soft px-2 py-0.5 rounded-pill border border-hairline">
                               {friend.referralCode}
                             </span>
                           </div>
-                          <p className="text-[11px] text-ink-muted truncate">
-                            {friend.status === 'redeemed' && friend.redeemedAt
-                              ? `ชำระเงินสำเร็จเมื่อ: ${new Date(friend.redeemedAt).toLocaleDateString('th-TH', {
+
+                          <div className="text-xs text-ink-body flex items-center gap-1.5 flex-wrap">
+                            <span className="text-ink-muted">เพื่อนที่แนะนำ:</span>
+                            <strong className="text-ink font-semibold">{friend.friendName}</strong>
+                          </div>
+
+                          <p className="text-[11px] text-ink-muted">
+                            {friend.redeemedAt
+                              ? `ชวนสำเร็จเมื่อ: ${new Date(friend.redeemedAt).toLocaleDateString('th-TH', {
                                   day: 'numeric',
                                   month: 'short',
                                   year: 'numeric',
-                                })}`
-                              : `สร้างคำชวนเมื่อ: ${new Date(friend.invitedAt).toLocaleDateString('th-TH', {
-                                  day: 'numeric',
-                                  month: 'short',
-                                  year: 'numeric',
-                                })}`}
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })} น.`
+                              : 'ชวนสำเร็จแล้ว'}
                           </p>
                         </div>
                       </div>
 
                       <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-hairline/60">
                         <div className="text-right">
-                          <span
-                            className={`inline-flex items-center px-2.5 py-0.5 rounded-pill text-[11px] font-semibold border ${
-                              friend.status === 'redeemed'
-                                ? 'bg-emerald-50 text-status-success border-emerald-200'
-                                : 'bg-amber-50 text-amber-700 border-amber-200'
-                            }`}
-                          >
-                            {friend.status === 'redeemed' ? 'สำเร็จแล้ว' : 'รอเพื่อนใช้สิทธิ์'}
-                          </span>
-                          <span className="block text-[10px] text-ink-muted mt-0.5 font-mono">
-                            {friend.discountAmount > 0
-                              ? `ส่วนลดจากคำชวน ฿${friend.discountAmount.toFixed(2)}`
-                              : 'ไม่มีส่วนลดเพิ่มเติม'}
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-pill text-[11px] font-semibold border bg-emerald-50 text-status-success border-emerald-200">
+                            <CheckCircle2 className="h-3 w-3" />
+                            <span>ชวนสำเร็จแล้ว</span>
                           </span>
                         </div>
                       </div>
@@ -895,15 +931,15 @@ export const CitizenReferralPage: React.FC = () => {
                 </div>
               ) : (
                 <div className="bg-white border border-hairline rounded-card p-8 sm:p-10 text-center shadow-xs space-y-3">
-                  <div className="h-12 w-12 rounded-full bg-blue-50 text-brand-blue flex items-center justify-center mx-auto border border-blue-200">
-                    <Users className="h-6 w-6" />
+                  <div className="h-12 w-12 rounded-full bg-emerald-50 text-status-success flex items-center justify-center mx-auto border border-emerald-200">
+                    <CheckCircle2 className="h-6 w-6" />
                   </div>
                   <div>
                     <h4 className="text-sm sm:text-base font-bold text-ink">
-                      ยังไม่มีรายการเพื่อนในตัวกรองนี้
+                      ยังไม่มีประวัติการชวนเพื่อนสำเร็จ
                     </h4>
                     <p className="text-xs text-ink-muted mt-1 leading-relaxed max-w-sm mx-auto">
-                      แชร์รหัสคำชวนร้านนี้ให้เพื่อน แล้วติดตามสถานะการใช้สิทธิ์ได้ที่นี่
+                      เลือกร้านค้าด้านบนแล้วส่งโค้ดให้เพื่อน เมื่อเพื่อนไปใช้บริการและสแกนจ่ายเงินสำเร็จ รายการจะแสดงที่นี่
                     </p>
                   </div>
                 </div>

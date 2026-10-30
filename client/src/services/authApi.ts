@@ -1,7 +1,7 @@
 import api from '../lib/axios';
 import { AuthResponse, ApiResponse, DemoLoginRole, User } from '../types';
 
-export interface DemoMerchantAccount {
+export interface DemoLoginAccount {
   id: string;
   name: string;
 }
@@ -12,8 +12,13 @@ export const authApi = {
     return response.data;
   },
 
-  listDemoMerchants: async (): Promise<DemoMerchantAccount[]> => {
-    const response = await api.get<ApiResponse<DemoMerchantAccount[]>>('/auth/demo-merchants');
+  listDemoCitizens: async (): Promise<DemoLoginAccount[]> => {
+    const response = await api.get<ApiResponse<DemoLoginAccount[]>>('/auth/demo-citizens');
+    return response.data.data;
+  },
+
+  listDemoMerchants: async (): Promise<DemoLoginAccount[]> => {
+    const response = await api.get<ApiResponse<DemoLoginAccount[]>>('/auth/demo-merchants');
     return response.data.data;
   },
 

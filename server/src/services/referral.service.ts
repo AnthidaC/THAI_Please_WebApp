@@ -405,7 +405,7 @@ export class ReferralService {
     }
 
     const baseUrl = process.env.CLIENT_URL || 'https://thai-please.gov.th';
-    const shareUrl = `${baseUrl}/register?ref=${referral.referral_code}&merchantId=${merchantId}`;
+    const shareUrl = `${baseUrl}/citizen/scan-copay?ref=${referral.referral_code}&merchantId=${merchantId}`;
 
     return {
       referralId: referral.referral_id,
@@ -705,18 +705,20 @@ export class ReferralService {
         if (activeReferral) {
           activeReferralCode = activeReferral.referral_code;
           const baseUrl = process.env.CLIENT_URL || 'https://thai-please.gov.th';
-          shareUrl = `${baseUrl}/register?ref=${activeReferral.referral_code}&merchantId=${selectedMerchantId}`;
+          shareUrl = `${baseUrl}/citizen/scan-copay?ref=${activeReferral.referral_code}&merchantId=${selectedMerchantId}`;
         }
       }
     }
 
-    // 2. ดึงรายการคำชวนทั้งหมดของผู้ใช้
+    // 2. ดึงรายการคำชวนทั้งหมดของผู้ใช้ (รวมทุกร้านค้า เพื่อแสดงประวัติการแนะนำเพื่อนโดยรวม)
     const allReferrals = await prisma.referrals.findMany({
       where: {
         referrer_user_id: userId,
-        ...(selectedMerchantId ? { merchant_id: selectedMerchantId } : {}),
       },
-      orderBy: { created_at: 'desc' },
+      orderBy: [
+        { converted_at: 'desc' },
+        { created_at: 'desc' },
+      ],
       include: {
         merchants: { select: { shop_name: true } },
         users_referrals_referred_user_idTousers: { select: { full_name: true } },
