@@ -3,7 +3,6 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   LayoutDashboard,
-  Wallet,
   Store,
   ShieldAlert,
   Megaphone,
@@ -15,8 +14,6 @@ import {
   TrendingUp,
   RefreshCw,
   FileCheck2,
-  Sparkles,
-  Sliders,
   ChevronRight,
 } from 'lucide-react';
 import { useAuthStore } from '../../../stores/authStore';
@@ -569,82 +566,7 @@ export const DashboardPage: React.FC = () => {
           </div>
         </section>
 
-        {/* ========================================================= */}
-        {/* 4. SANDBOX & SIMULATION TESTING SUITE */}
-        {/* ========================================================= */}
-        <section aria-labelledby="heading-sandbox" className="rounded-card border border-slate-200/80 bg-white p-5 sm:p-6 shadow-xs space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <div>
-              <div className="flex items-center space-x-2">
-                <div className="h-8 w-8 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center">
-                  <Sliders className="h-4 w-4" />
-                </div>
-                <h2 id="heading-sandbox" className="text-base font-bold text-ink">
-                  สภาพแวดล้อมจำลองการทำงาน (Sandbox & Simulation)
-                </h2>
-              </div>
-              <p className="text-xs text-ink-muted mt-1">
-                เครื่องมือช่วยผู้ดูแลระบบในการทดสอบกระบวนการจริงจากมุมมองประชาชนและร้านค้า
-              </p>
-            </div>
-            <span className="inline-flex items-center space-x-1 text-[11px] font-semibold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full self-start sm:self-auto">
-              <Sparkles className="h-3 w-3 text-amber-500" />
-              <span>Admin Testing Mode</span>
-            </span>
-          </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
-            {/* Citizen Wallet Simulation */}
-            <div
-              onClick={() => navigate(APP_ROUTES.CITIZEN_WALLET)}
-              className="rounded-2xl border border-slate-200/70 bg-slate-50/70 p-4 hover:bg-blue-50/50 hover:border-blue-200 transition cursor-pointer group flex flex-col justify-between"
-            >
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <div className="h-9 w-9 rounded-xl bg-blue-100/70 text-brand-blue flex items-center justify-center group-hover:scale-105 transition-transform">
-                    <Wallet className="h-4 w-4" />
-                  </div>
-                  <span className="text-[11px] font-medium text-brand-blue bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200/60">
-                    มุมมองประชาชน
-                  </span>
-                </div>
-                <h3 className="text-sm font-bold text-ink">กระเป๋าเงินประชาชน (Citizen Wallet)</h3>
-                <p className="text-xs text-ink-muted mt-1 leading-relaxed">
-                  จำลองการตรวจสอบยอดเงินคงเหลือ โควตารัฐสมทบ 60% ทดสอบการเติมเงิน และสแกน QR Co-pay หน้าร้าน
-                </p>
-              </div>
-              <div className="mt-3.5 pt-2.5 border-t border-slate-200/60 flex items-center justify-between text-xs font-semibold text-brand-blue">
-                <span>เปิดกระเป๋าเงินประชาชน</span>
-                <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-1 transition-transform" />
-              </div>
-            </div>
-
-            {/* Merchant POS Simulation */}
-            <div
-              onClick={() => navigate(APP_ROUTES.MERCHANT_POS_QR)}
-              className="rounded-2xl border border-slate-200/70 bg-slate-50/70 p-4 hover:bg-emerald-50/50 hover:border-emerald-200 transition cursor-pointer group flex flex-col justify-between"
-            >
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <div className="h-9 w-9 rounded-xl bg-emerald-100/70 text-status-success flex items-center justify-center group-hover:scale-105 transition-transform">
-                    <Store className="h-4 w-4" />
-                  </div>
-                  <span className="text-[11px] font-medium text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200/60">
-                    มุมมองร้านค้า
-                  </span>
-                </div>
-                <h3 className="text-sm font-bold text-ink">ระบบสร้าง QR ร้านค้า (Merchant POS)</h3>
-                <p className="text-xs text-ink-muted mt-1 leading-relaxed">
-                  จำลองการระบุยอดเงิน สร้าง Dynamic QR หน้าร้าน แจ้งเตือนเงินเข้าสด และทดสอบการรับชำระ Co-pay
-                </p>
-              </div>
-              <div className="mt-3.5 pt-2.5 border-t border-slate-200/60 flex items-center justify-between text-xs font-semibold text-status-success">
-                <span>เปิดระบบรับเงินหน้าร้าน</span>
-                <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-1 transition-transform" />
-              </div>
-            </div>
-          </div>
-        </section>
 
         {/* ========================================================= */}
         {/* 5. SECURITY AUDIT & SESSION DIAGNOSTICS */}
