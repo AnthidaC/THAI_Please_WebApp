@@ -15,6 +15,7 @@ export const APP_ROUTES = {
   // เส้นทางประชาชน (Citizen Flow)
   CITIZEN_HOME: '/citizen/home',
   CITIZEN_WALLET: '/citizen/wallet',
+  CITIZEN_REWARDS: '/citizen/rewards',
   CITIZEN_SCAN_COPAY: '/citizen/scan-copay',
   CITIZEN_SLIP: '/citizen/slip/:id',
   CITIZEN_TRANSACTIONS: '/citizen/transactions',

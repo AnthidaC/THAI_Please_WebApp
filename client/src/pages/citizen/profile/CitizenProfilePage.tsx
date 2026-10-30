@@ -19,11 +19,13 @@ import {
   Star,
   Store,
   SlidersHorizontal,
+  Gift,
 } from 'lucide-react';
 import { useAuthStore } from '../../../stores/authStore';
 import { APP_ROUTES } from '../../../constants/routes';
 import { getWalletBalance } from '../../../services/paymentApi';
 import { getMyBadges } from '../../../services/badgeApi';
+import { getMyRewards } from '../../../services/rewardApi';
 import { usePaymentPinStatus } from '../../../hooks/usePaymentPinStatus';
 import { WalletSecuritySettings } from '../../../components/payment/WalletSecuritySettings';
 
@@ -49,6 +51,13 @@ export const CitizenProfilePage: React.FC = () => {
     staleTime: 30000,
   });
 
+  const { data: rewards, isLoading: isRewardsLoading, isError: isRewardsError } = useQuery({
+    queryKey: ['my-rewards'],
+    queryFn: getMyRewards,
+    enabled: isAuthenticated,
+    staleTime: 0,
+  });
+
   // สถานะ PIN ความปลอดภัย
   const { data: pinStatus } = usePaymentPinStatus();
 
@@ -58,11 +67,16 @@ export const CitizenProfilePage: React.FC = () => {
   const badgeCompletion = badgeList.length > 0
     ? Math.round((unlockedBadges.length / badgeList.length) * 100)
     : 0;
+  const rewardList = rewards ?? [];
+  const availableRewardCount = rewardList.filter((reward) =>
+    reward.status === 'available' &&
+    (!reward.expiresAt || new Date(reward.expiresAt).getTime() > Date.now())
+  ).length;
 
   const handleLogout = () => {
     if (window.confirm('คุณต้องการออกจากระบบใช่หรือไม่?')) {
       clearAuth();
-      navigate(APP_ROUTES.HOME);
+      navigate(APP_ROUTES.HOME, { replace: true });
     }
   };
 
@@ -221,6 +235,38 @@ export const CitizenProfilePage: React.FC = () => {
             ดูรีวิว
           </button>
         </section>
+
+        <Link
+          to={APP_ROUTES.CITIZEN_REWARDS}
+          aria-labelledby="owned-rewards-heading"
+          className="group block overflow-hidden rounded-2xl border border-emerald-700 bg-emerald-800 shadow-sm transition-colors hover:bg-emerald-900 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-300 focus-visible:ring-offset-2 motion-reduce:transition-none"
+        >
+          <div className="flex flex-col gap-3 px-5 py-4 text-white sm:flex-row sm:items-center sm:justify-between sm:px-6">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/10 text-white">
+                <Gift className="h-5 w-5" aria-hidden="true" />
+              </div>
+              <div className="min-w-0">
+                <h2 id="owned-rewards-heading" className="text-base font-bold text-white sm:text-lg">
+                  รางวัลของฉัน
+                </h2>
+                <p className="mt-0.5 text-xs text-emerald-100">
+                  ดูรหัสรางวัล สถานะ และวันหมดอายุของคุณ
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center justify-between gap-3 sm:justify-end">
+              <span className="text-xs font-semibold text-emerald-50">
+                {isRewardsLoading
+                  ? 'กำลังโหลด…'
+                  : isRewardsError
+                  ? 'ดูรางวัลทั้งหมด'
+                  : `ทั้งหมด ${numberFormat.format(rewardList.length)} รายการ · พร้อมใช้ ${numberFormat.format(availableRewardCount)}`}
+              </span>
+              <ArrowRight className="h-5 w-5 shrink-0 transition-transform group-hover:translate-x-1 motion-reduce:transition-none" aria-hidden="true" />
+            </div>
+          </div>
+        </Link>
 
         {/* Badge portal */}
         <article
@@ -427,7 +473,7 @@ export const CitizenProfilePage: React.FC = () => {
             <button
               type="button"
               onClick={handleLogout}
-              className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold text-status-error bg-red-50 hover:bg-red-100 border border-red-200 rounded-pill transition"
+              className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold text-status-error bg-red-50 hover:bg-red-100 border border-red-200 rounded-pill transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue focus-visible:ring-offset-2"
             >
               <LogOut className="h-3.5 w-3.5" />
               <span>ออกจากระบบบัญชีประชาชน</span>

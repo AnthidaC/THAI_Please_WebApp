@@ -1,6 +1,7 @@
 import type { Prisma } from '@prisma/client';
 import prisma from '../../utils/prisma';
 import { badgeConditionRegistry } from './conditionRegistry';
+import { issueCompletedMissionRewards } from '../citizenMissionReward.service';
 
 export interface TierView {
   tierId: string;
@@ -266,6 +267,16 @@ export const awardAfterActivity = async (
   context = 'activity'
 ): Promise<ConditionEvaluationResult[]> => {
   const results: ConditionEvaluationResult[] = [];
+
+  try {
+    const issuedCount = await issueCompletedMissionRewards(userId, conditionTypes);
+    if (issuedCount > 0) {
+      console.info(`[MissionReward] Issued ${issuedCount} reward(s) after ${context} for user ${userId}`);
+    }
+  } catch (error) {
+    console.error(`[MissionReward] Evaluation failed after ${context} for user ${userId}`, error);
+  }
+
   for (const conditionType of conditionTypes) {
     try {
       results.push(await evaluateCondition(userId, conditionType));

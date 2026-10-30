@@ -30,6 +30,8 @@ import { useAuthStore } from '../../../stores/authStore';
 import { QrCameraScanner } from '../../../components/payment/QrCameraScanner';
 import { usePaymentPinStatus } from '../../../hooks/usePaymentPinStatus';
 import { PaymentPinConfirmation } from '../../../components/payment/PaymentPinConfirmation';
+import { getMyRewards } from '../../../services/rewardApi';
+import type { CitizenReward } from '../../../services/rewardApi';
 
 export const CitizenScanCopayPage: React.FC = () => {
   const navigate = useNavigate();
@@ -60,7 +62,30 @@ export const CitizenScanCopayPage: React.FC = () => {
     queryKey: ['wallet-balance'],
     queryFn: getWalletBalance,
   });
+  const {
+    data: ownedRewards = [],
+    isLoading: isRewardsLoading,
+    isError: isRewardsError,
+  } = useQuery({
+    queryKey: ['my-rewards'],
+    queryFn: getMyRewards,
+    staleTime: 0,
+  });
+  const discountRewards = ownedRewards.filter(
+    (reward): reward is CitizenReward & { discountType: string; discountValue: number } =>
+      reward.discountType !== null && reward.discountValue !== null
+  );
+  const availableOwnedRewards = discountRewards.filter((reward) =>
+    reward.status === 'available' &&
+    (!reward.expiresAt || new Date(reward.expiresAt).getTime() > Date.now())
+  );
   const { data: pinStatus, refetch: refetchPinStatus } = usePaymentPinStatus();
+
+  useEffect(() => {
+    if (scannedData && availableOwnedRewards.length > 0 && !appliedDiscount) {
+      setShowCoupon(true);
+    }
+  }, [scannedData, availableOwnedRewards.length, appliedDiscount]);
 
   // ติดตามพิกัด GPS จริงจากเบราว์เซอร์แบบเบื้องหลัง
   useEffect(() => {
@@ -386,33 +411,105 @@ export const CitizenScanCopayPage: React.FC = () => {
                     type="button"
                     onClick={() => setShowCoupon((v) => !v)}
                     disabled={!!appliedDiscount}
-                    className="w-full flex items-center justify-between gap-2"
+                    aria-expanded={showCoupon || Boolean(appliedDiscount)}
+                    className="w-full flex items-center justify-between gap-2 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue focus-visible:ring-offset-2"
                   >
                     <span className="text-xs font-semibold text-ink flex items-center space-x-1.5">
-                      <Gift className="h-3.5 w-3.5 text-brand-blue shrink-0" />
+                      <Gift className="h-3.5 w-3.5 text-brand-blue shrink-0" aria-hidden="true" />
                       <span>มีคูปองส่วนลด / โค้ดเพื่อน?</span>
                     </span>
                     {appliedDiscount ? (
                       <span className="rounded-pill bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-status-success border border-emerald-200 flex items-center space-x-1 shrink-0">
-                        <Check className="h-3 w-3" />
+                        <Check className="h-3 w-3" aria-hidden="true" />
                         <span>ใช้โค้ดแล้ว</span>
                       </span>
                     ) : (
-                      <ChevronDown className={`h-4 w-4 text-ink-muted transition shrink-0 ${showCoupon ? 'rotate-180' : ''}`} />
+                      <ChevronDown className={`h-4 w-4 text-ink-muted transition shrink-0 ${showCoupon ? 'rotate-180' : ''}`} aria-hidden="true" />
                     )}
                   </button>
 
                   {(showCoupon || appliedDiscount) && (
-                    <div className="mt-2.5">
+                    <div className="mt-2.5" aria-live="polite">
                       {!appliedDiscount ? (
                         <div className="space-y-2">
+                          <section className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-3 space-y-2">
+                            <div className="flex items-center justify-between gap-2">
+                              <h4 className="text-xs font-bold text-ink">คูปองส่วนลดของคุณ</h4>
+                              {availableOwnedRewards.length > 0 && (
+                                <span className="shrink-0 rounded-pill bg-white px-2 py-0.5 text-[10px] font-semibold text-emerald-800 border border-emerald-200">
+                                  พร้อมใช้ {availableOwnedRewards.length} ใบ
+                                </span>
+                              )}
+                            </div>
+
+                            {availableOwnedRewards.length > 0 ? (
+                              <div className="grid gap-2 sm:grid-cols-2">
+                                {availableOwnedRewards.map((reward) => {
+                                  const discountLabel = reward.discountType === 'percent'
+                                    ? `${reward.discountValue.toLocaleString('th-TH', { maximumFractionDigits: 2 })}%`
+                                    : `฿${reward.discountValue.toLocaleString('th-TH', { maximumFractionDigits: 2 })}`;
+
+                                  return (
+                                    <button
+                                      key={reward.userRewardId}
+                                      type="button"
+                                      disabled={discountMutation.isPending}
+                                      onClick={() => {
+                                        setDiscountCodeInput(reward.rewardCode);
+                                        handleApplyDiscount(reward.rewardCode);
+                                      }}
+                                      className="flex w-full min-w-0 items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-white px-3 py-2.5 text-left transition hover:border-emerald-400 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-60"
+                                      aria-label={`ใช้คูปอง ${reward.rewardName} ลด ${discountLabel}`}
+                                    >
+                                      <span className="min-w-0 space-y-0.5">
+                                        <span className="block truncate text-xs font-semibold text-ink">{reward.rewardName}</span>
+                                        <span className="block truncate font-mono text-[10px] text-ink-muted" translate="no">{reward.rewardCode}</span>
+                                        {reward.expiresAt && (
+                                          <span className="block text-[10px] text-ink-muted">
+                                            ใช้ได้ถึง {new Intl.DateTimeFormat('th-TH', {
+                                              year: 'numeric',
+                                              month: 'short',
+                                              day: 'numeric',
+                                            }).format(new Date(reward.expiresAt))}
+                                          </span>
+                                        )}
+                                      </span>
+                                      <span className="shrink-0 text-right">
+                                        <span className="block font-mono text-sm font-bold text-emerald-800">
+                                          {discountLabel}
+                                        </span>
+                                        <span className="block text-[10px] font-semibold text-emerald-700">
+                                          {discountMutation.isPending ? 'กำลังตรวจสอบ…' : 'ใช้คูปอง'}
+                                        </span>
+                                      </span>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            ) : (
+                              <p className="text-[11px] text-ink-muted">
+                                {isRewardsLoading
+                                  ? 'กำลังโหลดคูปองของคุณ…'
+                                  : isRewardsError
+                                  ? 'โหลดคูปองไม่สำเร็จ คุณยังกรอกรหัสคูปองด้านล่างได้'
+                                  : discountRewards.length > 0
+                                  ? 'ไม่มีคูปองที่ยังพร้อมใช้งาน'
+                                  : 'ยังไม่มีคูปองส่วนลดที่ใช้กับรายการนี้ได้'}
+                              </p>
+                            )}
+                          </section>
+
                           <div className="flex space-x-2">
                             <div className="relative flex-1 min-w-0">
-                              <Tag className="absolute left-3 top-2.5 h-3.5 w-3.5 text-ink-muted" />
+                              <Tag className="absolute left-3 top-2.5 h-3.5 w-3.5 text-ink-muted" aria-hidden="true" />
+                              <label htmlFor="input-discount-code" className="sr-only">รหัสคูปองส่วนลด</label>
                               <input
                                 id="input-discount-code"
+                                name="discountCode"
                                 type="text"
-                                placeholder="กรอกโค้ด เช่น FRIEND30, DUO50"
+                                autoComplete="off"
+                                spellCheck={false}
+                                placeholder="กรอกรหัส เช่น FRIEND30, DUO50…"
                                 value={discountCodeInput}
                                 onChange={(e) => setDiscountCodeInput(e.target.value.toUpperCase())}
                                 onKeyDown={(e) => {
@@ -421,7 +518,7 @@ export const CitizenScanCopayPage: React.FC = () => {
                                     handleApplyDiscount(discountCodeInput);
                                   }
                                 }}
-                                className="w-full rounded-pill border border-hairline pl-8 pr-3 py-2 text-xs font-mono text-ink placeholder:font-sans focus:border-brand-blue focus:outline-none uppercase"
+                                className="w-full rounded-pill border border-hairline pl-8 pr-3 py-2 text-xs font-mono text-ink placeholder:font-sans focus:border-brand-blue focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue focus-visible:ring-offset-1 uppercase"
                               />
                             </div>
                             <button
@@ -429,15 +526,15 @@ export const CitizenScanCopayPage: React.FC = () => {
                               type="button"
                               disabled={!discountCodeInput.trim() || discountMutation.isPending}
                               onClick={() => handleApplyDiscount(discountCodeInput)}
-                              className="rounded-pill bg-brand-blue px-4 py-2 text-xs font-semibold text-white transition hover:bg-brand-blue-hover disabled:opacity-40 shrink-0"
+                              className="rounded-pill bg-brand-blue px-4 py-2 text-xs font-semibold text-white transition hover:bg-brand-blue-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue focus-visible:ring-offset-2 disabled:opacity-40 shrink-0"
                             >
                               {discountMutation.isPending ? 'ตรวจ...' : 'ใช้โค้ด'}
                             </button>
                           </div>
 
                           {discountError && (
-                            <p className="text-[11px] text-status-error flex items-center space-x-1">
-                              <AlertTriangle className="h-3 w-3 flex-shrink-0" />
+                            <p role="alert" className="text-[11px] text-status-error flex items-center space-x-1">
+                              <AlertTriangle className="h-3 w-3 flex-shrink-0" aria-hidden="true" />
                               <span>{discountError}</span>
                             </p>
                           )}
@@ -454,9 +551,9 @@ export const CitizenScanCopayPage: React.FC = () => {
                                   setDiscountCodeInput('FRIEND30');
                                   handleApplyDiscount('FRIEND30');
                                 }}
-                                className="rounded-pill border border-emerald-200 bg-emerald-50/80 px-2.5 py-1 text-[10px] font-medium text-emerald-800 transition hover:bg-emerald-100 flex items-center space-x-1"
+                                className="rounded-pill border border-emerald-200 bg-emerald-50/80 px-2.5 py-1 text-[10px] font-medium text-emerald-800 transition hover:bg-emerald-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue focus-visible:ring-offset-2 flex items-center space-x-1"
                               >
-                                <Users className="h-3 w-3 text-emerald-600 shrink-0" />
+                                <Users className="h-3 w-3 text-emerald-600 shrink-0" aria-hidden="true" />
                                 <span>FRIEND30 (ลด ฿30 เพื่อนชวนเพื่อน)</span>
                               </button>
                               <button
@@ -465,9 +562,9 @@ export const CitizenScanCopayPage: React.FC = () => {
                                   setDiscountCodeInput('DUO50');
                                   handleApplyDiscount('DUO50');
                                 }}
-                                className="rounded-pill border border-blue-200 bg-blue-50/80 px-2.5 py-1 text-[10px] font-medium text-brand-blue transition hover:bg-blue-100 flex items-center space-x-1"
+                                className="rounded-pill border border-blue-200 bg-blue-50/80 px-2.5 py-1 text-[10px] font-medium text-brand-blue transition hover:bg-blue-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue focus-visible:ring-offset-2 flex items-center space-x-1"
                               >
-                                <Tag className="h-3 w-3 text-brand-blue shrink-0" />
+                                <Tag className="h-3 w-3 text-brand-blue shrink-0" aria-hidden="true" />
                                 <span>DUO50 (ลด ฿50 สิทธิพิเศษคู่หู)</span>
                               </button>
                               <button
@@ -476,9 +573,9 @@ export const CitizenScanCopayPage: React.FC = () => {
                                   setDiscountCodeInput('WELCOME20');
                                   handleApplyDiscount('WELCOME20');
                                 }}
-                                className="rounded-pill border border-hairline bg-surface-soft px-2.5 py-1 text-[10px] font-medium text-ink transition hover:bg-gray-100 flex items-center space-x-1"
+                                className="rounded-pill border border-hairline bg-surface-soft px-2.5 py-1 text-[10px] font-medium text-ink transition hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue focus-visible:ring-offset-2 flex items-center space-x-1"
                               >
-                                <Gift className="h-3 w-3 text-ink-muted shrink-0" />
+                                <Gift className="h-3 w-3 text-ink-muted shrink-0" aria-hidden="true" />
                                 <span>WELCOME20 (ลด ฿20 สิทธิพิเศษต้อนรับ)</span>
                               </button>
                             </div>
@@ -508,10 +605,10 @@ export const CitizenScanCopayPage: React.FC = () => {
                           <button
                             type="button"
                             onClick={handleRemoveDiscount}
-                            className="rounded-full p-1 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-900 transition shrink-0"
-                            title="ยกเลิกการใช้โค้ดนี้"
+                            aria-label="ยกเลิกคูปองที่ใช้"
+                            className="rounded-full p-1 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700 focus-visible:ring-offset-2 transition shrink-0"
                           >
-                            <X className="h-4 w-4" />
+                            <X className="h-4 w-4" aria-hidden="true" />
                           </button>
                         </div>
                       )}

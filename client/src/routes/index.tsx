@@ -32,6 +32,7 @@ import { CitizenMerchantDetailPage } from '../pages/citizen/merchants/CitizenMer
 import { CitizenPreferencesPage } from '../pages/citizen/preferences/CitizenPreferencesPage';
 import { CitizenReferralPage } from '../pages/citizen/referrals/CitizenReferralPage';
 import { CitizenProfilePage } from '../pages/citizen/profile/CitizenProfilePage';
+import { CitizenRewardsPage } from '../pages/citizen/rewards/CitizenRewardsPage';
 
 // Merchant Flow Pages
 import { MerchantPosQrPage } from '../pages/merchant/pos-qr/MerchantPosQrPage';
@@ -62,6 +63,7 @@ export const router = createBrowserRouter([
         children: [
           { path: APP_ROUTES.CITIZEN_HOME, element: <CitizenHomePage /> },
           { path: APP_ROUTES.CITIZEN_WALLET, element: <CitizenWalletPage /> },
+          { path: APP_ROUTES.CITIZEN_REWARDS, element: <CitizenRewardsPage /> },
           { path: APP_ROUTES.CITIZEN_BENEFITS_REGISTER, element: <CitizenBenefitsRegisterPage /> },
           { path: APP_ROUTES.CITIZEN_SCAN_COPAY, element: <CitizenScanCopayPage /> },
           { path: APP_ROUTES.CITIZEN_SLIP, element: <CitizenPaymentSlipPage /> },

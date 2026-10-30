@@ -13,6 +13,10 @@ export const Navbar: React.FC = () => {
   // เมนูแยกตามบทบาท (ประชาชน / ร้านค้า / ผู้ดูแลระบบ) — แยกตามบทบาทเด็ดขาด ไม่ปนกัน
   const role = resolveNavRole(user?.role, location.pathname);
   const homePath = isAuthenticated ? homeRouteForRole(user?.role) : APP_ROUTES.HOME;
+  const handleSignOut = () => {
+    clearAuth();
+    navigate(APP_ROUTES.HOME, { replace: true });
+  };
   const roleConfig = ROLE_CONFIG[role];
   const isMerchant = role === 'MERCHANT';
   const isAdmin = role === 'ADMIN';
@@ -135,7 +139,7 @@ export const Navbar: React.FC = () => {
                 {/* Logout Button */}
                 <button
                   type="button"
-                  onClick={clearAuth}
+                  onClick={handleSignOut}
                   className="h-8 w-8 rounded-full border border-slate-200 bg-white hover:bg-rose-50 hover:border-rose-200 hover:text-rose-600 text-slate-500 flex items-center justify-center transition shadow-2xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500"
                   title="ออกจากระบบ"
                   aria-label="ออกจากระบบ"
