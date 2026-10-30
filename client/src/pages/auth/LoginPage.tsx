@@ -16,7 +16,6 @@ type LoginErrorResponse = {
 };
 
 const demoAccountIdForRole: Partial<Record<DemoLoginRole, string | undefined>> = {
-  CITIZEN: import.meta.env.VITE_DEMO_CITIZEN_USER_ID,
   ADMIN: import.meta.env.VITE_DEMO_ADMIN_STAFF_ID,
 };
 
@@ -35,11 +34,31 @@ export const LoginPage: React.FC = () => {
   const [password, setPassword] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [demoCitizens, setDemoCitizens] = useState<{ id: string; name: string }[]>([]);
+  const [selectedCitizenId, setSelectedCitizenId] = useState('');
+  const [isLoadingCitizens, setIsLoadingCitizens] = useState(import.meta.env.DEV);
+  const [citizenLoadError, setCitizenLoadError] = useState<string | null>(null);
   const [demoMerchants, setDemoMerchants] = useState<{ id: string; name: string }[]>([]);
   const [selectedMerchantId, setSelectedMerchantId] = useState('');
   const [isLoadingMerchants, setIsLoadingMerchants] = useState(import.meta.env.DEV);
   const [merchantLoadError, setMerchantLoadError] = useState<string | null>(null);
   const from = (location.state as { from?: { pathname: string } } | null)?.from?.pathname;
+
+  const loadDemoCitizens = useCallback(async () => {
+    setIsLoadingCitizens(true);
+    setCitizenLoadError(null);
+    try {
+      const citizens = await authApi.listDemoCitizens();
+      setDemoCitizens(citizens);
+      setSelectedCitizenId((currentId) =>
+        citizens.some((citizen) => citizen.id === currentId) ? currentId : ''
+      );
+    } catch {
+      setCitizenLoadError('โหลดรายชื่อประชาชนทดสอบไม่ได้ กรุณาลองอีกครั้ง');
+    } finally {
+      setIsLoadingCitizens(false);
+    }
+  }, []);
 
   const loadDemoMerchants = useCallback(async () => {
     setIsLoadingMerchants(true);
@@ -58,8 +77,11 @@ export const LoginPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (import.meta.env.DEV) void loadDemoMerchants();
-  }, [loadDemoMerchants]);
+    if (import.meta.env.DEV) {
+      void loadDemoCitizens();
+      void loadDemoMerchants();
+    }
+  }, [loadDemoCitizens, loadDemoMerchants]);
 
   const handleCredentialsLogin = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -200,10 +222,64 @@ export const LoginPage: React.FC = () => {
       {import.meta.env.DEV && (
         <div className="space-y-2 border-t border-hairline pt-4">
           <p className="text-center text-xs font-semibold text-ink-muted">หรือเลือกบัญชีทดสอบ</p>
-          <button type="button" onClick={() => void handleDemoLogin('CITIZEN')} disabled={isLoading} className="group flex min-h-11 w-full items-center justify-between rounded-xl border border-hairline bg-surface-soft/60 p-3 text-left text-xs font-medium text-ink transition hover:border-blue-200 hover:bg-blue-50 disabled:cursor-wait disabled:opacity-60">
-            <span className="flex items-center gap-3"><User className="h-4 w-4 text-brand-blue" aria-hidden="true" />เข้าสู่ระบบประชาชนทดสอบ</span>
-            <ArrowRight className="h-4 w-4 text-ink-muted transition group-hover:translate-x-1" aria-hidden="true" />
-          </button>
+          <div className="space-y-3 rounded-xl border border-blue-100 bg-blue-50/40 p-3">
+            <div>
+              <label htmlFor="demo-citizen-id" className="mb-1.5 block text-xs font-semibold text-ink">
+                เลือกบัญชีประชาชนทดสอบ
+              </label>
+              <select
+                id="demo-citizen-id"
+                name="demoCitizenId"
+                value={selectedCitizenId}
+                onChange={(event) => {
+                  setSelectedCitizenId(event.target.value);
+                  setErrorMsg(null);
+                }}
+                disabled={isLoading || isLoadingCitizens || demoCitizens.length === 0}
+                className="min-h-11 w-full rounded-lg border border-hairline bg-white px-3 py-2 text-sm text-ink focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-200 disabled:cursor-not-allowed disabled:bg-surface-soft disabled:text-ink-muted"
+              >
+                <option value="">
+                  {isLoadingCitizens ? 'กำลังโหลดรายชื่อประชาชน…' : 'เลือกบัญชีประชาชน…'}
+                </option>
+                {demoCitizens.map((citizen) => (
+                  <option key={citizen.id} value={citizen.id}>{citizen.name}</option>
+                ))}
+              </select>
+              {isLoadingCitizens && (
+                <p role="status" aria-live="polite" className="mt-1.5 text-xs text-ink-muted">
+                  กำลังโหลดรายชื่อประชาชน…
+                </p>
+              )}
+              {citizenLoadError && (
+                <div role="alert" className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-status-error">
+                  <span>{citizenLoadError}</span>
+                  <button
+                    type="button"
+                    onClick={() => void loadDemoCitizens()}
+                    className="min-h-9 rounded-lg px-2 font-semibold text-brand-blue hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-200"
+                  >
+                    โหลดอีกครั้ง
+                  </button>
+                </div>
+              )}
+              {!isLoadingCitizens && !citizenLoadError && demoCitizens.length === 0 && (
+                <p role="status" aria-live="polite" className="mt-1.5 text-xs text-ink-muted">
+                  ไม่พบบัญชีประชาชนทดสอบ
+                </p>
+              )}
+            </div>
+            <button
+              type="button"
+              id="btn-demo-citizen"
+              onClick={() => void handleDemoLogin('CITIZEN', selectedCitizenId)}
+              disabled={isLoading || isLoadingCitizens || !selectedCitizenId || !!citizenLoadError}
+              aria-busy={isLoading}
+              className="group flex min-h-11 w-full items-center justify-between rounded-xl border border-hairline bg-white p-3 text-left text-xs font-medium text-ink transition hover:border-blue-200 hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-200 motion-reduce:transition-none disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <span className="flex items-center gap-3"><User className="h-4 w-4 text-brand-blue" aria-hidden="true" />เข้าสู่ระบบประชาชนทดสอบ</span>
+              {isLoading ? <LoaderCircle className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden="true" /> : <ArrowRight className="h-4 w-4 text-ink-muted transition group-hover:translate-x-1 motion-reduce:transition-none" aria-hidden="true" />}
+            </button>
+          </div>
           <div className="space-y-3 rounded-xl border border-emerald-100 bg-emerald-50/40 p-3">
             <div>
               <label htmlFor="demo-merchant-id" className="mb-1.5 block text-xs font-semibold text-ink">

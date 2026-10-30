@@ -1,6 +1,7 @@
 import React from 'react';
 import { Check, Lock } from 'lucide-react';
 import type { CitizenBadge, CitizenBadgeTier } from '../../services/badgeApi';
+import { getBadgeTierIcon } from './badgeTierIcons';
 
 const CONDITION_LABEL: Record<string, string> = {
   transaction_count: 'จำนวนธุรกรรมที่ชำระสำเร็จ',
@@ -32,13 +33,6 @@ const progressPercent = (progress: number, required: number): number => {
 const hasReachedTier = (progress: number | null, tier: CitizenBadgeTier): boolean =>
   progress !== null && progress >= tier.requiredCount;
 
-const TIER_ICON_BY_LEVEL: Record<number, string> = {
-  1: '/icons/badges/bronze.svg',
-  2: '/icons/badges/silver.svg',
-  3: '/icons/badges/gold.svg',
-  4: '/icons/badges/platinum.svg',
-};
-
 interface BadgeProgressCardProps {
   badge: CitizenBadge;
 }
@@ -48,7 +42,7 @@ export const BadgeProgressCard: React.FC<BadgeProgressCardProps> = ({ badge }) =
   const progress = badge.progress;
   const target = badge.nextTier;
   const iconTierLevel = badge.currentTier?.level ?? badge.nextTier?.level ?? 1;
-  const tierIcon = TIER_ICON_BY_LEVEL[iconTierLevel] ?? TIER_ICON_BY_LEVEL[1];
+  const tierIcon = getBadgeTierIcon(iconTierLevel);
   const targetReached = target ? hasReachedTier(progress, target) : false;
   const percent = progress !== null && target
     ? progressPercent(progress, target.requiredCount)

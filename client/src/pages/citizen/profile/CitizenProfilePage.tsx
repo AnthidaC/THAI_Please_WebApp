@@ -28,6 +28,7 @@ import { getMyBadges } from '../../../services/badgeApi';
 import { getMyRewards } from '../../../services/rewardApi';
 import { usePaymentPinStatus } from '../../../hooks/usePaymentPinStatus';
 import { WalletSecuritySettings } from '../../../components/payment/WalletSecuritySettings';
+import { getBadgeTierIcon } from '../../../components/badges/badgeTierIcons';
 
 const numberFormat = new Intl.NumberFormat('th-TH');
 
@@ -164,6 +165,38 @@ export const CitizenProfilePage: React.FC = () => {
             </div>
           </div>
         </section>
+
+        {unlockedBadges.length > 0 && (
+          <section aria-label="เหรียญตราที่ได้รับ" className="-mt-2 flex flex-wrap items-center gap-2.5 px-5 sm:px-6">
+            {unlockedBadges.map((badge) => {
+              const tier = badge.currentTier;
+              if (!tier) return null;
+
+              const tooltip = `${badge.name} · ${tier.name}`;
+
+              return (
+                <span
+                  key={badge.id}
+                  role="img"
+                  tabIndex={0}
+                  aria-label={tooltip}
+                  title={tooltip}
+                  className="inline-flex h-12 w-12 shrink-0 cursor-help items-center justify-center rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue focus-visible:ring-offset-2"
+                >
+                  <img
+                    src={getBadgeTierIcon(tier.level)}
+                    alt=""
+                    aria-hidden="true"
+                    width={48}
+                    height={48}
+                    loading="lazy"
+                    className="h-12 w-12 object-contain"
+                  />
+                </span>
+              );
+            })}
+          </section>
+        )}
 
         {/* ================= 3. QUICK WALLET & CO-PAY STATS ================= */}
         <section aria-label="สถิติกระเป๋าเงินและสิทธิ์คนละครึ่ง" className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
