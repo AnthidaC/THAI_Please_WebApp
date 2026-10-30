@@ -57,7 +57,7 @@ const getDummyHash = (): Promise<string> => {
   return dummyHashPromise;
 };
 
-const findMerchantCredential: CredentialProvider = async (email) => {
+export const findMerchantCredential: CredentialProvider = async (email) => {
   const application = await prisma.merchantApplication.findFirst({
     where: { email },
     orderBy: { created_at: 'desc' },
@@ -99,7 +99,7 @@ const findMerchantCredential: CredentialProvider = async (email) => {
   };
 };
 
-const findStaffCredential: CredentialProvider = async (email) => {
+export const findStaffCredential: CredentialProvider = async (email) => {
   const staff = await prisma.staff_accounts.findUnique({ where: { email } });
   if (!staff) return null;
 
@@ -124,8 +124,42 @@ const findStaffCredential: CredentialProvider = async (email) => {
   };
 };
 
+export const findCitizenCredential: CredentialProvider = async (email) => {
+  const normalizedEmail = email.trim().toLowerCase();
+  const identity = await prisma.auth_identities.findUnique({
+    where: { email: normalizedEmail },
+  });
+  if (!identity || identity.account_type !== 'CITIZEN_ACCOUNT') return null;
+
+  const credentials = await prisma.citizen_credentials.findUnique({
+    where: { user_id: identity.account_id },
+    include: { users: true },
+  });
+  if (!credentials || !credentials.users) return null;
+
+  return {
+    passwordHash: credentials.password_hash,
+    authenticate: async () => {
+      const user = credentials.users;
+      return {
+        kind: 'authenticated',
+        data: {
+          user: {
+            id: user.user_id,
+            email: identity.email,
+            name: user.full_name,
+            role: 'USER',
+            createdAt: user.created_at.toISOString(),
+          },
+          token: signToken({ userId: user.user_id, role: 'CITIZEN' }),
+        },
+      };
+    },
+  };
+};
+
 export const loginWithCredentials = createCredentialLoginService(
-  [findMerchantCredential, findStaffCredential],
+  [findMerchantCredential, findStaffCredential, findCitizenCredential],
   comparePassword,
   getDummyHash,
 );

@@ -9,7 +9,6 @@ export const APP_ROUTES = {
   MERCHANT_HOME: '/merchant/home',
   MERCHANT_APPLICATION_STATUS: '/merchant/application-status',
   MERCHANT_PROFILE: '/merchant/profile',
-  CITIZEN_BENEFITS_REGISTER: '/citizen/register-benefits',
   PROFILE: '/profile',
 
   // เส้นทางประชาชน (Citizen Flow)

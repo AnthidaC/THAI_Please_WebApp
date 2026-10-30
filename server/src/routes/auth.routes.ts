@@ -1,14 +1,21 @@
 import { Router } from 'express';
 import type { NextFunction, Request, Response } from 'express';
 import rateLimit from 'express-rate-limit';
-import { authLogin, demoLogin, getMe, listDemoMerchants } from '../controllers/auth.controller';
+import { authLogin, demoLogin, getMe, listDemoMerchants, registerCitizenController } from '../controllers/auth.controller';
 import { validate } from '../middlewares/validate.middleware';
-import { authLoginSchema, demoLoginSchema } from '../validations/auth.validation';
+import { authLoginSchema, citizenRegisterSchema, demoLoginSchema } from '../validations/auth.validation';
 import { authenticate, requireCitizen } from '../middlewares/auth.middleware';
 
 const router = Router();
 export const authLoginRateLimit = rateLimit({
   windowMs: 15 * 60 * 1000,
+  limit: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+export const citizenRegisterRateLimit = rateLimit({
+  windowMs: 60 * 60 * 1000,
   limit: 5,
   standardHeaders: true,
   legacyHeaders: false,
@@ -23,6 +30,7 @@ export const developmentOnlyDemoLogin = (req: Request, res: Response, next: Next
 };
 
 router.post('/login', authLoginRateLimit, validate(authLoginSchema), authLogin);
+router.post('/register-citizen', citizenRegisterRateLimit, validate(citizenRegisterSchema), registerCitizenController);
 router.get('/demo-merchants', developmentOnlyDemoLogin, listDemoMerchants);
 router.post('/demo-login', developmentOnlyDemoLogin, validate(demoLoginSchema), demoLogin);
 router.get('/me', authenticate, requireCitizen, getMe);

@@ -6,9 +6,34 @@ export interface DemoMerchantAccount {
   name: string;
 }
 
+export interface CitizenRegisterPayload {
+  fullName: string;
+  citizenId: string;
+  provinceCode: string;
+  email: string;
+  password: string;
+}
+
+export interface CitizenRegisterResponse {
+  status: 'success';
+  data: {
+    id: string;
+    email: string;
+    name: string;
+    role: string;
+    createdAt: string;
+  };
+  message: string;
+}
+
 export const authApi = {
   login: async (credentials: { email: string; password: string }): Promise<AuthResponse> => {
     const response = await api.post<AuthResponse>('/auth/login', credentials);
+    return response.data;
+  },
+
+  registerCitizen: async (payload: CitizenRegisterPayload): Promise<CitizenRegisterResponse> => {
+    const response = await api.post<CitizenRegisterResponse>('/auth/register-citizen', payload);
     return response.data;
   },
 
