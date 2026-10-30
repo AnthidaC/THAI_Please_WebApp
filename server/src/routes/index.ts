@@ -33,6 +33,7 @@ router.use('/preferences', preferenceRoutes);
 router.use('/referrals', referralRoutes);
 router.use('/geo', geoRoutes);
 router.use('/merchant-applications', merchantApplicationRoutes);
+router.use('/merchant', merchantApplicationRoutes);
 router.use('/admin/social-impact', socialImpactRoutes);
 router.use('/staff', staffRoutes);
 
