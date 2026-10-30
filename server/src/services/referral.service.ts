@@ -36,18 +36,6 @@ export interface ReferralFriendItem {
   redeemedAt: string | null;
 }
 
-export interface EarnedCouponItem {
-  userRewardId: string;
-  rewardCode: string;
-  rewardName: string;
-  discountValue: number;
-  status: string;
-  earnedAt: string;
-  expiresAt: string | null;
-  usedAt: string | null;
-  rewardType: 'REFEREE_WELCOME_10' | 'REFERRER_MILESTONE_40';
-}
-
 export interface ReferralStatsResult {
   merchantId: string | null;
   merchantName: string | null;
@@ -60,15 +48,8 @@ export interface ReferralStatsResult {
     totalRedeemed: number;
     totalPending: number;
     totalSuccessfulMerchants?: number;
-    milestonesCompleted: number;
-    currentMilestoneProgress: number; // e.g. 0 to 4
-    milestoneTarget: number; // 5
-    merchantsNeededForNextMilestone?: number;
-    friendsNeededForNextMilestone: number;
-    totalMilestoneCouponsEarned: number;
   };
   invitedFriends: ReferralFriendItem[];
-  earnedCoupons: EarnedCouponItem[];
 }
 
 export interface ReferralValidationResult {
@@ -99,29 +80,20 @@ export interface ReferralConversionResult {
   refereeUserId: string;
   merchantId: string;
   transactionId: string;
-  refereeCoupon?: {
-    userRewardId: string;
-    rewardCode: string;
-    discountValue: number;
-  };
+  /** @deprecated Referral rewards are issued by missions. This is retained as an empty legacy field. */
   referrerMilestoneCoupons: Array<{
     userRewardId: string;
     rewardCode: string;
     discountValue: number;
     milestoneIndex: number;
   }>;
-  milestoneState: {
-    uniqueMerchantsCount: number;
-    milestonesCompleted: number;
-    progressInCurrentMilestone: number;
-    merchantsNeededForNextMilestone: number;
-    uniqueRefereesAtMerchant?: number;
-    friendsNeededForNextMilestone?: number;
-  };
 }
 
+/** @deprecated Kept for the legacy referral test fixtures; conversion no longer issues this reward. */
 export const REFERRER_MILESTONE_DISCOUNT_AMOUNT = 40.0;
+/** @deprecated Kept for existing referral progress fixtures. */
 export const REFERRER_MILESTONE_STEP = 5;
+/** @deprecated Kept for the legacy referral test fixtures; conversion no longer issues this reward. */
 export const REFERRER_MILESTONE_VALID_DAYS = 14;
 
 export class ReferralService {
@@ -138,6 +110,40 @@ export class ReferralService {
     const firstName = parts[0];
     const lastName = parts[parts.length - 1];
     return `${firstName} ${lastName.charAt(0)}***`;
+  }
+
+  /**
+   * @deprecated Legacy helper retained for existing test fixtures. Conversion no longer creates or awards this reward.
+   */
+  public async getOrCreateRewardTemplates(
+    tx: Prisma.TransactionClient | typeof prisma = prisma
+  ): Promise<{ reward40: { reward_id: string } }> {
+    let reward40 = await tx.rewards.findFirst({
+      where: {
+        reward_type: 'discount',
+        discount_type: 'fixed',
+        discount_value: new Prisma.Decimal(REFERRER_MILESTONE_DISCOUNT_AMOUNT),
+        status: 'active',
+      },
+      select: { reward_id: true },
+    });
+
+    if (!reward40) {
+      reward40 = await tx.rewards.create({
+        data: {
+          reward_name: 'คูปองไมล์สโตนชวนเพื่อน (Referrer Milestone ฿40)',
+          description: 'รางวัลเก่าจากระบบ referral; รางวัลใหม่ออกผ่านภารกิจเท่านั้น',
+          reward_type: 'discount',
+          discount_type: 'fixed',
+          discount_value: new Prisma.Decimal(REFERRER_MILESTONE_DISCOUNT_AMOUNT),
+          valid_days: REFERRER_MILESTONE_VALID_DAYS,
+          status: 'active',
+        },
+        select: { reward_id: true },
+      });
+    }
+
+    return { reward40 };
   }
 
   /**
@@ -503,44 +509,8 @@ export class ReferralService {
   }
 
   /**
-   * ค้นหาหรือสร้าง Reward Template สำหรับคูปองไมล์สโตน ฿40 (Referrer Milestone)
-   * ปฏิบัติตามโมเดล rewards ของ Dev 4
-   */
-  public async getOrCreateRewardTemplates(
-    tx: Prisma.TransactionClient | typeof prisma = prisma
-  ): Promise<{ reward40: { reward_id: string } }> {
-    let reward40 = await tx.rewards.findFirst({
-      where: {
-        reward_type: 'discount',
-        discount_type: 'fixed',
-        discount_value: new Prisma.Decimal(REFERRER_MILESTONE_DISCOUNT_AMOUNT),
-        status: 'active',
-      },
-      select: { reward_id: true },
-    });
-
-    if (!reward40) {
-      reward40 = await tx.rewards.create({
-        data: {
-          reward_name: 'คูปองไมล์สโตนชวนเพื่อน (Referrer Milestone ฿40)',
-          description: 'ส่วนลด ฿40.00 สำหรับผู้แนะนำเมื่อสะสมร้านค้าที่ชวนเพื่อนสำเร็จครบทุก 5 ร้านค้าที่ไม่ซ้ำกัน (อายุ 14 วัน)',
-          reward_type: 'discount',
-          discount_type: 'fixed',
-          discount_value: new Prisma.Decimal(REFERRER_MILESTONE_DISCOUNT_AMOUNT),
-          valid_days: REFERRER_MILESTONE_VALID_DAYS,
-          status: 'active',
-        },
-        select: { reward_id: true },
-      });
-    }
-
-    return { reward40 };
-  }
-
-  /**
-   * ดำเนินการแปลงสถานะ Referral และแจกจ่ายรางวัลไมล์สโตนให้ผู้แนะนำอย่างปลอดภัยใน Transaction (Idempotent)
-   * - ผู้แนะนำ (Referrer): ได้รับ 1x คูปอง ฿40 ทุกๆ 5 ร้านค้าที่ไม่ซ้ำกัน (อายุ 14 วัน)
-   * - ผู้ถูกแนะนำ (Referee): ไม่ได้รับคูปอง (สิทธิ์รางวัลมอบให้เฉพาะผู้แนะนำเท่านั้น)
+   * บันทึกการแนะนำเพื่อนที่สำเร็จอย่างปลอดภัยใน Transaction (Idempotent)
+   * รางวัลสำหรับการแนะนำเพื่อนจะมอบผ่านภารกิจที่เปิดใช้งานเท่านั้น
    */
   public async processReferralConversion(params: {
     referralCode: string;
@@ -564,47 +534,18 @@ export class ReferralService {
       }
 
       const referral = lockedRows[0];
+      const alreadyRedeemedForTransaction =
+        referral.status === 'redeemed' && referral.transaction_id === params.transactionId;
 
-      // 2. เตรียม Template คูปองสำหรับ Referrer Milestone (฿40)
-      const { reward40 } = await this.getOrCreateRewardTemplates(tx);
-
-      // Idempotency check: ถ้าธุรกรรมนี้ถูกประมวลผลสำเร็จไปแล้ว ให้ส่งผลลัพธ์เดิมกลับโดยไม่ทำซ้ำ
-      if (referral.status === 'redeemed' && referral.transaction_id === params.transactionId) {
-        const distinctMerchants = await tx.referrals.findMany({
-          where: {
-            referrer_user_id: referral.referrer_user_id,
-            status: 'redeemed',
-            merchant_id: { not: null },
-          },
-          select: { merchant_id: true },
-          distinct: ['merchant_id'],
-        });
-        const uniqueCount = distinctMerchants.length;
-        const completedMilestones = Math.floor(uniqueCount / REFERRER_MILESTONE_STEP);
-        const progress = uniqueCount % REFERRER_MILESTONE_STEP;
-        const needed = progress === 0 && uniqueCount > 0 ? REFERRER_MILESTONE_STEP : REFERRER_MILESTONE_STEP - progress;
-
-        return {
-          success: true,
-          referralId: referral.referral_id,
-          referralCode: referral.referral_code,
-          referrerUserId: referral.referrer_user_id,
-          refereeUserId: params.refereeUserId,
-          merchantId: referral.merchant_id,
-          transactionId: params.transactionId,
-          referrerMilestoneCoupons: [],
-          milestoneState: {
-            uniqueMerchantsCount: uniqueCount,
-            milestonesCompleted: completedMilestones,
-            progressInCurrentMilestone: progress,
-            merchantsNeededForNextMilestone: needed,
-            uniqueRefereesAtMerchant: uniqueCount,
-            friendsNeededForNextMilestone: needed,
-          },
-        };
+      if (
+        alreadyRedeemedForTransaction &&
+        referral.referred_user_id &&
+        referral.referred_user_id !== params.refereeUserId
+      ) {
+        throw new ReferralError('Referral conversion does not match the completed transaction', 409);
       }
 
-      if (referral.status === 'redeemed' && referral.transaction_id !== params.transactionId) {
+      if (referral.status === 'redeemed' && !alreadyRedeemedForTransaction) {
         throw new ReferralError('รหัสแนะนำเพื่อนนี้ถูกใช้งานไปแล้ว', 400);
       }
 
@@ -665,77 +606,25 @@ export class ReferralService {
         referral.referral_id
       );
 
-      // 3. อัปเดตสถานะ referral เป็น redeemed
+      // 3. อัปเดต referral เมื่อ checkout ยังไม่ได้ทำเครื่องหมายว่าใช้แล้ว
       const completedAt = new Date();
-      await tx.referrals.update({
-        where: { referral_id: referral.referral_id },
-        data: {
-          status: 'redeemed',
-          referred_user_id: params.refereeUserId,
-          transaction_id: params.transactionId,
-          converted_at: completedAt,
-          updated_at: completedAt,
-        },
-      });
-
-      // 4. (Simplified UC 2.4.3): สิทธิ์รางวัลมอบให้เฉพาะผู้แนะนำเท่านั้น (ไม่มีการสร้าง user_rewards ให้แก่ referee)
-
-      // 5. คำนวณไมล์สโตนของผู้แนะนำ: นับจำนวนร้านค้าที่ไม่ซ้ำกัน (DISTINCT merchant_id) ที่เพื่อนชำระเงินสำเร็จ
-      const distinctRedeemedMerchants = await tx.referrals.findMany({
-        where: {
-          referrer_user_id: referral.referrer_user_id,
-          status: 'redeemed',
-          merchant_id: { not: null },
-        },
-        select: { merchant_id: true },
-        distinct: ['merchant_id'],
-      });
-
-      const uniqueMerchantsCount = distinctRedeemedMerchants.length;
-      const totalMilestonesDeserved = Math.floor(uniqueMerchantsCount / REFERRER_MILESTONE_STEP);
-
-      // นับจำนวนคูปองไมล์สโตน ฿40 ที่เคยออกให้ referrer คนนี้ไปแล้วตลอดทั้งโครงการ
-      const alreadyAwardedMilestones = await tx.user_rewards.count({
-        where: {
-          user_id: referral.referrer_user_id,
-          reward_id: reward40.reward_id,
-        },
-      });
-
-      const milestonesToIssue = Math.max(0, totalMilestonesDeserved - alreadyAwardedMilestones);
-      const referrerMilestoneCoupons: ReferralConversionResult['referrerMilestoneCoupons'] = [];
-
-      for (let i = 0; i < milestonesToIssue; i++) {
-        const milestoneIndex = alreadyAwardedMilestones + i + 1;
-        const milestoneRewardCode = `MILE40-${this.generateRandomCode().replace('TP-', '')}-${milestoneIndex * 5}`;
-        const expiresAt = new Date(completedAt.getTime() + REFERRER_MILESTONE_VALID_DAYS * 86400000);
-
-        const milestoneReward = await tx.user_rewards.create({
+      if (!alreadyRedeemedForTransaction) {
+        await tx.referrals.update({
+          where: { referral_id: referral.referral_id },
           data: {
-            user_id: referral.referrer_user_id,
-            reward_id: reward40.reward_id,
-            referral_id: referral.referral_id,
+            status: 'redeemed',
+            referred_user_id: params.refereeUserId,
             transaction_id: params.transactionId,
-            reward_code: milestoneRewardCode,
-            status: 'available',
-            earned_at: completedAt,
-            expires_at: expiresAt,
+            converted_at: completedAt,
+            updated_at: completedAt,
           },
         });
-
-        referrerMilestoneCoupons.push({
-          userRewardId: milestoneReward.user_reward_id,
-          rewardCode: milestoneReward.reward_code,
-          discountValue: REFERRER_MILESTONE_DISCOUNT_AMOUNT,
-          milestoneIndex,
+      } else if (!referral.referred_user_id) {
+        await tx.referrals.update({
+          where: { referral_id: referral.referral_id },
+          data: { referred_user_id: params.refereeUserId },
         });
       }
-
-      const progressInCurrentMilestone = uniqueMerchantsCount % REFERRER_MILESTONE_STEP;
-      const merchantsNeeded =
-        progressInCurrentMilestone === 0 && uniqueMerchantsCount > 0
-          ? REFERRER_MILESTONE_STEP
-          : REFERRER_MILESTONE_STEP - progressInCurrentMilestone;
 
       return {
         success: true,
@@ -745,21 +634,13 @@ export class ReferralService {
         refereeUserId: params.refereeUserId,
         merchantId: referral.merchant_id,
         transactionId: params.transactionId,
-        referrerMilestoneCoupons,
-        milestoneState: {
-          uniqueMerchantsCount,
-          milestonesCompleted: totalMilestonesDeserved,
-          progressInCurrentMilestone,
-          merchantsNeededForNextMilestone: merchantsNeeded,
-          uniqueRefereesAtMerchant: uniqueMerchantsCount,
-          friendsNeededForNextMilestone: merchantsNeeded,
-        },
+        referrerMilestoneCoupons: [],
       };
     });
   }
 
   /**
-   * ดึงสถิติคำชวนเพื่อน ประวัติเพื่อน และคูปองที่ได้รับ (Dashboard API)
+   * ดึงสถิติคำชวนเพื่อนและประวัติเพื่อน (Dashboard API)
    */
   public async getReferralStats(
     userId: string,
@@ -890,37 +771,7 @@ export class ReferralService {
       };
     });
 
-    // 3. ดึงคูปองที่ผู้ใช้ได้รับจาก Referral (ทั้ง milestone ฿40 และ welcome ฿10)
-    const userRewards = await prisma.user_rewards.findMany({
-      where: {
-        user_id: userId,
-        referral_id: { not: null },
-      },
-      include: {
-        rewards: true,
-      },
-      orderBy: { earned_at: 'desc' },
-    });
-
-    const earnedCoupons: EarnedCouponItem[] = userRewards.map((ur) => {
-      const is40 = Number(ur.rewards.discount_value) >= 40;
-      const isExpired = Boolean(
-        ur.expires_at && new Date(ur.expires_at).getTime() < Date.now()
-      );
-      return {
-        userRewardId: ur.user_reward_id,
-        rewardCode: ur.reward_code,
-        rewardName: ur.rewards.reward_name,
-        discountValue: Number(ur.rewards.discount_value || 0),
-        status: isExpired && ur.status === 'available' ? 'expired' : ur.status,
-        earnedAt: ur.earned_at.toISOString(),
-        expiresAt: ur.expires_at ? ur.expires_at.toISOString() : null,
-        usedAt: ur.used_at ? ur.used_at.toISOString() : null,
-        rewardType: is40 ? 'REFERRER_MILESTONE_40' : 'REFEREE_WELCOME_10',
-      };
-    });
-
-    // 4. คำนวณไมล์สโตนของผู้แนะนำจากจำนวนร้านค้าที่ไม่ซ้ำกันที่เพื่อนชำระเงินสำเร็จ (DISTINCT merchant_id)
+    // 3. นับร้านค้าที่มีเพื่อนชำระเงินสำเร็จ เพื่อแสดงสถิติ referral
     const distinctSuccessfulMerchants = await prisma.referrals.findMany({
       where: {
         referrer_user_id: userId,
@@ -932,17 +783,6 @@ export class ReferralService {
     });
 
     const totalSuccessfulMerchants = distinctSuccessfulMerchants.length;
-    const milestonesCompleted = Math.floor(totalSuccessfulMerchants / REFERRER_MILESTONE_STEP);
-    const currentMilestoneProgress = totalSuccessfulMerchants % REFERRER_MILESTONE_STEP;
-    const merchantsNeededForNextMilestone =
-      currentMilestoneProgress === 0 && totalSuccessfulMerchants > 0
-        ? REFERRER_MILESTONE_STEP
-        : REFERRER_MILESTONE_STEP - currentMilestoneProgress;
-
-    const totalMilestoneCouponsEarned = earnedCoupons.filter(
-      (c) => c.rewardType === 'REFERRER_MILESTONE_40'
-    ).length;
-
     return {
       merchantId: selectedMerchantId,
       merchantName,
@@ -955,15 +795,8 @@ export class ReferralService {
         totalRedeemed,
         totalPending,
         totalSuccessfulMerchants,
-        milestonesCompleted,
-        currentMilestoneProgress,
-        milestoneTarget: REFERRER_MILESTONE_STEP,
-        merchantsNeededForNextMilestone,
-        friendsNeededForNextMilestone: merchantsNeededForNextMilestone,
-        totalMilestoneCouponsEarned,
       },
       invitedFriends,
-      earnedCoupons,
     };
   }
 }

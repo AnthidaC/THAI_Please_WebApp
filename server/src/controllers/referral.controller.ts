@@ -71,7 +71,7 @@ export const getMyReferralCode = async (req: Request, res: Response): Promise<vo
 };
 
 /**
- * ดึงสถิติ Dashboard การแนะนำเพื่อน ไมล์สโตน และคูปองที่ได้รับ (Authenticated)
+ * ดึงสถิติ Dashboard การแนะนำเพื่อน (Authenticated)
  * GET /api/referrals/stats
  */
 export const getReferralStats = async (req: Request, res: Response): Promise<void> => {
@@ -121,7 +121,7 @@ export const validateReferralCode = async (req: Request, res: Response): Promise
 };
 
 /**
- * ประมวลผล Conversion และมอบรางวัลให้แก่ Referrer และ Referee (Integration Hook)
+ * บันทึก Conversion ของ Referral (Integration Hook)
  * POST /api/referrals/convert
  */
 export const convertReferral = async (req: Request, res: Response): Promise<void> => {
@@ -141,7 +141,7 @@ export const convertReferral = async (req: Request, res: Response): Promise<void
       transactionId,
     });
 
-    sendSuccess(res, result, 'บันทึกการใช้สิทธิ์แนะนำเพื่อนและออกคูปองสำเร็จ');
+    sendSuccess(res, result, 'บันทึกการแนะนำเพื่อนสำเร็จ');
   } catch (error: any) {
     if (error instanceof ReferralError) {
       sendError(res, error.message, error.statusCode);

@@ -903,6 +903,7 @@ export class PaymentService {
           where: { referral_id: discountInfo.referralId, status: { not: 'redeemed' } },
           data: {
             status: 'redeemed',
+            referred_user_id: params.userId,
             transaction_id: newTx.transaction_id,
             converted_at: completedAtDate,
           },
@@ -1011,7 +1012,7 @@ export class PaymentService {
             transactionId: transactionRecord.transaction_id,
           });
         } catch (refErr) {
-          console.error('[Payment] Referral conversion reward processing error:', refErr);
+          console.error('[Payment] Referral conversion processing error:', refErr);
         }
       }
     }
