@@ -2,7 +2,7 @@ import React from 'react';
 import { NavLink, Link, useNavigate, useLocation } from 'react-router-dom';
 import { LogOut, LogIn } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
-import { APP_ROUTES } from '../../constants/routes';
+import { APP_ROUTES, homeRouteForRole } from '../../constants/routes';
 import { ROLE_CONFIG, getNavItems, resolveNavRole } from './navConfig';
 
 export const Navbar: React.FC = () => {
@@ -12,6 +12,11 @@ export const Navbar: React.FC = () => {
 
   // เมนูแยกตามบทบาท (ประชาชน / ร้านค้า / ผู้ดูแลระบบ) — แยกตามบทบาทเด็ดขาด ไม่ปนกัน
   const role = resolveNavRole(user?.role, location.pathname);
+  const homePath = isAuthenticated ? homeRouteForRole(user?.role) : APP_ROUTES.HOME;
+  const handleSignOut = () => {
+    clearAuth();
+    navigate(APP_ROUTES.HOME, { replace: true });
+  };
   const roleConfig = ROLE_CONFIG[role];
   const isMerchant = role === 'MERCHANT';
   const isAdmin = role === 'ADMIN';
@@ -40,13 +45,13 @@ export const Navbar: React.FC = () => {
       {/* 1. TOP NAVBAR (Modern, Polished Desktop Header with Distinct Role Presentation) */}
       <nav
         aria-label="แถบเมนูหลัก"
-        className="bg-white/95 backdrop-blur-md border-b border-hairline px-3.5 sm:px-6 lg:px-8 py-2.5 sm:py-3 shadow-2xs sticky top-0 z-30 font-sans transition-all"
+        className="bg-white/95 backdrop-blur-md border-b border-hairline px-3.5 sm:px-6 lg:px-8 py-2.5 sm:py-3 shadow-2xs sticky top-0 z-30 font-sans transition-colors"
       >
         <div className="flex items-center justify-between max-w-7xl mx-auto gap-2 sm:gap-4">
           {/* Brand Logo & Role Indicator */}
           <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
             <Link
-              to={APP_ROUTES.HOME}
+              to={homePath}
               className="flex items-center space-x-2 sm:space-x-2.5 select-none min-w-0 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue rounded-xl p-1 -m-1"
               aria-label="หน้าแรก ไทยช่วยไทยพลีส"
             >
@@ -92,7 +97,7 @@ export const Navbar: React.FC = () => {
                     to={to}
                     end={to === APP_ROUTES.HOME || to === APP_ROUTES.ADMIN_DASHBOARD}
                     className={({ isActive }) =>
-                      `inline-flex items-center space-x-1.5 px-3 lg:px-3.5 py-1.5 rounded-full text-xs lg:text-[13px] font-semibold transition-all whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue ${
+                      `inline-flex items-center space-x-1.5 px-3 lg:px-3.5 py-1.5 rounded-full text-xs lg:text-[13px] font-semibold transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue ${
                         isActive
                           ? getActiveDesktopClass(to)
                           : 'text-slate-600 hover:text-ink hover:bg-white/80'
@@ -134,7 +139,7 @@ export const Navbar: React.FC = () => {
                 {/* Logout Button */}
                 <button
                   type="button"
-                  onClick={clearAuth}
+                  onClick={handleSignOut}
                   className="h-8 w-8 rounded-full border border-slate-200 bg-white hover:bg-rose-50 hover:border-rose-200 hover:text-rose-600 text-slate-500 flex items-center justify-center transition shadow-2xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500"
                   title="ออกจากระบบ"
                   aria-label="ออกจากระบบ"

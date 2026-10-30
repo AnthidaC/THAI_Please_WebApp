@@ -1,6 +1,6 @@
 import { Prisma } from '@prisma/client';
 import type { PrismaClient } from '@prisma/client';
-import type { BadgeConditionHandler } from '../conditionRegistry';
+import type { BadgeConditionHandler, ProgressWindow } from '../conditionRegistry';
 import { ELIGIBLE_TRANSACTION_STATUSES } from './eligibleActivity';
 
 export type SpendingProgressClient = Pick<PrismaClient, 'transactions'>;
@@ -18,11 +18,12 @@ export const createTotalSpendingHandler = (
   client: SpendingProgressClient
 ): BadgeConditionHandler => ({
   conditionType: 'total_spending',
-  getProgress: async (userId) => {
+  getProgress: async (userId, window?: ProgressWindow) => {
     const result = await client.transactions.aggregate({
       where: {
         user_id: userId,
         status: { in: [...ELIGIBLE_TRANSACTION_STATUSES] },
+        ...(window && { completed_at: { gte: window.startsAt, lte: window.endsAt } }),
       },
       _sum: { citizen_paid_amount: true },
     });

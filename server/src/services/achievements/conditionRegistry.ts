@@ -1,6 +1,11 @@
 export interface BadgeConditionHandler {
   conditionType: string;
-  getProgress(userId: string): Promise<number>;
+  getProgress(userId: string, window?: ProgressWindow): Promise<number>;
+}
+
+export interface ProgressWindow {
+  startsAt: Date;
+  endsAt: Date;
 }
 
 export class BadgeConditionRegistry {
@@ -24,10 +29,10 @@ export class BadgeConditionRegistry {
     return [...this.handlers.keys()].sort();
   }
 
-  async getProgress(conditionType: string, userId: string): Promise<number> {
+  async getProgress(conditionType: string, userId: string, window?: ProgressWindow): Promise<number> {
     const handler = this.handlers.get(conditionType);
     if (!handler) throw new Error(`Condition type is not registered: ${conditionType}`);
-    const progress = await handler.getProgress(userId);
+    const progress = await handler.getProgress(userId, window);
     if (!Number.isFinite(progress) || progress < 0) {
       throw new Error(`Handler returned invalid progress for condition type: ${conditionType}`);
     }

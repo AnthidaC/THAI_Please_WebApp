@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import type { NextFunction, Request, Response } from 'express';
 import rateLimit from 'express-rate-limit';
-import { authLogin, demoLogin, getMe } from '../controllers/auth.controller';
+import { authLogin, demoLogin, getMe, listDemoMerchants } from '../controllers/auth.controller';
 import { validate } from '../middlewares/validate.middleware';
 import { authLoginSchema, demoLoginSchema } from '../validations/auth.validation';
 import { authenticate, requireCitizen } from '../middlewares/auth.middleware';
@@ -23,6 +23,7 @@ export const developmentOnlyDemoLogin = (req: Request, res: Response, next: Next
 };
 
 router.post('/login', authLoginRateLimit, validate(authLoginSchema), authLogin);
+router.get('/demo-merchants', developmentOnlyDemoLogin, listDemoMerchants);
 router.post('/demo-login', developmentOnlyDemoLogin, validate(demoLoginSchema), demoLogin);
 router.get('/me', authenticate, requireCitizen, getMe);
 

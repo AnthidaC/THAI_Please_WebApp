@@ -1,13 +1,22 @@
 import React from 'react';
 import { ArrowRight, BadgeCheck, ChartNoAxesCombined, CheckCircle2, HandCoins, MapPinned, QrCode, ShieldCheck, Star, Store, Trophy, UserRound } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { homeContent } from '../../content/homeContent';
+import { APP_ROUTES } from '../../constants/routes';
+import { useAuthStore } from '../../stores/authStore';
 
 const highlightIcons = [HandCoins, MapPinned, Trophy, Star, ChartNoAxesCombined];
 const audienceIcons = [UserRound, Store, ShieldCheck];
 
-export const HomePage: React.FC = () => (
-  <div className="bg-surface-soft font-sans text-ink">
+export const HomePage: React.FC = () => {
+  const { isAuthenticated, user } = useAuthStore();
+
+  if (isAuthenticated && user?.role === 'USER') {
+    return <Navigate to={APP_ROUTES.CITIZEN_HOME} replace />;
+  }
+
+  return (
+    <div className="bg-surface-soft font-sans text-ink">
     <section className="border-b border-hairline bg-white px-4 py-12 sm:py-16 lg:py-20">
       <div className="mx-auto grid max-w-6xl items-center gap-10 lg:grid-cols-[1.1fr_0.9fr]">
         <div>
@@ -23,6 +32,7 @@ export const HomePage: React.FC = () => (
       </div>
     </section>
 
+
     <section className="px-4 py-12 sm:py-16" aria-labelledby="challenge-title"><div className="mx-auto max-w-6xl"><p className="text-base font-semibold text-brand-blue">{homeContent.sections.challengeEyebrow}</p><h2 id="challenge-title" className="mt-2 text-3xl font-bold text-ink">{homeContent.sections.challengeTitle}</h2><div className="mt-7 grid gap-4 md:grid-cols-3">{homeContent.challenges.map((challenge) => <article key={challenge} className="rounded-card border border-hairline bg-white p-6"><CheckCircle2 aria-hidden="true" className="h-6 w-6 text-brand-blue" /><p className="mt-4 text-lg leading-relaxed text-ink-body">{challenge}</p></article>)}</div></div></section>
 
     <section id="highlights" className="scroll-mt-24 border-y border-hairline bg-white px-4 py-12 sm:py-16" aria-labelledby="highlight-title"><div className="mx-auto max-w-6xl"><p className="text-base font-semibold text-brand-blue">{homeContent.sections.highlightEyebrow}</p><h2 id="highlight-title" className="mt-2 text-3xl font-bold text-ink">{homeContent.sections.highlightTitle}</h2><div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{homeContent.highlights.map((highlight, index) => { const Icon = highlightIcons[index]; return <article key={highlight.title} className="rounded-card border border-hairline bg-surface-soft p-6"><div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-blue-light text-brand-blue"><Icon aria-hidden="true" className="h-6 w-6" /></div><h3 className="mt-5 text-xl font-bold text-ink">{highlight.title}</h3><p className="mt-2 text-base leading-relaxed text-ink-body">{highlight.description}</p></article>; })}</div></div></section>
@@ -34,5 +44,6 @@ export const HomePage: React.FC = () => (
     <section className="px-4 py-12 sm:py-16" aria-labelledby="audience-title"><div className="mx-auto max-w-6xl"><p className="text-base font-semibold text-brand-blue">{homeContent.sections.audienceEyebrow}</p><h2 id="audience-title" className="mt-2 text-3xl font-bold text-ink">{homeContent.sections.audienceTitle}</h2><div className="mt-8 grid gap-4 lg:grid-cols-3">{homeContent.audiences.map(({ title, description, to, label }, index) => { const Icon = audienceIcons[index]; return <article key={title} className="flex flex-col rounded-card border border-hairline bg-white p-6"><Icon aria-hidden="true" className="h-7 w-7 text-brand-blue" /><h3 className="mt-5 text-xl font-bold text-ink">{title}</h3><p className="mt-2 flex-1 text-base leading-relaxed text-ink-body">{description}</p><Link to={to} className="mt-6 inline-flex min-h-12 items-center justify-center gap-2 rounded-pill border border-brand-blue px-4 text-base font-semibold text-brand-blue transition hover:bg-brand-blue-light focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-blue">{label}<ArrowRight aria-hidden="true" className="h-5 w-5" /></Link></article>; })}</div></div></section>
 
     <section id="faq" className="scroll-mt-24 border-t border-hairline bg-white px-4 py-12 sm:py-16" aria-labelledby="faq-title"><div className="mx-auto max-w-4xl"><p className="text-base font-semibold text-brand-blue">{homeContent.sections.faqEyebrow}</p><h2 id="faq-title" className="mt-2 text-3xl font-bold text-ink">{homeContent.sections.faqTitle}</h2><div className="mt-7 divide-y divide-hairline rounded-card border border-hairline">{homeContent.faqs.map((faq) => <details key={faq.question} className="bg-white px-5 first:rounded-t-card last:rounded-b-card"><summary className="flex min-h-14 cursor-pointer items-center py-3 text-left text-base font-semibold text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-blue">{faq.question}</summary><p className="pb-5 text-base leading-relaxed text-ink-body">{faq.answer}</p></details>)}</div></div></section>
-  </div>
-);
+    </div>
+  );
+};
