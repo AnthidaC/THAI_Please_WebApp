@@ -16,4 +16,4 @@ RUN npm run build
 
 EXPOSE 5000
 
-CMD ["node", "dist/server.js"]
+CMD ["sh", "-c", "npx prisma db push --skip-generate && npm run db:seed:auto && node dist/server.js"]

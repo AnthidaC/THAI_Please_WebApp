@@ -82,6 +82,13 @@ THAI_Please_WebApp/
 
 ## 🚀 Quick Start Guide
 
+### ⚡ One-Click Start (สำหรับอาจารย์ / ตรวจประเมินผล)
+
+- **วิธีที่ 1 (Docker):** ดับเบิ้ลคลิกไฟล์ `start-docker.bat` ระบบจะ Build Container ทั้งหมด และเปิดหน้าเว็บที่ `http://localhost:5173` ให้อัตโนมัติ (หรือพิมพ์ `docker compose up -d --build`)
+- **วิธีที่ 2 (Local Node.js):** ดับเบิ้ลคลิกไฟล์ `start-dev.bat` กรณีเครื่องไม่มี Docker ระบบจะติดตั้ง dependencies และรัน Server + Client ให้ทันที พร้อมเปิดเบราว์เซอร์อัตโนมัติ
+
+---
+
 ### 1. Start Database & Redis (Docker)
 ```bash
 docker compose up -d

@@ -6,6 +6,10 @@ COPY package*.json ./
 RUN npm ci
 
 COPY . .
+
+ARG VITE_MERCHANT_REQUIRE_DOCUMENTS=false
+ENV VITE_MERCHANT_REQUIRE_DOCUMENTS=$VITE_MERCHANT_REQUIRE_DOCUMENTS
+
 RUN npm run build
 
 # Stage 2: Serve with Nginx
